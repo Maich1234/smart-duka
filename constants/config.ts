@@ -1,0 +1,20 @@
+import { Colors } from './Colors';
+import { Spacing } from './Spacing';
+import { Typography } from './Typography';
+import { Shadows } from './Shadows';
+
+export { Colors, Spacing, Typography, Shadows };
+
+export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
+
+export const APP_NAME = 'Smart Duka';
+export const APP_VERSION = '1.0.0';
+
+export const PAYMENT_METHODS = [
+  { label: 'Cash', value: 'cash' },
+  { label: 'M-Pesa', value: 'mpesa' },
+] as const;
+
+export const DEFAULT_LOW_STOCK_ALERT = 5;
+export const DEFAULT_PAGE_SIZE = 20;
+export const MAX_PAGE_SIZE = 100;
