@@ -74,6 +74,11 @@ export interface ResetPasswordData {
   newPassword: string;
 }
 
+export interface VerifyEmailData {
+  email: string;
+  code: string;
+}
+
 /**
  * Login with email and password
  */
@@ -135,5 +140,21 @@ export const verifyOtp = async (email: string, otp: string) => {
  */
 export const resetPassword = async (email: string, newPassword: string) => {
   const response = await api.post('/auth/reset-password', { email, newPassword });
+  return response.data;
+};
+
+/**
+ * Verify email address with code sent at registration
+ */
+export const verifyEmail = async (email: string, code: string) => {
+  const response = await api.post('/auth/verify-email', { email, code });
+  return response.data;
+};
+
+/**
+ * Resend the email verification code
+ */
+export const resendVerificationEmail = async (email: string) => {
+  const response = await api.post('/auth/resend-verification-email', { email });
   return response.data;
 };

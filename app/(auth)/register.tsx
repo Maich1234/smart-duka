@@ -46,11 +46,7 @@ export default function RegisterScreen() {
       if (res.success) {
         const { token, ...userData } = res.data;
         setAuth(userData as any, token);
-        if (userData.role === 'owner') {
-          router.replace('/(owner)/dashboard');
-        } else {
-          router.replace('/(staff)/dashboard');
-        }
+        router.replace({ pathname: '/(auth)/verify-email', params: { email: data.email } });
       } else {
         Alert.alert('Error', res.message || 'Registration failed');
       }

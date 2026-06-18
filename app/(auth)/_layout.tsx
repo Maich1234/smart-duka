@@ -37,6 +37,14 @@ export default function AuthLayout() {
           presentation: 'modal',
         }}
       />
+      <Stack.Screen
+        name="verify-email"
+        options={{
+          title: 'Verify Email',
+          headerBackVisible: false,
+          gestureEnabled: false,
+        }}
+      />
     </Stack>
   );
 }
