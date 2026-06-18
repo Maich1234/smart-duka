@@ -1,6 +1,14 @@
-# Welcome to your Expo app 👋
+# Smart Duka 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Smart Duka is a mobile app for managing a shop's inventory, sales, and staff. It's built with [Expo](https://expo.dev) and [Expo Router](https://docs.expo.dev/router/introduction), and supports separate experiences for shop owners and staff.
+
+## Features
+
+- **Auth** — login, registration, email verification, and password recovery
+- **Owner dashboard** — inventory, sales, staff management, and profile
+- **Staff dashboard** — inventory and sales, scoped to staff permissions
+- **Payments** — cash and M-Pesa
+- **Low stock alerts** and paginated product/sales lists
 
 ## Get started
 
@@ -25,27 +33,20 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-## Get a fresh project
+## Project structure
 
-When you're ready, run:
+- `app/` — routes, grouped into `(auth)`, `(owner)`, and `(staff)` segments
+- `components/` — shared UI components
+- `services/` — API clients (`auth`, `dashboard`, `products`, `sales`, `shop`, `staff`)
+- `store/` — Zustand stores (e.g. `authStore`)
+- `constants/` — app config, theme tokens (colors, spacing, typography, shadows)
+- `context/`, `hooks/`, `utils/` — supporting app logic
 
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+The API base URL and other app-wide settings live in [constants/config.ts](constants/config.ts).
 
 ## Learn more
 
-To learn more about developing your project with Expo, look at the following resources:
+To learn more about developing with Expo, look at the following resources:
 
 - [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
 - [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-# smart-duka
