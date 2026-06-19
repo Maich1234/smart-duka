@@ -1,0 +1,200 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Sale } from '@/services/sales';
+import { Colors } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
+import { Spacing } from '@/constants/Spacing';
+import { formatCurrency, formatDateTime } from '@/utils/formatters';
+
+interface ReceiptPreviewProps {
+  sale: Sale;
+  shopName: string;
+  shopPhone?: string;
+  currency?: string;
+}
+
+const DASH = '- - - - - - - - - - - - - - - - - - -';
+
+export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ sale, shopName, shopPhone, currency }) => {
+  return (
+    <View style={styles.receipt}>
+      <Text style={styles.shopName}>{shopName}</Text>
+      {!!shopPhone && <Text style={styles.shopPhone}>{shopPhone}</Text>}
+      <Text style={styles.poweredBy}>Smart Duka POS</Text>
+
+      <Text style={styles.dash}>{DASH}</Text>
+
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>Invoice</Text>
+        <Text style={styles.metaValue}>{sale.invoiceNumber}</Text>
+      </View>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>Date</Text>
+        <Text style={styles.metaValue}>{formatDateTime(sale.createdAt)}</Text>
+      </View>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>Served By</Text>
+        <Text style={styles.metaValue}>{sale.staff?.name ?? '-'}</Text>
+      </View>
+      <View style={styles.metaRow}>
+        <Text style={styles.metaLabel}>Payment</Text>
+        <View style={[styles.badge, sale.paymentMethod === 'mpesa' ? styles.badgeMpesa : styles.badgeCash]}>
+          <Text style={styles.badgeText}>{sale.paymentMethod.toUpperCase()}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.dash}>{DASH}</Text>
+
+      <View style={styles.colHeader}>
+        <Text style={[styles.colText, { flex: 3 }]}>Item</Text>
+        <Text style={[styles.colText, styles.center, { width: 36 }]}>Qty</Text>
+        <Text style={[styles.colText, styles.right, { width: 90 }]}>Subtotal</Text>
+      </View>
+
+      {sale.items.map((item, index) => (
+        <View key={index} style={styles.itemRow}>
+          <Text style={[styles.itemName, { flex: 3 }]} numberOfLines={1}>
+            {item.productName}
+          </Text>
+          <Text style={[styles.itemMeta, styles.center, { width: 36 }]}>x{item.quantity}</Text>
+          <Text style={[styles.itemMeta, styles.right, { width: 90 }]}>{formatCurrency(item.subtotal, currency)}</Text>
+        </View>
+      ))}
+
+      <Text style={styles.dash}>{DASH}</Text>
+
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>TOTAL</Text>
+        <Text style={styles.totalAmount}>{formatCurrency(sale.totalAmount, currency)}</Text>
+      </View>
+
+      <Text style={styles.dash}>{DASH}</Text>
+      <Text style={styles.thanks}>Thank you, dear customer!</Text>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  receipt: {
+    backgroundColor: Colors.surface,
+    width: '100%',
+    borderRadius: 12,
+    padding: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  shopName: {
+    fontFamily: Typography.fontFamilyBold,
+    fontSize: Typography.size.h3,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  shopPhone: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  poweredBy: {
+    fontSize: Typography.size.caption,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginBottom: Spacing.xs,
+  },
+  dash: {
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    fontSize: Typography.size.caption,
+    marginVertical: Spacing.sm,
+    letterSpacing: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  metaLabel: {
+    fontSize: Typography.size.small,
+    color: Colors.textSecondary,
+  },
+  metaValue: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  badge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  badgeCash: {
+    backgroundColor: '#DCFCE7',
+  },
+  badgeMpesa: {
+    backgroundColor: '#DBEAFE',
+  },
+  badgeText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  colHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingBottom: 4,
+    marginBottom: 4,
+  },
+  colText: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  itemName: {
+    fontSize: Typography.size.small,
+    color: Colors.textPrimary,
+  },
+  itemMeta: {
+    fontSize: Typography.size.small,
+    color: Colors.textSecondary,
+  },
+  center: {
+    textAlign: 'center',
+  },
+  right: {
+    textAlign: 'right',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  totalLabel: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilyBold,
+    color: Colors.textPrimary,
+  },
+  totalAmount: {
+    fontSize: Typography.size.h3,
+    fontFamily: Typography.fontFamilyBold,
+    color: Colors.success,
+  },
+  thanks: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamily,
+    fontStyle: 'italic',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+  },
+});

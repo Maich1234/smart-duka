@@ -13,6 +13,7 @@ interface ShopSettingsFormProps {
     phone: string;
     email: string;
     taxRate: number;
+    currency: string;
   };
   onChange: (field: keyof ShopSettingsFormProps['shop'], value: string | number) => void;
   onSave: () => void;
@@ -33,6 +34,14 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
       <Input label="Phone" value={shop.phone} onChangeText={(t) => onChange('phone', t)} />
       <Input label="Email" value={shop.email} onChangeText={(t) => onChange('email', t)} />
       <Input label="Tax Rate (%)" value={String(shop.taxRate)} onChangeText={(t) => onChange('taxRate', parseFloat(t) || 0)} keyboardType="numeric" />
+      <Input
+        label="Currency Code"
+        value={shop.currency}
+        onChangeText={(t) => onChange('currency', t.toUpperCase())}
+        placeholder="KES"
+        autoCapitalize="characters"
+        maxLength={8}
+      />
       <Button title="Update Shop" onPress={onSave} loading={loading} style={styles.button} />
     </View>
   );

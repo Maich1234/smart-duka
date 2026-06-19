@@ -7,7 +7,14 @@ export interface User {
   name: string;
   email: string;
   role: 'owner' | 'staff';
-  shop: { _id: string; name: string };
+  shop: {
+    _id: string;
+    name: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+    currency?: string;
+  };
   permissions?: string[];
 }
 

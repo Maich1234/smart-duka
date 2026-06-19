@@ -34,7 +34,7 @@ export default function StaffSales() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa'>('cash');
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [receiptVisible, setReceiptVisible] = useState(false);
@@ -140,6 +140,9 @@ export default function StaffSales() {
           visible={detailsModalVisible}
           onClose={() => setDetailsModalVisible(false)}
           sale={selectedSale}
+          shopName={user?.shop?.name || 'Smart Duka'}
+          shopPhone={user?.shop?.phone}
+          currency={user?.shop?.currency}
         />
       </View>
     );
@@ -218,6 +221,9 @@ export default function StaffSales() {
         visible={detailsModalVisible}
         onClose={() => setDetailsModalVisible(false)}
         sale={selectedSale}
+        shopName={user?.shop?.name || 'Smart Duka'}
+        shopPhone={user?.shop?.phone}
+        currency={user?.shop?.currency}
       />
 
       <ReceiptModal
@@ -225,6 +231,8 @@ export default function StaffSales() {
         onClose={() => setReceiptVisible(false)}
         sale={completedSale}
         shopName={user?.shop?.name || 'Smart Duka'}
+        shopPhone={user?.shop?.phone}
+        currency={user?.shop?.currency}
       />
     </View>
   );

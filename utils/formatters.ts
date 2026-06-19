@@ -1,8 +1,9 @@
 /**
- * Format currency in Kenyan Shillings
+ * Format currency. Defaults to KES until the shop owner sets their own
+ * currency code in Shop Settings (services/shop.ts Shop.currency).
  */
-export const formatCurrency = (amount: number): string => {
-  return `KES ${amount.toLocaleString(undefined, {
+export const formatCurrency = (amount: number, currency: string = 'KES'): string => {
+  return `${currency} ${amount.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

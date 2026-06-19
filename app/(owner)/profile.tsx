@@ -14,7 +14,7 @@ import { Spacing } from '@/constants/Spacing';
 export default function OwnerProfile() {
   const { user, logout } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
-  const [shop, setShop] = useState({ name: '', address: '', phone: '', email: '', taxRate: 0 });
+  const [shop, setShop] = useState({ name: '', address: '', phone: '', email: '', taxRate: 0, currency: 'KES' });
   const [loadingShop, setLoadingShop] = useState(true);
   const [updatingShop, setUpdatingShop] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);

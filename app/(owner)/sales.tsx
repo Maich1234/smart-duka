@@ -2,22 +2,24 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { getSales } from '@/services/sales';
+import { getSales, type Sale } from '@/services/sales';
 import { getStaff } from '@/services/staff';
 import { SalesFilters } from '@/components/sales/SalesFilters';
 import { SalesList } from '@/components/sales/SalesList';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
+import { useAuthStore, type AuthState } from '@/store/authStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
 export default function OwnerSales() {
+  const user = useAuthStore((s: AuthState) => s.user);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [staffId, setStaffId] = useState('');
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   const { data: salesData, isLoading, refetch } = useQuery({
@@ -83,6 +85,9 @@ export default function OwnerSales() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         sale={selectedSale}
+        shopName={user?.shop?.name || 'Smart Duka'}
+        shopPhone={user?.shop?.phone}
+        currency={user?.shop?.currency}
       />
     </View>
   );

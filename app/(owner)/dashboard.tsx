@@ -1,13 +1,16 @@
 import React from 'react';
-import { ScrollView, View, Text, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { getOwnerDashboard } from '@/services/dashboard';
 import { SalesSummaryCard } from '@/components/dashboard/SalesSummaryCard';
 import { StatsRow } from '@/components/dashboard/StatsRow';
 import { LowStockList } from '@/components/dashboard/LowStockList';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
+import { Card } from '@/components/ui/Card';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -49,6 +52,19 @@ export default function OwnerDashboard() {
         transactions={dashboard?.transactionsToday || 0}
       />
 
+      <TouchableOpacity onPress={() => router.push('/(owner)/reports')} activeOpacity={0.7}>
+        <Card style={styles.reportsCard}>
+          <View style={styles.reportsIcon}>
+            <Ionicons name="bar-chart" size={22} color={Colors.primary} />
+          </View>
+          <View style={styles.reportsTextWrap}>
+            <Text style={styles.reportsTitle}>Sales Reports</Text>
+            <Text style={styles.reportsSubtitle}>Daily, weekly &amp; monthly insights</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
+        </Card>
+      </TouchableOpacity>
+
       <StatsRow
         products={dashboard?.totalProducts || 0}
         stockValue={dashboard?.currentStockValue || 0}
@@ -68,4 +84,23 @@ const styles = StyleSheet.create({
   header: { padding: Spacing.lg, paddingBottom: Spacing.sm },
   greeting: { fontSize: Typography.size.body, color: Colors.textSecondary },
   shopName: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
+  reportsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+  },
+  reportsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E6F4F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  reportsTextWrap: { flex: 1 },
+  reportsTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  reportsSubtitle: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
 });
