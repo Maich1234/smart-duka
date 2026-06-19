@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, FlatList, RefreshControl, Alert, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProducts, createProduct, updateProduct, deleteProduct, updateStock } from '@/services/products';
 import { InventoryHeader } from '@/components/inventory/InventoryHeader';
@@ -7,8 +8,10 @@ import { ProductCard } from '@/components/inventory/ProductCard';
 import { ProductFormModal } from '@/components/inventory/ProductFormModal';
 import { StockUpdateModal } from '@/components/inventory/StockUpdateModal';
 import { Colors } from '@/constants/Colors';
+import { Spacing } from '@/constants/Spacing';
 
 export default function OwnerInventory() {
+  const tabBarHeight = useBottomTabBarHeight();
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [stockModalVisible, setStockModalVisible] = useState(false);
@@ -124,6 +127,7 @@ export default function OwnerInventory() {
     <View style={styles.container}>
       <InventoryHeader onAddPress={() => openModal()} searchValue={search} onSearchChange={setSearch} />
       <FlatList
+        showsVerticalScrollIndicator={false}
         data={products}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
@@ -137,6 +141,7 @@ export default function OwnerInventory() {
             onUpdateStock={() => openStockModal(item)}
           />
         )}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
         ListEmptyComponent={
           <View style={styles.center}>
@@ -170,5 +175,5 @@ export default function OwnerInventory() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty: { textAlign: 'center', marginTop: 40, color: Colors.textSecondary },
+  empty: { textAlign: 'center', marginTop: Spacing.xl, color: Colors.textSecondary },
 });

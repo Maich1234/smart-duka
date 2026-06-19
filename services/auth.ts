@@ -27,14 +27,6 @@ export interface RegisterData {
 
 export interface RegisterResponse {
   success: boolean;
-  data: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-    token: string;
-    shop: { _id: string; name: string };
-  };
   message?: string;
 }
 

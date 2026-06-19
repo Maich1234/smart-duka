@@ -1,6 +1,7 @@
 import React from 'react';
-import { Modal, View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
 import { Button } from '../ui/Button';
+import { BottomSheet } from '../ui/BottomSheet';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -16,45 +17,41 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({ visible, onC
   if (!sale) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.title}>Sale Details</Text>
-          <Text style={styles.invoice}>{sale.invoiceNumber}</Text>
-          <Text style={styles.date}>{formatDateTime(sale.createdAt)}</Text>
-          <Text style={styles.staff}>Staff: {sale.staff?.name}</Text>
-          <Text style={styles.payment}>Payment: {sale.paymentMethod.toUpperCase()}</Text>
+    <BottomSheet visible={visible} onClose={onClose}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Sale Details</Text>
+        <Text style={styles.invoice}>{sale.invoiceNumber}</Text>
+        <Text style={styles.date}>{formatDateTime(sale.createdAt)}</Text>
+        <Text style={styles.staff}>Staff: {sale.staff?.name}</Text>
+        <Text style={styles.payment}>Payment: {sale.paymentMethod.toUpperCase()}</Text>
 
-          <Text style={styles.itemsTitle}>Items</Text>
-          <FlatList
-            data={sale.items}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.itemRow}>
-                <Text style={styles.itemName}>{item.productName}</Text>
-                <Text style={styles.itemQty}>x{item.quantity}</Text>
-                <Text style={styles.itemPrice}>{formatCurrency(item.unitPrice)}</Text>
-                <Text style={styles.itemSubtotal}>{formatCurrency(item.subtotal)}</Text>
-              </View>
-            )}
-            scrollEnabled={false}
-          />
+        <Text style={styles.itemsTitle}>Items</Text>
+        <FlatList
+          data={sale.items}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.itemRow}>
+              <Text style={styles.itemName}>{item.productName}</Text>
+              <Text style={styles.itemQty}>x{item.quantity}</Text>
+              <Text style={styles.itemPrice}>{formatCurrency(item.unitPrice)}</Text>
+              <Text style={styles.itemSubtotal}>{formatCurrency(item.subtotal)}</Text>
+            </View>
+          )}
+          scrollEnabled={false}
+        />
 
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalAmount}>{formatCurrency(sale.totalAmount)}</Text>
-          </View>
-
-          <Button title="Close" onPress={onClose} style={styles.closeButton} />
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalAmount}>{formatCurrency(sale.totalAmount)}</Text>
         </View>
-      </View>
-    </Modal>
+
+        <Button title="Close" onPress={onClose} style={styles.closeButton} />
+      </ScrollView>
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: Spacing.md },
-  modalContent: { backgroundColor: Colors.surface, borderRadius: 24, padding: Spacing.lg, maxHeight: '90%' },
   title: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, marginBottom: Spacing.md, color: Colors.textPrimary, textAlign: 'center' },
   invoice: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, textAlign: 'center', color: Colors.primary },
   date: { fontSize: Typography.size.small, textAlign: 'center', color: Colors.textSecondary, marginBottom: Spacing.xs },

@@ -8,10 +8,10 @@ import { useTheme } from '@/hooks/useTheme';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Spacing } from '@/constants/Spacing';
 import { Typography } from '@/constants/Typography';
 import { verifyEmail, resendVerificationEmail } from '@/services/auth';
-import { useAuthStore } from '@/store/authStore';
 
 const codeSchema = z.object({
   code: z.string().length(6, 'Code must be 6 digits'),
@@ -22,7 +22,6 @@ type CodeForm = z.infer<typeof codeSchema>;
 export default function VerifyEmailScreen() {
   const { colors } = useTheme();
   const { email } = useLocalSearchParams<{ email: string }>();
-  const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -35,12 +34,7 @@ export default function VerifyEmailScreen() {
     setLoading(true);
     try {
       await verifyEmail(email, data.code);
-      Alert.alert('Success', 'Email verified successfully');
-      if (user?.role === 'staff') {
-        router.replace('/(staff)/dashboard');
-      } else {
-        router.replace('/(owner)/dashboard');
-      }
+      router.replace({ pathname: '/(auth)/login', params: { email, verified: '1' } });
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Invalid verification code');
     } finally {
@@ -63,6 +57,7 @@ export default function VerifyEmailScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={styles.container}>
+        <AuthHeader />
         <Card style={styles.card}>
           <Text style={[styles.title, { color: colors.text }]}>Verify Your Email</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>

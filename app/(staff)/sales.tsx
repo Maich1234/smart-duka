@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert, Text } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { getProducts, type Product } from '@/services/products';
@@ -15,6 +16,8 @@ import { ReceiptModal } from '@/components/sales/ReceiptModal';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { usePermission } from '@/utils/permissions';
+import { Ionicons } from '@expo/vector-icons';
 
 interface CartEntry extends Product {
   cartQuantity: number;
@@ -22,6 +25,9 @@ interface CartEntry extends Product {
 
 export default function StaffSales() {
   const user = useAuthStore((s: AuthState) => s.user);
+  const tabBarHeight = useBottomTabBarHeight();
+  const canRecordSale = usePermission('record_sale');
+  const canViewSales = usePermission('view_sales');
 
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartEntry[]>([]);
@@ -38,11 +44,13 @@ export default function StaffSales() {
   const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['products', search],
     queryFn: () => getProducts({ search }),
+    enabled: canRecordSale,
   });
 
   const { data: mySalesData } = useQuery({
     queryKey: ['mySales'],
     queryFn: () => getMySales({ limit: 50 }),
+    enabled: canViewSales,
   });
 
   const createSaleMutation = useMutation({
@@ -105,12 +113,45 @@ export default function StaffSales() {
     });
   };
 
+  if (!canRecordSale && !canViewSales) {
+    return (
+      <View style={styles.center}>
+        <Ionicons name="lock-closed-outline" size={48} color={Colors.textTertiary} />
+        <Text style={styles.restrictedText}>You do not have permission to access Sales.</Text>
+      </View>
+    );
+  }
+
+  if (!canRecordSale) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>My Sales History</Text>
+        <FlatList
+          showsVerticalScrollIndicator={false}
+          data={mySales}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => (
+            <SaleCard sale={item} showStaff={false} onPress={() => { setSelectedSale(item); setDetailsModalVisible(true); }} />
+          )}
+          contentContainerStyle={{ padding: Spacing.md, paddingBottom: tabBarHeight + Spacing.lg }}
+          ListEmptyComponent={<Text style={styles.empty}>No sales yet</Text>}
+        />
+        <SaleDetailsModal
+          visible={detailsModalVisible}
+          onClose={() => setDetailsModalVisible(false)}
+          sale={selectedSale}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Record Sale</Text>
       <SearchBar value={search} onChangeText={setSearch} placeholder="Search products" />
 
       <FlatList
+        showsVerticalScrollIndicator={false}
         data={products}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
@@ -121,6 +162,7 @@ export default function StaffSales() {
             onPress={() => addToCart(item)}
           />
         )}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={productsLoading} onRefresh={refetchProducts} />}
         ListHeaderComponent={
           cart.length > 0 ? (
@@ -144,6 +186,7 @@ export default function StaffSales() {
           ) : null
         }
         ListFooterComponent={
+          canViewSales ? (
           <View style={styles.historySection}>
             <Text style={styles.sectionTitle}>My Sales History</Text>
             {mySales.length === 0 ? (
@@ -159,6 +202,7 @@ export default function StaffSales() {
               ))
             )}
           </View>
+          ) : null
         }
       />
 
@@ -188,6 +232,8 @@ export default function StaffSales() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
+  restrictedText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: Typography.size.body, textAlign: 'center' },
   title: {
     fontSize: Typography.size.h2,
     fontFamily: Typography.fontFamilyBold,

@@ -14,48 +14,28 @@ interface StaffCardProps {
     phone?: string;
     isActive: boolean;
   };
-  onEdit: () => void;
-  onResetPassword: () => void;
-  onPermissions: () => void;
-  onDelete: () => void;
+  onPress: () => void;
 }
 
-export const StaffCard: React.FC<StaffCardProps> = ({
-  staff,
-  onEdit,
-  onResetPassword,
-  onPermissions,
-  onDelete,
-}) => {
+export const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
   return (
-    <Card style={styles.card}>
-      <View style={styles.content}>
-        <View style={styles.info}>
-          <Text style={styles.name}>{staff.name}</Text>
-          <Text style={styles.email}>{staff.email}</Text>
-          {staff.phone && <Text style={styles.phone}>{staff.phone}</Text>}
-          <View style={styles.statusBadge}>
-            <Text style={[styles.status, { color: staff.isActive ? Colors.success : Colors.danger }]}>
-              {staff.isActive ? 'Active' : 'Inactive'}
-            </Text>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <Card style={styles.card}>
+        <View style={styles.content}>
+          <View style={styles.info}>
+            <Text style={styles.name}>{staff.name}</Text>
+            <Text style={styles.email}>{staff.email}</Text>
+            {staff.phone && <Text style={styles.phone}>{staff.phone}</Text>}
+            <View style={styles.statusBadge}>
+              <Text style={[styles.status, { color: staff.isActive ? Colors.success : Colors.danger }]}>
+                {staff.isActive ? 'Active' : 'Inactive'}
+              </Text>
+            </View>
           </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
         </View>
-        <View style={styles.actions}>
-          <TouchableOpacity onPress={onEdit} style={styles.actionBtn}>
-            <Ionicons name="pencil-outline" size={22} color={Colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onResetPassword} style={styles.actionBtn}>
-            <Ionicons name="key-outline" size={22} color={Colors.warning} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onPermissions} style={styles.actionBtn}>
-            <Ionicons name="shield-outline" size={22} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onDelete} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={22} color={Colors.danger} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Card>
+      </Card>
+    </TouchableOpacity>
   );
 };
 
@@ -68,6 +48,4 @@ const styles = StyleSheet.create({
   phone: { fontSize: Typography.size.small, color: Colors.textSecondary, marginTop: 2 },
   statusBadge: { marginTop: 4 },
   status: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold },
-  actions: { flexDirection: 'row', gap: Spacing.md },
-  actionBtn: { padding: Spacing.xs },
 });

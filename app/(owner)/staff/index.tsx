@@ -2,34 +2,27 @@ import React, { useState } from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
-import { getProducts } from '@/services/products';
-import { InventoryHeader } from '@/components/inventory/InventoryHeader';
-import { ProductCard } from '@/components/inventory/ProductCard';
+import { router } from 'expo-router';
+import { getStaff } from '@/services/staff';
+import { StaffCard } from '@/components/staff/StaffCard';
+import { SearchBar } from '@/components/ui/SearchBar';
+import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { usePermission } from '@/utils/permissions';
 
-export default function StaffInventory() {
+export default function OwnerStaffList() {
   const tabBarHeight = useBottomTabBarHeight();
   const [search, setSearch] = useState('');
-  const canViewProducts = usePermission('view_products');
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['products', search],
-    queryFn: () => getProducts({ search }),
-    enabled: canViewProducts,
+    queryKey: ['staff', search],
+    queryFn: () => getStaff({ search }),
   });
 
-  const products = data?.data || [];
+  const staffList = data?.data || [];
 
-  if (!canViewProducts) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.empty}>You do not have permission to view products.</Text>
-      </View>
-    );
-  }
-
-  if (isLoading && products.length === 0) {
+  if (isLoading && staffList.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -39,19 +32,23 @@ export default function StaffInventory() {
 
   return (
     <View style={styles.container}>
-      <InventoryHeader onAddPress={() => {}} searchValue={search} onSearchChange={setSearch} title="Products" showAddButton={false} />
+      <View style={styles.header}>
+        <Text style={styles.title}>Staff</Text>
+        <Button title="Add Staff" onPress={() => router.push('/(owner)/staff/new')} size="sm" />
+      </View>
+      <SearchBar value={search} onChangeText={setSearch} />
       <FlatList
         showsVerticalScrollIndicator={false}
-        data={products}
+        data={staffList}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <ProductCard product={item} showCostPrice={false} showActions={false} />
+          <StaffCard staff={item} onPress={() => router.push(`/(owner)/staff/${item._id}`)} />
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
         ListEmptyComponent={
           <View style={styles.center}>
-            <Text style={styles.empty}>No products found</Text>
+            <Text style={styles.empty}>No staff found</Text>
           </View>
         }
       />
@@ -62,5 +59,14 @@ export default function StaffInventory() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
   empty: { textAlign: 'center', marginTop: Spacing.xl, color: Colors.textSecondary },
 });

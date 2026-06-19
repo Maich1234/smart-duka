@@ -3,12 +3,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { BlurView } from 'expo-blur';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { Redirect } from 'expo-router';
+
+const TAB_BAR_BASE_HEIGHT = 56;
 
 export default function StaffLayout() {
   const { colors, isDark } = useTheme();
   const { user, isLoading } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // Redirect if not staff
   if (!isLoading && (!user || user.role !== 'staff')) {
@@ -21,12 +25,18 @@ export default function StaffLayout() {
       backgroundColor: 'transparent',
       borderTopWidth: 0,
       elevation: 0,
+      height: TAB_BAR_BASE_HEIGHT + insets.bottom,
+      paddingBottom: insets.bottom,
+      paddingTop: 8,
     },
     android: {
       backgroundColor: colors.surface,
       borderTopColor: colors.border,
       borderTopWidth: 1,
       elevation: 8,
+      height: TAB_BAR_BASE_HEIGHT + insets.bottom,
+      paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+      paddingTop: 8,
     },
   });
 

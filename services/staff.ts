@@ -131,10 +131,15 @@ export const updateStaffPermissions = async (id: string, permissions: string[]):
   return response.data;
 };
 
+export interface PermissionsResponse {
+  success: boolean;
+  data: Permission[];
+}
+
 /**
  * Get all available permissions (hardcoded on backend)
  */
-export const getAllPermissions = async () => {
+export const getAllPermissions = async (): Promise<PermissionsResponse> => {
   const res = await api.get('/staff/permissions');
   return res.data;
 };

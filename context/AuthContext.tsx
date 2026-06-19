@@ -9,7 +9,12 @@ interface AuthContextType {
   user: ReturnType<typeof useAuthStore.getState>['user'];
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password: string) => Promise<{
+    success: boolean;
+    message?: string;
+    role?: 'owner' | 'staff';
+    needsVerification?: boolean;
+  }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -43,16 +48,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.success) {
         const { token, ...userData } = response.data;
         setAuth(userData, token);
-        if (userData.role === 'owner') {
-          router.replace('/(owner)/dashboard');
-        } else {
-          router.replace('/(staff)/dashboard');
-        }
-        return { success: true };
+        return { success: true, role: userData.role };
       }
       return { success: false, message: response.message };
     } catch (error: any) {
-      return { success: false, message: error.response?.data?.message || 'Login failed' };
+      const message = error.response?.data?.message || 'Login failed';
+      const needsVerification = error.response?.status === 401 && /verify your email/i.test(message);
+      return { success: false, message, needsVerification };
     }
   };
 

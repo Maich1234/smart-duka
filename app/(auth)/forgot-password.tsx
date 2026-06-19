@@ -8,6 +8,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Spacing } from '@/constants/Spacing';
 import { Typography } from '@/constants/Typography';
 import api from '@/services/api';
@@ -107,6 +108,7 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={styles.container}>
+        <AuthHeader />
         <Card style={styles.card}>
           <Text style={[styles.title, { color: colors.text }]}>Reset Password</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>

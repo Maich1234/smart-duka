@@ -7,10 +7,10 @@ import { router } from 'expo-router';
 import { register as registerApi } from '@/services/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { useAuthStore } from '@/store/authStore';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name too short'),
@@ -28,7 +28,6 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
-  const { setAuth } = useAuthStore();
   const { control, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
@@ -44,8 +43,6 @@ export default function RegisterScreen() {
         phone: data.phone,
       });
       if (res.success) {
-        const { token, ...userData } = res.data;
-        setAuth(userData as any, token);
         router.replace({ pathname: '/(auth)/verify-email', params: { email: data.email } });
       } else {
         Alert.alert('Error', res.message || 'Registration failed');
@@ -63,6 +60,7 @@ export default function RegisterScreen() {
       style={styles.container}
     >
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <AuthHeader />
         <Text style={styles.title}>Create Your Shop</Text>
         <Text style={styles.subtitle}>Start selling in minutes</Text>
 

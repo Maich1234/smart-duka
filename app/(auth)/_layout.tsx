@@ -45,6 +45,13 @@ export default function AuthLayout() {
           gestureEnabled: false,
         }}
       />
+      <Stack.Screen
+        name="onboarding"
+        options={{
+          headerShown: false,
+          gestureEnabled: false,
+        }}
+      />
     </Stack>
   );
 }

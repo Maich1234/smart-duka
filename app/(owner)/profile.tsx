@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Alert, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { ScrollView, Alert, StyleSheet, View, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/context/AuthContext';
 import { getShopConfig, updateShopConfig } from '@/services/shop';
 import { changePassword } from '@/services/auth';
@@ -12,6 +13,7 @@ import { Spacing } from '@/constants/Spacing';
 
 export default function OwnerProfile() {
   const { user, logout } = useAuth();
+  const tabBarHeight = useBottomTabBarHeight();
   const [shop, setShop] = useState({ name: '', address: '', phone: '', email: '', taxRate: 0 });
   const [loadingShop, setLoadingShop] = useState(true);
   const [updatingShop, setUpdatingShop] = useState(false);
@@ -65,21 +67,24 @@ export default function OwnerProfile() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ShopSettingsForm
-        shop={shop}
-        onChange={(field, value) => setShop({ ...shop, [field]: value })}
-        onSave={handleShopUpdate}
-        loading={updatingShop}
-      />
-      <AccountInfo name={user?.name || ''} email={user?.email || ''} role={user?.role || ''} />
-      <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
-      <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
-    </ScrollView>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}>
+        <ShopSettingsForm
+          shop={shop}
+          onChange={(field, value) => setShop({ ...shop, [field]: value })}
+          onSave={handleShopUpdate}
+          loading={updatingShop}
+        />
+        <AccountInfo name={user?.name || ''} email={user?.email || ''} role={user?.role || ''} />
+        <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
+        <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: { flex: 1, backgroundColor: Colors.background, padding: Spacing.md },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   logoutButton: { marginTop: Spacing.md, marginBottom: Spacing.xl },

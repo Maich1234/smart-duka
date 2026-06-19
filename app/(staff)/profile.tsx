@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, Alert, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { ScrollView, Alert, StyleSheet, View, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/context/AuthContext';
 import { changePassword } from '@/services/auth';
 import { AccountInfo } from '@/components/profile/AccountInfo';
@@ -10,6 +11,7 @@ import { Spacing } from '@/constants/Spacing';
 
 export default function StaffProfile() {
   const { user, logout } = useAuth();
+  const tabBarHeight = useBottomTabBarHeight();
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
   const handlePasswordChange = async (current: string, newPwd: string) => {
@@ -33,15 +35,18 @@ export default function StaffProfile() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <AccountInfo name={user.name} email={user.email} role={user.role} />
-      <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
-      <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
-    </ScrollView>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}>
+        <AccountInfo name={user.name} email={user.email} role={user.role} />
+        <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
+        <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: { flex: 1, backgroundColor: Colors.background, padding: Spacing.md },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   logoutButton: { marginTop: Spacing.md, marginBottom: Spacing.xl },

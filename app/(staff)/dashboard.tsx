@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { getStaffDashboard } from '@/services/dashboard';
@@ -11,6 +12,7 @@ import { Spacing } from '@/constants/Spacing';
 
 export default function StaffDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
+  const tabBarHeight = useBottomTabBarHeight();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['staffDashboard'],
     queryFn: getStaffDashboard,
@@ -29,6 +31,8 @@ export default function StaffDashboard() {
   return (
     <ScrollView
       style={styles.container}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
     >
       <View style={styles.header}>

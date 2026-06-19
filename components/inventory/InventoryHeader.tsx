@@ -11,6 +11,7 @@ interface InventoryHeaderProps {
   searchValue: string;
   onSearchChange: (text: string) => void;
   title?: string;
+  showAddButton?: boolean;
 }
 
 export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
@@ -18,12 +19,13 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
   searchValue,
   onSearchChange,
   title = 'Inventory',
+  showAddButton = true,
 }) => {
   return (
     <View>
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
-        <Button title="Add Product" onPress={onAddPress} size="sm" />
+        {showAddButton && <Button title="Add Product" onPress={onAddPress} size="sm" />}
       </View>
       <SearchBar value={searchValue} onChangeText={onSearchChange} />
     </View>

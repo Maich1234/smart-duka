@@ -21,7 +21,7 @@ export const SalesSummaryCard: React.FC<SalesSummaryCardProps> = ({
 }) => {
   return (
     <Card style={styles.card}>
-      <Text style={styles.title}>Today's Sales</Text>
+      <Text style={styles.title}>Today’s Sales</Text>
       <Text style={styles.total}>{formatCurrency(total)}</Text>
       <View style={styles.row}>
         <View style={styles.item}>
