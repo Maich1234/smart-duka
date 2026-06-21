@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, FlatList, RefreshControl, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
 import { getProducts } from '@/services/products';
@@ -30,11 +32,7 @@ export default function StaffInventory() {
   }
 
   if (isLoading && products.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
@@ -49,11 +47,7 @@ export default function StaffInventory() {
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={styles.empty}>No products found</Text>
-          </View>
-        }
+        ListEmptyComponent={<EmptyState title="No products found" />}
       />
     </View>
   );

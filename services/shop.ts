@@ -9,6 +9,8 @@ export interface Shop {
   taxRate: number;
   currency: string;
   isActive: boolean;
+  /** Custom closing message printed at the bottom of every receipt */
+  receiptThankYouNote?: string;
 }
 
 export interface ShopConfigResponse {
@@ -23,6 +25,7 @@ export interface UpdateShopConfigData {
   email?: string;
   taxRate?: number;
   currency?: string;
+  receiptThankYouNote?: string;
 }
 
 export const getShopConfig = async (): Promise<ShopConfigResponse> => {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, View, Text, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -24,11 +25,7 @@ export default function OwnerDashboard() {
   });
 
   if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   const dashboard = data?.data;
@@ -80,7 +77,6 @@ export default function OwnerDashboard() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { padding: Spacing.lg, paddingBottom: Spacing.sm },
   greeting: { fontSize: Typography.size.body, color: Colors.textSecondary },
   shopName: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },

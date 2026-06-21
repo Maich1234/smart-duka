@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
+import { HelpLink } from '../help/HelpLink';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -89,12 +90,15 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
         placeholder={isDecimal ? `e.g. 0.5` : undefined}
       />
       {priceEditable && (
-        <Input
-          label={`Price${minPrice != null || maxPrice != null ? ` (${minPrice ?? 0}–${maxPrice ?? '∞'})` : ''}`}
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-        />
+        <>
+          <Input
+            label={`Price${minPrice != null || maxPrice != null ? ` (${minPrice ?? 0}–${maxPrice ?? '∞'})` : ''}`}
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="numeric"
+          />
+          <HelpLink slug="recording-sales" label="Why can I change this price?" />
+        </>
       )}
       <View style={styles.buttonRow}>
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />

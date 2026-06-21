@@ -3,6 +3,7 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Switch } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { HelpLink } from '../help/HelpLink';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -106,7 +107,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <Text style={styles.sectionLabel}>Type</Text>
+      <View style={styles.sectionLabelRow}>
+        <Text style={styles.sectionLabel}>Type</Text>
+        <HelpLink slug="product-types" label="What do these mean?" />
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeRow}>
         {TYPE_OPTIONS.map((opt) => {
           const active = form.productType === opt.value;
@@ -192,7 +196,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
       {form.productType === 'bundle' && (
         <>
-          <Text style={styles.sectionLabel}>Includes</Text>
+          <View style={styles.sectionLabelRow}>
+            <Text style={styles.sectionLabel}>Includes</Text>
+            <HelpLink slug="bundles-recipes" label="How bundles work" />
+          </View>
           {form.bundleItems.map((item, i) => (
             <View key={i} style={styles.bundleRow}>
               <View style={styles.bundlePicker}>
@@ -282,6 +289,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 const styles = StyleSheet.create({
   content: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
   sectionLabel: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary, marginBottom: Spacing.xs, marginTop: Spacing.xs },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   hint: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginBottom: Spacing.sm },
 
   typeRow: { marginBottom: Spacing.md },

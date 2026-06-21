@@ -54,7 +54,21 @@
       "Bash(npx eas-cli *)",
       "Bash(git -C /home/maich/Documents/smart-duka log --oneline -- android)",
       "Bash(git -C /home/maich/Documents/smart-duka ls-files android)",
-      "Bash(tee /tmp/eas-build.log)"
+      "Bash(tee /tmp/eas-build.log)",
+      "Bash(npm view *)",
+      "Bash(python3)",
+      "Bash(echo \"started with pid $!\")",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"node_modules/.bin/expo\")",
+      "Bash(echo \"tsc exit: $?\")",
+      "Bash(curl -s http://localhost:8099/reports -o /tmp/reports.html)",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(xargs cat)",
+      "Bash(curl -s -o /dev/null -w \"help index: %{http_code}\\\\n\" \"http://localhost:8099/\\(help\\)\")",
+      "Bash(curl -s -o /dev/null -w \"help slug: %{http_code}\\\\n\" \"http://localhost:8099/\\(help\\)/product-types\")",
+      "Bash(pkill -f \"expo start --web --port 8099\")",
+      "Bash(pkill -f \"Metro Bundler\")",
+      "Bash(jobs -l)"
     ],
     "additionalDirectories": [
       "/tmp",

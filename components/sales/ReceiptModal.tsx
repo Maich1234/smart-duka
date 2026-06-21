@@ -17,6 +17,8 @@ interface ReceiptModalProps {
   shopName: string;
   shopPhone?: string;
   currency?: string;
+  servedByName?: string;
+  thankYouNote?: string;
 }
 
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({
@@ -26,6 +28,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   shopName,
   shopPhone,
   currency,
+  servedByName,
+  thankYouNote,
 }) => {
   const [printing, setPrinting] = useState(false);
 
@@ -33,7 +37,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     if (!sale) return;
     setPrinting(true);
     try {
-      await printHtml(buildReceiptHtml(sale, shopName, shopPhone, currency));
+      const html = await buildReceiptHtml(sale, shopName, shopPhone, currency, servedByName, thankYouNote);
+      await printHtml(html);
     } catch {
       // Most rejections here are the user dismissing the system print sheet,
       // not a real failure — keep the receipt open so they can simply retry.
@@ -54,7 +59,14 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} />
+        <ReceiptPreview
+          sale={sale}
+          shopName={shopName}
+          shopPhone={shopPhone}
+          currency={currency}
+          servedByName={servedByName}
+          thankYouNote={thankYouNote}
+        />
       </ScrollView>
 
       <Button title="Print Receipt" onPress={handlePrint} loading={printing} style={styles.printBtn} />

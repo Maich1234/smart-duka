@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { getSales, type Sale } from '@/services/sales';
 import { getStaff } from '@/services/staff';
+import { getShopConfig } from '@/services/shop';
 import { SalesFilters } from '@/components/sales/SalesFilters';
 import { SalesList } from '@/components/sales/SalesList';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
@@ -35,6 +36,12 @@ export default function OwnerSales() {
     queryKey: ['staffList'],
     queryFn: () => getStaff(),
   });
+
+  const { data: shopConfigData } = useQuery({
+    queryKey: ['shopConfig'],
+    queryFn: getShopConfig,
+  });
+  const thankYouNote = shopConfigData?.data.receiptThankYouNote;
 
   const sales = salesData?.data || [];
   const staffList = staffData?.data || [];
@@ -88,6 +95,7 @@ export default function OwnerSales() {
         shopName={user?.shop?.name || 'Smart Duka'}
         shopPhone={user?.shop?.phone}
         currency={user?.shop?.currency}
+        thankYouNote={thankYouNote}
       />
     </View>
   );

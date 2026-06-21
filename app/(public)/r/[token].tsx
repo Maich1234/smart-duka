@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Linking } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { APP_NAME } from '@/constants/config';
+import { APP_NAME, APP_SCHEME } from '@/constants/config';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 
 const STAR_VALUES = [1, 2, 3, 4, 5];
@@ -36,18 +38,13 @@ export default function ReceiptVerificationScreen() {
   });
 
   if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   if (isError || !data?.success) {
     return (
-      <View style={styles.center}>
-        <Ionicons name="alert-circle-outline" size={48} color={Colors.danger} />
-        <Text style={styles.errorText}>This receipt code is invalid or could not be found.</Text>
+      <View style={styles.errorContainer}>
+        <ErrorState title="Receipt not found" subtitle="This receipt code is invalid or could not be found." />
       </View>
     );
   }
@@ -63,6 +60,20 @@ export default function ReceiptVerificationScreen() {
       </View>
       <Text style={styles.verified}>Verified Authentic Receipt</Text>
       <Text style={styles.poweredBy}>{APP_NAME} POS</Text>
+
+      {Platform.OS === 'web' && (
+        <TouchableOpacity
+          style={styles.openAppButton}
+          onPress={() => {
+            Linking.openURL(`${APP_SCHEME}://r/${token}`).catch(() => {
+              // App isn't installed — the user just stays on this web page.
+            });
+          }}
+        >
+          <Ionicons name="phone-portrait-outline" size={16} color={Colors.primary} />
+          <Text style={styles.openAppText}>Open in Smart Duka App</Text>
+        </TouchableOpacity>
+      )}
 
       <Card style={styles.receiptCard}>
         <Text style={styles.shopName}>{receipt.shopName}</Text>
@@ -138,10 +149,22 @@ export default function ReceiptVerificationScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, alignItems: 'center', padding: Spacing.lg, backgroundColor: Colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
   badge: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
   verified: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, textAlign: 'center' },
-  poweredBy: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginBottom: Spacing.lg },
+  poweredBy: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginBottom: Spacing.sm },
+  openAppButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 20,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    marginBottom: Spacing.lg,
+  },
+  openAppText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.primary },
   errorText: { fontSize: Typography.size.body, color: Colors.danger, textAlign: 'center', marginTop: Spacing.md },
 
   receiptCard: { width: '100%', maxWidth: 420, padding: Spacing.lg, marginBottom: Spacing.md },

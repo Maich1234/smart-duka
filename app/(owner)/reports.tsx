@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useQuery } from '@tanstack/react-query';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +9,8 @@ import { getRatingsSummary } from '@/services/ratings';
 import { getDepletionAnalytics } from '@/services/analytics';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { Card } from '@/components/ui/Card';
+import { TrendChart } from '@/components/reports/TrendChart';
+import { HelpLink } from '@/components/help/HelpLink';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -19,8 +22,6 @@ const PERIODS: { value: ReportPeriod; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ];
-
-const MAX_BAR_HEIGHT = 120;
 
 export default function OwnerReports() {
   const tabBarHeight = useBottomTabBarHeight();
@@ -48,15 +49,10 @@ export default function OwnerReports() {
   const depletion = depletionData?.data;
 
   if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   const series = report?.series || [];
-  const maxTotal = Math.max(...series.map((b) => b.total), 1);
 
   return (
     <ScrollView
@@ -111,22 +107,7 @@ export default function OwnerReports() {
 
       <Text style={styles.sectionTitle}>Trend</Text>
       <Card style={styles.chartCard}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartScroll}>
-          {series.map((bucket) => (
-            <View key={bucket.date} style={styles.barColumn}>
-              <Text style={styles.barValue}>{bucket.total > 0 ? Math.round(bucket.total) : ''}</Text>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.bar,
-                    { height: Math.max((bucket.total / maxTotal) * MAX_BAR_HEIGHT, bucket.total > 0 ? 4 : 0) },
-                  ]}
-                />
-              </View>
-              <Text style={styles.barLabel} numberOfLines={1}>{bucket.label}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        <TrendChart series={series} />
       </Card>
 
       <Text style={styles.sectionTitle}>Top Products</Text>
@@ -163,7 +144,10 @@ export default function OwnerReports() {
         )}
       </Card>
 
-      <Text style={styles.sectionTitle}>Customer Ratings</Text>
+      <View style={styles.sectionTitleRow}>
+        <Text style={styles.sectionTitle}>Customer Ratings</Text>
+        <HelpLink slug="receipts-and-ratings" />
+      </View>
       <Card style={styles.summaryCard}>
         {!ratingsSummary || ratingsSummary.totalRatings === 0 ? (
           <Text style={styles.empty}>No customer ratings yet</Text>
@@ -203,7 +187,10 @@ export default function OwnerReports() {
         )}
       </Card>
 
-      <Text style={styles.sectionTitle}>Stock Velocity</Text>
+      <View style={styles.sectionTitleRow}>
+        <Text style={styles.sectionTitle}>Stock Velocity</Text>
+        <HelpLink slug="sales-reports" />
+      </View>
       <Card style={styles.listCard}>
         {!depletion || (depletion.fastMovers.length === 0 && depletion.slowMovers.length === 0) ? (
           <Text style={styles.empty}>Not enough sales history yet</Text>
@@ -248,7 +235,6 @@ export default function OwnerReports() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
   title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginBottom: Spacing.md },
 
   periodToggle: {
@@ -278,14 +264,9 @@ const styles = StyleSheet.create({
   paymentText: { fontSize: Typography.size.small, color: Colors.textSecondary },
 
   sectionTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary, marginBottom: Spacing.sm, marginTop: Spacing.xs },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   chartCard: { padding: Spacing.md, marginBottom: Spacing.md },
-  chartScroll: { paddingHorizontal: Spacing.xs, alignItems: 'flex-end' },
-  barColumn: { alignItems: 'center', width: 56 },
-  barValue: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginBottom: 4, height: 14 },
-  barTrack: { height: MAX_BAR_HEIGHT, justifyContent: 'flex-end' },
-  bar: { width: 22, backgroundColor: Colors.primary, borderRadius: BorderRadius.sm },
-  barLabel: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: Spacing.xs, width: 56, textAlign: 'center' },
 
   listCard: { padding: Spacing.md, marginBottom: Spacing.md },
   listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },

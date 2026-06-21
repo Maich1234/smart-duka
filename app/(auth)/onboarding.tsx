@@ -63,13 +63,22 @@ export default function OnboardingScreen() {
       finish();
       return;
     }
-    listRef.current?.scrollToIndex({ index: index + 1 });
+    listRef.current?.scrollToIndex({ index: index + 1, animated: true });
   };
 
   const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
     setIndex(newIndex);
   };
+
+  // Without a fixed-width layout, scrollToIndex has to estimate slide
+  // position and can land on the wrong slide (or throw) before the list has
+  // measured itself — getItemLayout gives it an exact answer up front.
+  const getItemLayout = (_: ArrayLike<Slide> | null | undefined, i: number) => ({
+    length: width,
+    offset: width * i,
+    index: i,
+  });
 
   const isLast = index === SLIDES.length - 1;
 
@@ -87,6 +96,10 @@ export default function OnboardingScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={handleScrollEnd}
+        getItemLayout={getItemLayout}
+        onScrollToIndexFailed={({ index: failedIndex }) => {
+          listRef.current?.scrollToOffset({ offset: failedIndex * width, animated: true });
+        }}
         renderItem={({ item }) => (
           <View style={styles.slide}>
             <View style={styles.iconCircle}>

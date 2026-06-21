@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Alert } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getProductById, getProducts, updateProduct, type UpdateProductData } from '@/services/products';
 import { Screen } from '@/components/ui/Screen';
 import { ProductForm, type ProductFormData } from '@/components/inventory/ProductForm';
-import { Colors } from '@/constants/Colors';
 
 const EMPTY_FORM: ProductFormData = {
   name: '', category: '', sellingPrice: '', costPrice: '', quantity: '', lowStockAlert: '5',
@@ -127,11 +127,7 @@ export default function EditProductScreen() {
   };
 
   if (isLoading || !seeded) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
@@ -148,7 +144,3 @@ export default function EditProductScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
-});

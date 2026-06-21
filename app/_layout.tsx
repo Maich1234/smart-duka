@@ -16,6 +16,9 @@ import { useAuthStore, type AuthState } from '@/store/authStore';
 import { onForegroundMessage } from '@/services/notifications';
 
 SplashScreen.preventAutoHideAsync();
+// Cross-fade the native splash into the first screen instead of a hard cut,
+// so the static OS splash hands off cleanly to our animated splash.tsx.
+SplashScreen.setOptions({ duration: 300, fade: true });
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,7 +46,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded && !isAuthLoading) {
-      SplashScreen.hideAsync();
+      // Defer one frame so the router has already committed its redirect
+      // (see app/index.tsx) before the native splash fades out — otherwise
+      // the blank index route can flash for a frame in between.
+      requestAnimationFrame(() => SplashScreen.hideAsync());
     }
   }, [fontsLoaded, isAuthLoading]);
 
@@ -77,6 +83,7 @@ export default function RootLayout() {
               <Stack.Screen name="(owner)" />
               <Stack.Screen name="(staff)" />
               <Stack.Screen name="(public)" />
+              <Stack.Screen name="(help)" />
             </Stack>
             <OfflineIndicator />
           </AuthProvider>

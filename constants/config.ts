@@ -11,6 +11,11 @@ export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
 // link on receipts (must point at a host serving the (public) route group).
 export const PUBLIC_WEB_URL = 'https://smart-duka.vercel.app';
 
+// Matches app.json's "scheme" — used to deep-link from the web verification
+// page into the native app when it's installed (falls back to the web page
+// itself, which is already loaded, if it isn't).
+export const APP_SCHEME = 'smartduka';
+
 export const APP_NAME = 'Smart Duka';
 export const APP_VERSION = '1.0.0';
 

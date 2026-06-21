@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { getAllPermissions, type Permission } from '@/services/staff';
 import { Button } from '@/components/ui/Button';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useStaffDraftStore } from '@/store/staffDraftStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -33,11 +35,7 @@ export default function StaffPermissionsScreen() {
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
@@ -46,6 +44,7 @@ export default function StaffPermissionsScreen() {
         <Text style={styles.summaryText}>
           {selected.length} of {allPermissions.length} permissions selected
         </Text>
+        <HelpLink slug="staff-permissions" label="What do these permissions control?" style={styles.helpLink} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -83,7 +82,6 @@ export default function StaffPermissionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   summary: {
     padding: Spacing.md,
     backgroundColor: Colors.surface,
@@ -91,6 +89,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   summaryText: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center' },
+  helpLink: { alignSelf: 'center' },
   scrollContent: { padding: Spacing.md, paddingBottom: Spacing.xxl },
   category: { marginBottom: Spacing.lg },
   categoryTitle: {

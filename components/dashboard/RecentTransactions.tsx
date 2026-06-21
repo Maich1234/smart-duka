@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { Card } from '../ui/Card';
+import { EmptyState } from '../ui/EmptyState';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -41,7 +42,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transact
           </View>
         )}
         scrollEnabled={false}
-        ListEmptyComponent={<Text style={styles.empty}>No sales yet</Text>}
+        ListEmptyComponent={<EmptyState title="No sales yet" />}
       />
     </Card>
   );
@@ -56,5 +57,4 @@ const styles = StyleSheet.create({
   staff: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
   amount: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.success, textAlign: 'right' },
   method: { fontSize: Typography.size.caption, color: Colors.textSecondary, textAlign: 'right' },
-  empty: { textAlign: 'center', color: Colors.textSecondary, paddingVertical: Spacing.md },
 });

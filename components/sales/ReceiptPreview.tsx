@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Sale } from '@/services/sales';
+import { HelpLink } from '@/components/help/HelpLink';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -13,11 +14,22 @@ interface ReceiptPreviewProps {
   shopName: string;
   shopPhone?: string;
   currency?: string;
+  /** Fallback "Served By" name when sale.staff isn't populated (e.g. right after checkout) */
+  servedByName?: string;
+  /** Owner-configurable closing message; falls back to the default thank-you line */
+  thankYouNote?: string;
 }
 
 const DASH = '- - - - - - - - - - - - - - - - - - -';
 
-export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ sale, shopName, shopPhone, currency }) => {
+export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
+  sale,
+  shopName,
+  shopPhone,
+  currency,
+  servedByName,
+  thankYouNote,
+}) => {
   return (
     <View style={styles.receipt}>
       <Text style={styles.shopName}>{shopName}</Text>
@@ -36,7 +48,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ sale, shopName, 
       </View>
       <View style={styles.metaRow}>
         <Text style={styles.metaLabel}>Served By</Text>
-        <Text style={styles.metaValue}>{sale.staff?.name ?? '-'}</Text>
+        <Text style={styles.metaValue}>{sale.staff?.name ?? servedByName ?? '-'}</Text>
       </View>
       <View style={styles.metaRow}>
         <Text style={styles.metaLabel}>Payment</Text>
@@ -71,12 +83,13 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ sale, shopName, 
       </View>
 
       <Text style={styles.dash}>{DASH}</Text>
-      <Text style={styles.thanks}>Thank you, dear customer!</Text>
+      <Text style={styles.thanks}>{thankYouNote?.trim() || 'Thank you, dear customer!'}</Text>
 
       {!!sale.receiptToken && (
         <View style={styles.qrSection}>
           <QRCode value={`${PUBLIC_WEB_URL}/r/${sale.receiptToken}`} size={120} />
           <Text style={styles.qrHint}>Scan to verify this receipt & rate your service</Text>
+          <HelpLink slug="receipts-and-ratings" label="How does this work?" style={styles.qrHelpLink} />
         </View>
       )}
     </View>
@@ -219,5 +232,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.xs,
     maxWidth: 180,
+  },
+  qrHelpLink: {
+    marginTop: Spacing.xs,
   },
 });

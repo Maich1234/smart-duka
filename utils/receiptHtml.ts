@@ -1,5 +1,7 @@
+import QRCode from 'qrcode';
 import { Sale } from '@/services/sales';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import { PUBLIC_WEB_URL } from '@/constants/config';
 
 function escapeHtml(value: string): string {
   return value
@@ -17,7 +19,14 @@ function escapeHtml(value: string): string {
  * scaling once a thermal printer is selected — this just keeps the content
  * itself receipt-shaped rather than a wide A4 invoice layout.
  */
-export function buildReceiptHtml(sale: Sale, shopName: string, shopPhone?: string, currency?: string): string {
+export async function buildReceiptHtml(
+  sale: Sale,
+  shopName: string,
+  shopPhone?: string,
+  currency?: string,
+  servedByName?: string,
+  thankYouNote?: string
+): Promise<string> {
   const rows = sale.items
     .map(
       (item) => `
@@ -33,6 +42,13 @@ export function buildReceiptHtml(sale: Sale, shopName: string, shopPhone?: strin
     ? `<p style="text-align:center;margin:0 0 4px;font-size:10px;color:#444">${escapeHtml(shopPhone)}</p>`
     : '';
 
+  const qrSection = sale.receiptToken
+    ? `<div style="text-align:center;margin-top:14px">
+        ${await QRCode.toString(`${PUBLIC_WEB_URL}/r/${sale.receiptToken}`, { type: 'svg', margin: 1, width: 120 })}
+        <p style="margin:4px 0 0;font-size:9px;color:#666">Scan to verify this receipt &amp; rate your service</p>
+      </div>`
+    : '';
+
   return `<!DOCTYPE html>
 <html>
 <head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -44,7 +60,7 @@ export function buildReceiptHtml(sale: Sale, shopName: string, shopPhone?: strin
   <table style="width:100%;font-size:10px;margin-bottom:4px">
     <tr><td><b>Invoice</b></td><td style="text-align:right">${escapeHtml(sale.invoiceNumber)}</td></tr>
     <tr><td><b>Date</b></td><td style="text-align:right">${formatDateTime(sale.createdAt)}</td></tr>
-    <tr><td><b>Served By</b></td><td style="text-align:right">${escapeHtml(sale.staff?.name ?? '-')}</td></tr>
+    <tr><td><b>Served By</b></td><td style="text-align:right">${escapeHtml(sale.staff?.name ?? servedByName ?? '-')}</td></tr>
     <tr><td><b>Payment</b></td><td style="text-align:right">${sale.paymentMethod.toUpperCase()}</td></tr>
   </table>
   <hr style="border:none;border-top:1px dashed #000;margin:8px 0">
@@ -66,7 +82,8 @@ export function buildReceiptHtml(sale: Sale, shopName: string, shopPhone?: strin
     </tr>
   </table>
   <hr style="border:none;border-top:1px dashed #000;margin:8px 0">
-  <p style="text-align:center;margin-top:16px;font-size:11px;font-style:italic;color:#000">Thank you, dear customer!</p>
+  <p style="text-align:center;margin-top:16px;font-size:11px;font-style:italic;color:#000">${escapeHtml(thankYouNote?.trim() || 'Thank you, dear customer!')}</p>
+  ${qrSection}
 </body>
 </html>`;
 }

@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { View, FlatList, RefreshControl, Alert, StyleSheet, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, FlatList, RefreshControl, Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -83,11 +85,7 @@ export default function OwnerInventory() {
   }, [products, velocityFilter, fastIds, slowIds, stockoutIds]);
 
   if (isLoading && products.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
@@ -141,9 +139,7 @@ export default function OwnerInventory() {
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
         ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={styles.empty}>No products found</Text>
-          </View>
+          <EmptyState title="No products found" subtitle="Add your first product to start tracking stock." />
         }
       />
 
@@ -161,8 +157,6 @@ export default function OwnerInventory() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty: { textAlign: 'center', marginTop: Spacing.xl, color: Colors.textSecondary },
 
   velocityBanner: {
     flexDirection: 'row',

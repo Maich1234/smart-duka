@@ -1,9 +1,9 @@
 import React from 'react';
-import { FlatList, RefreshControl, StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import { FlatList, RefreshControl } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SaleCard } from './SaleCard';
-import { Colors } from '@/constants/Colors';
-import { Typography } from '@/constants/Typography';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Spacing } from '@/constants/Spacing';
 
 interface SalesListProps {
@@ -24,11 +24,7 @@ export const SalesList: React.FC<SalesListProps> = ({
   const tabBarHeight = useBottomTabBarHeight();
 
   if (isLoading && sales.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState fullscreen={false} />;
   }
 
   return (
@@ -41,16 +37,7 @@ export const SalesList: React.FC<SalesListProps> = ({
       )}
       contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} />}
-      ListEmptyComponent={
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No sales found</Text>
-        </View>
-      }
+      ListEmptyComponent={<EmptyState title="No sales found" />}
     />
   );
 };
-
-const styles = StyleSheet.create({
-  emptyContainer: { padding: Spacing.xl, alignItems: 'center' },
-  emptyText: { fontSize: Typography.size.body, color: Colors.textSecondary },
-});

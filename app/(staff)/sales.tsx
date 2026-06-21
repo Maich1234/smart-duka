@@ -3,8 +3,10 @@ import { View, StyleSheet, FlatList, RefreshControl, Alert, Text } from 'react-n
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
 import { createSale, getMySales, type Sale } from '@/services/sales';
+import { getShopConfig } from '@/services/shop';
 import { ProductCard } from '@/components/inventory/ProductCard';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { CartItem } from '@/components/sales/CartItem';
@@ -62,6 +64,12 @@ export default function StaffSales() {
     queryFn: () => getMySales({ limit: 50 }),
     enabled: canViewSales,
   });
+
+  const { data: shopConfigData } = useQuery({
+    queryKey: ['shopConfig'],
+    queryFn: getShopConfig,
+  });
+  const thankYouNote = shopConfigData?.data.receiptThankYouNote;
 
   const createSaleMutation = useMutation({
     mutationFn: createSale,
@@ -187,7 +195,7 @@ export default function StaffSales() {
             <SaleCard sale={item} showStaff={false} onPress={() => { setSelectedSale(item); setDetailsModalVisible(true); }} />
           )}
           contentContainerStyle={{ padding: Spacing.md, paddingBottom: tabBarHeight + Spacing.lg }}
-          ListEmptyComponent={<Text style={styles.empty}>No sales yet</Text>}
+          ListEmptyComponent={<EmptyState title="No sales yet" />}
         />
         <SaleDetailsModal
           visible={detailsModalVisible}
@@ -196,6 +204,7 @@ export default function StaffSales() {
           shopName={user?.shop?.name || 'Smart Duka'}
           shopPhone={user?.shop?.phone}
           currency={user?.shop?.currency}
+          thankYouNote={thankYouNote}
         />
       </View>
     );
@@ -254,7 +263,7 @@ export default function StaffSales() {
           <View style={styles.historySection}>
             <Text style={styles.sectionTitle}>My Sales History</Text>
             {mySales.length === 0 ? (
-              <Text style={styles.empty}>No sales yet</Text>
+              <EmptyState title="No sales yet" />
             ) : (
               mySales.map((sale) => (
                 <SaleCard
@@ -318,6 +327,8 @@ export default function StaffSales() {
         shopName={user?.shop?.name || 'Smart Duka'}
         shopPhone={user?.shop?.phone}
         currency={user?.shop?.currency}
+        servedByName={user?.name}
+        thankYouNote={thankYouNote}
       />
     </View>
   );
@@ -349,5 +360,4 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   historySection: { paddingHorizontal: Spacing.md, marginBottom: Spacing.xl },
-  empty: { textAlign: 'center', color: Colors.textSecondary, paddingVertical: Spacing.md },
 });

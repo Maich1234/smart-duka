@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { ScrollView, Alert, StyleSheet, View, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { ScrollView, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/context/AuthContext';
 import { changePassword } from '@/services/auth';
 import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { Button } from '@/components/ui/Button';
+import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 
@@ -27,16 +29,18 @@ export default function StaffProfile() {
   };
 
   if (!user) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}>
+        <Button
+          title="Help & Learning Center"
+          variant="outline"
+          onPress={() => router.push('/(help)')}
+          style={styles.helpButton}
+        />
         <AccountInfo name={user.name} email={user.email} role={user.role} />
         <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
         <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
@@ -48,6 +52,6 @@ export default function StaffProfile() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: Colors.background, padding: Spacing.md },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  helpButton: { marginBottom: Spacing.md },
   logoutButton: { marginTop: Spacing.md, marginBottom: Spacing.xl },
 });

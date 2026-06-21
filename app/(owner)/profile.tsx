@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Alert, StyleSheet, View, ActivityIndicator, KeyboardAvoidingView, Platform, Text, Switch } from 'react-native';
+import { ScrollView, Alert, StyleSheet, View, KeyboardAvoidingView, Platform, Text, Switch } from 'react-native';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/context/AuthContext';
 import { getShopConfig, updateShopConfig } from '@/services/shop';
@@ -15,6 +16,7 @@ import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -22,7 +24,7 @@ import { Spacing } from '@/constants/Spacing';
 export default function OwnerProfile() {
   const { user, logout } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
-  const [shop, setShop] = useState({ name: '', address: '', phone: '', email: '', taxRate: 0, currency: 'KES' });
+  const [shop, setShop] = useState({ name: '', address: '', phone: '', email: '', taxRate: 0, currency: 'KES', receiptThankYouNote: '' });
   const [loadingShop, setLoadingShop] = useState(true);
   const [updatingShop, setUpdatingShop] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
@@ -46,7 +48,7 @@ export default function OwnerProfile() {
   const loadShop = async () => {
     try {
       const res = await getShopConfig();
-      if (res.success) setShop(res.data);
+      if (res.success) setShop({ ...res.data, receiptThankYouNote: res.data.receiptThankYouNote ?? '' });
     } catch (error) {
       console.error(error);
     } finally {
@@ -79,11 +81,7 @@ export default function OwnerProfile() {
   };
 
   if (loadingShop) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
@@ -94,6 +92,13 @@ export default function OwnerProfile() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
       >
+        <Button
+          title="Help & Learning Center"
+          variant="outline"
+          onPress={() => router.push('/(help)')}
+          style={styles.helpButton}
+        />
+
         <ShopSettingsForm
           shop={shop}
           onChange={(field, value) => setShop({ ...shop, [field]: value })}
@@ -122,7 +127,7 @@ export default function OwnerProfile() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: Colors.background, padding: Spacing.md },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  helpButton: { marginBottom: Spacing.md },
   logoutButton: { marginTop: Spacing.md, marginBottom: Spacing.xl },
 
   notificationsCard: { marginBottom: Spacing.md },
