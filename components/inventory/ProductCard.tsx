@@ -9,6 +9,8 @@ import { formatCurrency } from '@/utils/formatters';
 import { Ionicons } from '@expo/vector-icons';
 import type { ProductType } from '@/services/products';
 
+const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+
 const TYPE_BADGES: Partial<Record<ProductType, { icon: keyof typeof Ionicons.glyphMap; label: string }>> = {
   variable: { icon: 'pricetags-outline', label: 'Variable' },
   weighted: { icon: 'scale-outline', label: 'Weighted' },
@@ -80,17 +82,35 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {showActions && (
             <View style={styles.actions}>
               {onUpdateStock && (
-                <TouchableOpacity onPress={onUpdateStock} style={styles.actionBtn}>
+                <TouchableOpacity
+                  onPress={onUpdateStock}
+                  style={styles.actionBtn}
+                  hitSlop={HIT_SLOP}
+                  accessibilityLabel="Update stock"
+                  accessibilityRole="button"
+                >
                   <Ionicons name="archive-outline" size={22} color={Colors.warning} />
                 </TouchableOpacity>
               )}
               {onEdit && (
-                <TouchableOpacity onPress={onEdit} style={styles.actionBtn}>
+                <TouchableOpacity
+                  onPress={onEdit}
+                  style={styles.actionBtn}
+                  hitSlop={HIT_SLOP}
+                  accessibilityLabel="Edit product"
+                  accessibilityRole="button"
+                >
                   <Ionicons name="pencil-outline" size={22} color={Colors.primary} />
                 </TouchableOpacity>
               )}
               {onDelete && (
-                <TouchableOpacity onPress={onDelete} style={styles.actionBtn}>
+                <TouchableOpacity
+                  onPress={onDelete}
+                  style={styles.actionBtn}
+                  hitSlop={HIT_SLOP}
+                  accessibilityLabel="Delete product"
+                  accessibilityRole="button"
+                >
                   <Ionicons name="trash-outline" size={22} color={Colors.danger} />
                 </TouchableOpacity>
               )}

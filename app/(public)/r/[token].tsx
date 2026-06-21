@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
   badge: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
   verified: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, textAlign: 'center' },
-  poweredBy: { fontSize: Typography.size.caption, color: Colors.textTertiary, marginBottom: Spacing.lg },
+  poweredBy: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginBottom: Spacing.lg },
   errorText: { fontSize: Typography.size.body, color: Colors.danger, textAlign: 'center', marginTop: Spacing.md },
 
   receiptCard: { width: '100%', maxWidth: 420, padding: Spacing.lg, marginBottom: Spacing.md },

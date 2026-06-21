@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.maich123.smartduka",
+      "package": "com.wabunifu.smartduka",
       "googleServicesFile": "./google-services.json"
     },
     "web": {

@@ -4,7 +4,7 @@ export const Colors = {
   primaryLight: '#14B8A6',
   primarySubtle: '#E6F4F2',
   primaryPressed: '#0C5C56',
-  success: '#16A34A',
+  success: '#15803D',
   successSubtle: '#E6F4EA',
   warning: '#F59E0B',
   warningSubtle: '#FEF3C7',

@@ -44,7 +44,13 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove })
       <View style={styles.controls}>
         <Text style={styles.quantity}>{quantityLabel}</Text>
         <Text style={styles.subtotal}>{formatCurrency(subtotal)}</Text>
-        <TouchableOpacity onPress={onRemove} style={styles.removeBtn}>
+        <TouchableOpacity
+          onPress={onRemove}
+          style={styles.removeBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={`Remove ${item.name} from cart`}
+          accessibilityRole="button"
+        >
           <Ionicons name="trash-outline" size={20} color={Colors.danger} />
         </TouchableOpacity>
       </View>
@@ -64,7 +70,7 @@ const styles = StyleSheet.create({
   info: { flex: 2 },
   name: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
   price: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  includes: { fontSize: Typography.size.caption, color: Colors.textTertiary, marginTop: 2 },
+  includes: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   quantity: { fontSize: Typography.size.body, color: Colors.textPrimary, minWidth: 40, textAlign: 'center' },
   subtotal: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.success, minWidth: 70, textAlign: 'right' },

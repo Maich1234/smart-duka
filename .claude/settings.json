@@ -50,7 +50,11 @@
       "Bash(curl -s http://localhost:8099/inventory -o /tmp/inv.html)",
       "Bash(curl -s \"http://localhost:8099/inventory/new\" -o /tmp/inv_new.html)",
       "Bash(curl -s \"http://localhost:8099/inventory/abc123/edit\" -o /tmp/inv_edit.html)",
-      "Bash(pkill -f \"expo start --web\")"
+      "Bash(pkill -f \"expo start --web\")",
+      "Bash(npx eas-cli *)",
+      "Bash(git -C /home/maich/Documents/smart-duka log --oneline -- android)",
+      "Bash(git -C /home/maich/Documents/smart-duka ls-files android)",
+      "Bash(tee /tmp/eas-build.log)"
     ],
     "additionalDirectories": [
       "/tmp",

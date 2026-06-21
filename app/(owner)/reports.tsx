@@ -302,6 +302,6 @@ const styles = StyleSheet.create({
   ratingCount: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 4 },
   staffRatings: { borderTopWidth: 1, borderTopColor: Colors.divider, marginTop: Spacing.sm, paddingTop: Spacing.xs },
 
-  velocitySubLabel: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, color: Colors.textTertiary, marginBottom: Spacing.xs },
+  velocitySubLabel: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary, marginBottom: Spacing.xs },
   velocitySubLabelSpaced: { marginTop: Spacing.sm },
 });

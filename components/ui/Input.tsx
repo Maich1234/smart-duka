@@ -29,6 +29,7 @@ export const Input: React.FC<InputProps> = ({
   onRightIconPress,
   secureTextEntry,
   style,
+  accessibilityLabel,
   ...props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -65,10 +66,17 @@ export const Input: React.FC<InputProps> = ({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           secureTextEntry={isSecure}
+          accessibilityLabel={accessibilityLabel ?? label}
           {...props}
         />
         {secureTextEntry && (
-          <TouchableOpacity onPress={togglePasswordVisibility} style={styles.rightIcon}>
+          <TouchableOpacity
+            onPress={togglePasswordVisibility}
+            style={styles.rightIcon}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+            accessibilityRole="button"
+          >
             <Ionicons
               name={isPasswordVisible ? 'eye-off' : 'eye'}
               size={20}

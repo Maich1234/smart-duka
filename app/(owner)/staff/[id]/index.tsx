@@ -143,5 +143,5 @@ const styles = StyleSheet.create({
   },
   permissionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 6 },
   permissionLabel: { fontSize: Typography.size.body, color: Colors.textPrimary },
-  permissionLabelMuted: { color: Colors.textTertiary },
+  permissionLabelMuted: { color: Colors.textSecondary },
 });

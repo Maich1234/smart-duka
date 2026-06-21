@@ -61,6 +61,7 @@ const TYPE_OPTIONS: { value: ProductType; label: string; icon: keyof typeof Ioni
 ];
 
 const UNIT_OPTIONS: UnitOfMeasure[] = ['kg', 'g', 'l', 'ml'];
+const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
 
 /**
  * Shared product form body — rendered full-screen by the new/edit routes
@@ -214,7 +215,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   keyboardType="numeric"
                 />
               </View>
-              <TouchableOpacity onPress={() => removeBundleItem(i)} style={styles.removeBtn}>
+              <TouchableOpacity
+                onPress={() => removeBundleItem(i)}
+                style={styles.removeBtn}
+                hitSlop={HIT_SLOP}
+                accessibilityLabel="Remove bundle item"
+                accessibilityRole="button"
+              >
                 <Ionicons name="trash-outline" size={18} color={Colors.danger} />
               </TouchableOpacity>
             </View>
@@ -237,7 +244,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     onChangeText={(t) => updateVariant(i, { name: t })}
                   />
                 </View>
-                <TouchableOpacity onPress={() => removeVariant(i)} style={styles.removeBtn}>
+                <TouchableOpacity
+                  onPress={() => removeVariant(i)}
+                  style={styles.removeBtn}
+                  hitSlop={HIT_SLOP}
+                  accessibilityLabel="Remove variant"
+                  accessibilityRole="button"
+                >
                   <Ionicons name="trash-outline" size={18} color={Colors.danger} />
                 </TouchableOpacity>
               </View>
@@ -269,7 +282,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 const styles = StyleSheet.create({
   content: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
   sectionLabel: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary, marginBottom: Spacing.xs, marginTop: Spacing.xs },
-  hint: { fontSize: Typography.size.caption, color: Colors.textTertiary, marginBottom: Spacing.sm },
+  hint: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginBottom: Spacing.sm },
 
   typeRow: { marginBottom: Spacing.md },
   typeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.xl, borderWidth: 1, borderColor: Colors.border, marginRight: Spacing.sm },
