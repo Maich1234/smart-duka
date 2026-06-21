@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Alert } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
@@ -12,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider } from '@/context/AuthContext';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { useAuthStore, type AuthState } from '@/store/authStore';
+import { onForegroundMessage } from '@/services/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,6 +47,20 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, isAuthLoading]);
 
+  useEffect(() => {
+    const unsubscribe = onForegroundMessage(({ notification, data }) => {
+      if (!notification?.title) return;
+      Alert.alert(notification.title, notification.body, [
+        { text: 'Dismiss', style: 'cancel' },
+        {
+          text: 'View',
+          onPress: () => router.push(data?.type === 'depletion_alert' ? '/(owner)/inventory' : '/(owner)/reports'),
+        },
+      ]);
+    });
+    return unsubscribe;
+  }, []);
+
   if (!fontsLoaded) return null;
 
   return (
@@ -60,6 +76,7 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(owner)" />
               <Stack.Screen name="(staff)" />
+              <Stack.Screen name="(public)" />
             </Stack>
             <OfflineIndicator />
           </AuthProvider>

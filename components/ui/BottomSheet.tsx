@@ -1,7 +1,9 @@
 import React from 'react';
 import { Modal, View, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -23,6 +25,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   maxHeightPercent = 90,
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView
@@ -30,7 +34,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.sheet, { maxHeight: `${maxHeightPercent}%` }]}>
+        <View
+          style={[
+            styles.sheet,
+            { maxHeight: `${maxHeightPercent}%`, paddingBottom: Spacing.xl + insets.bottom },
+          ]}
+        >
           <View style={styles.handle} />
           {children}
         </View>
@@ -42,13 +51,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: Colors.overlay,
     justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: BorderRadius.sheet,
+    borderTopRightRadius: BorderRadius.sheet,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
     paddingTop: Spacing.sm,

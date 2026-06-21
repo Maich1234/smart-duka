@@ -1,16 +1,42 @@
 import api from './api';
 
+export type ProductType = 'standard' | 'variable' | 'weighted' | 'refillable' | 'service' | 'bundle' | 'configurable';
+export type UnitOfMeasure = 'unit' | 'kg' | 'g' | 'l' | 'ml';
+
+export interface BundleItem {
+  product: string;
+  quantity: number;
+}
+
+export interface ProductVariant {
+  _id: string;
+  name: string;
+  sellingPrice: number;
+  costPrice?: number;
+  quantity: number;
+  sku?: string;
+  lowStockAlert: number;
+}
+
 export interface Product {
   _id: string;
   name: string;
   description?: string;
   category: string;
   sellingPrice: number;
-  costPrice: number;
+  costPrice?: number;
   quantity: number;
   lowStockAlert: number;
   createdAt: string;
   updatedAt: string;
+  productType: ProductType;
+  trackInventory: boolean;
+  unitOfMeasure: UnitOfMeasure;
+  minPrice?: number;
+  maxPrice?: number;
+  allowPriceOverride?: boolean;
+  bundleItems?: BundleItem[];
+  variants?: ProductVariant[];
 }
 
 export interface ProductsResponse {
@@ -34,20 +60,36 @@ export interface CreateProductData {
   name: string;
   description?: string;
   category: string;
+  productType?: ProductType;
   sellingPrice: number;
   costPrice: number;
   quantity?: number;
   lowStockAlert?: number;
+  trackInventory?: boolean;
+  unitOfMeasure?: UnitOfMeasure;
+  minPrice?: number;
+  maxPrice?: number;
+  allowPriceOverride?: boolean;
+  bundleItems?: BundleItem[];
+  variants?: Omit<ProductVariant, '_id'>[];
 }
 
 export interface UpdateProductData {
   name?: string;
   description?: string;
   category?: string;
+  productType?: ProductType;
   sellingPrice?: number;
   costPrice?: number;
   quantity?: number;
   lowStockAlert?: number;
+  trackInventory?: boolean;
+  unitOfMeasure?: UnitOfMeasure;
+  minPrice?: number;
+  maxPrice?: number;
+  allowPriceOverride?: boolean;
+  bundleItems?: BundleItem[];
+  variants?: Omit<ProductVariant, '_id'>[];
 }
 
 /**

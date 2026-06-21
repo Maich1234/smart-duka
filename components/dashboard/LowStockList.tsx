@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../ui/Card';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -21,7 +22,10 @@ export const LowStockList: React.FC<LowStockListProps> = ({ items, onPressItem }
 
   return (
     <Card style={styles.card}>
-      <Text style={styles.title}>⚠️ Low Stock Alert</Text>
+      <View style={styles.titleRow}>
+        <Ionicons name="alert-circle" size={18} color={Colors.danger} />
+        <Text style={styles.title}>Low Stock Alert</Text>
+      </View>
       <FlatList
         data={items}
         keyExtractor={(item) => item._id}
@@ -39,7 +43,8 @@ export const LowStockList: React.FC<LowStockListProps> = ({ items, onPressItem }
 
 const styles = StyleSheet.create({
   card: { marginHorizontal: Spacing.md, marginVertical: Spacing.sm, padding: Spacing.lg },
-  title: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.danger, marginBottom: Spacing.sm },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.sm },
+  title: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.danger },
   item: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
   name: { fontSize: Typography.size.body, color: Colors.textPrimary },
   quantity: { fontSize: Typography.size.small, color: Colors.danger },

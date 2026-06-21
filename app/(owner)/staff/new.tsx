@@ -11,6 +11,7 @@ import { useStaffDraftStore } from '@/store/staffDraftStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 
 const DEFAULT_STAFF_PERMISSIONS = ['view_products', 'record_sale', 'view_sales'];
 
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Spacing.md,

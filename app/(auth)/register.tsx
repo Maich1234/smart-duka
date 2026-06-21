@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { register as registerApi } from '@/services/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Screen } from '@/components/ui/Screen';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -55,11 +56,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+    <Screen backgroundColor={Colors.background} contentContainerStyle={styles.scrollContent}>
         <AuthHeader />
         <Text style={styles.title}>Create Your Shop</Text>
         <Text style={styles.subtitle}>Start selling in minutes</Text>
@@ -91,14 +88,12 @@ export default function RegisterScreen() {
             <Text style={styles.loginLink}>Sign In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
+  scrollContent: { paddingBottom: Spacing.xxl },
   title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginBottom: Spacing.xs },
   subtitle: { fontSize: Typography.size.body, color: Colors.textSecondary, marginBottom: Spacing.xl },
   button: { marginTop: Spacing.md },

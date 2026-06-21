@@ -31,6 +31,11 @@ export interface StaffPerformance {
   transactionCount: number;
 }
 
+export interface RatingSummary {
+  avgStars: number;
+  totalRatings: number;
+}
+
 export interface SalesReportData {
   period: ReportPeriod;
   rangeStart: string;
@@ -38,6 +43,7 @@ export interface SalesReportData {
   series: ReportBucket[];
   topProducts: TopProduct[];
   byStaff: StaffPerformance[];
+  ratingSummary: RatingSummary;
 }
 
 export interface SalesReportResponse {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/context/AuthContext';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Screen } from '@/components/ui/Screen';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -49,9 +50,10 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+    <Screen
+      backgroundColor={Colors.background}
+      padded={false}
+      contentContainerStyle={styles.scrollContent}
     >
       <StatusBar style="dark" />
       <View style={styles.inner}>
@@ -108,17 +110,17 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  inner: { flex: 1, justifyContent: 'center', padding: Spacing.lg },
+  scrollContent: { flexGrow: 1, justifyContent: 'center' },
+  inner: { padding: Spacing.lg },
   title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginBottom: Spacing.xs },
   subtitle: { fontSize: Typography.size.body, color: Colors.textSecondary, marginBottom: Spacing.xl },
   successBanner: {
-    backgroundColor: '#E6F4EA',
+    backgroundColor: Colors.successSubtle,
     borderRadius: 10,
     padding: Spacing.sm,
     marginBottom: Spacing.lg,

@@ -4,6 +4,7 @@ import { Card } from '../ui/Card';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 
 interface SaleCardProps {
@@ -32,7 +33,7 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, showStaff = false, onP
           <Text style={styles.staff}>By: {sale.staff.name}</Text>
         )}
         <View style={styles.methodContainer}>
-          <Text style={[styles.method, { color: sale.paymentMethod === 'cash' ? Colors.success : Colors.primary }]}>
+          <Text style={[styles.method, { color: sale.paymentMethod === 'cash' ? Colors.success : Colors.info }]}>
             {sale.paymentMethod.toUpperCase()}
           </Text>
         </View>
@@ -49,5 +50,5 @@ const styles = StyleSheet.create({
   date: { fontSize: Typography.size.small, color: Colors.textSecondary, marginBottom: 2 },
   staff: { fontSize: Typography.size.small, color: Colors.textSecondary, marginBottom: 2 },
   methodContainer: { alignItems: 'flex-start' },
-  method: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, backgroundColor: Colors.border, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, overflow: 'hidden' },
+  method: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, backgroundColor: Colors.border, paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.md, overflow: 'hidden' },
 });

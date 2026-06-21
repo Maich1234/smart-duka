@@ -3,25 +3,34 @@ import { View, StyleSheet, FlatList, RefreshControl, Alert, Text } from 'react-n
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
-import { getProducts, type Product } from '@/services/products';
+import { getProducts, type Product, type ProductVariant } from '@/services/products';
 import { createSale, getMySales, type Sale } from '@/services/sales';
 import { ProductCard } from '@/components/inventory/ProductCard';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { CartItem } from '@/components/sales/CartItem';
 import { CartSummary } from '@/components/sales/CartSummary';
 import { QuantityModal } from '@/components/sales/QuantityModal';
+import { VariantPickerModal } from '@/components/sales/VariantPickerModal';
 import { SaleCard } from '@/components/sales/SaleCard';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
 import { ReceiptModal } from '@/components/sales/ReceiptModal';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
+import { Shadows } from '@/constants/Shadows';
 import { usePermission } from '@/utils/permissions';
 import { Ionicons } from '@expo/vector-icons';
 
 interface CartEntry extends Product {
   cartQuantity: number;
+  /** Override for variable/service/configurable lines — undefined means use sellingPrice */
+  cartUnitPrice?: number;
+  cartVariantId?: string;
+  cartVariantName?: string;
 }
+
+const cartKey = (item: CartEntry) => `${item._id}:${item.cartVariantId ?? ''}`;
 
 export default function StaffSales() {
   const user = useAuthStore((s: AuthState) => s.user);
@@ -33,6 +42,7 @@ export default function StaffSales() {
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa'>('cash');
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
+  const [variantModalVisible, setVariantModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
@@ -71,7 +81,19 @@ export default function StaffSales() {
   const mySales = mySalesData?.data || [];
 
   const addToCart = (product: Product) => {
-    if (product.quantity === 0) {
+    if (product.productType === 'configurable') {
+      if (!product.variants?.length) {
+        Alert.alert('No Variants', `${product.name} has no variants configured yet`);
+        return;
+      }
+      setSelectedProduct(product);
+      setVariantModalVisible(true);
+      return;
+    }
+    // Bundles carry no stock of their own (their components do) — let the
+    // server be authoritative on whether there's enough component stock.
+    const tracksOwnStock = product.trackInventory && product.productType !== 'bundle';
+    if (tracksOwnStock && product.quantity <= 0) {
       Alert.alert('Out of Stock', `${product.name} is out of stock`);
       return;
     }
@@ -79,28 +101,52 @@ export default function StaffSales() {
     setQuantityModalVisible(true);
   };
 
-  const confirmAdd = (quantity: number) => {
+  const confirmAdd = (quantity: number, unitPrice?: number) => {
     if (!selectedProduct) return;
     setCart((prev) => {
-      const existing = prev.find((item) => item._id === selectedProduct._id);
+      const existing = prev.find((item) => item._id === selectedProduct._id && !item.cartVariantId);
       if (existing) {
         return prev.map((item) =>
-          item._id === selectedProduct._id
-            ? { ...item, cartQuantity: item.cartQuantity + quantity }
+          item === existing
+            ? { ...item, cartQuantity: item.cartQuantity + quantity, cartUnitPrice: unitPrice ?? item.cartUnitPrice }
             : item
         );
       }
-      return [...prev, { ...selectedProduct, cartQuantity: quantity }];
+      return [...prev, { ...selectedProduct, cartQuantity: quantity, cartUnitPrice: unitPrice }];
     });
     setQuantityModalVisible(false);
     setSelectedProduct(null);
   };
 
-  const removeFromCart = (id: string) => {
-    setCart((prev) => prev.filter((item) => item._id !== id));
+  const confirmVariantAdd = (variant: ProductVariant, quantity: number) => {
+    if (!selectedProduct) return;
+    setCart((prev) => {
+      const existing = prev.find((item) => item._id === selectedProduct._id && item.cartVariantId === variant._id);
+      if (existing) {
+        return prev.map((item) =>
+          item === existing ? { ...item, cartQuantity: item.cartQuantity + quantity } : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          ...selectedProduct,
+          cartQuantity: quantity,
+          cartUnitPrice: variant.sellingPrice,
+          cartVariantId: variant._id,
+          cartVariantName: variant.name,
+        },
+      ];
+    });
+    setVariantModalVisible(false);
+    setSelectedProduct(null);
   };
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.sellingPrice * item.cartQuantity, 0);
+  const removeFromCart = (key: string) => {
+    setCart((prev) => prev.filter((item) => cartKey(item) !== key));
+  };
+
+  const totalAmount = cart.reduce((sum, item) => sum + (item.cartUnitPrice ?? item.sellingPrice) * item.cartQuantity, 0);
 
   const handleCheckout = () => {
     if (cart.length === 0) {
@@ -108,7 +154,14 @@ export default function StaffSales() {
       return;
     }
     createSaleMutation.mutate({
-      items: cart.map((item) => ({ productId: item._id, quantity: item.cartQuantity })),
+      items: cart.map((item) => ({
+        productId: item._id,
+        quantity: item.cartQuantity,
+        ...((item.productType === 'variable' || item.productType === 'service') && item.cartUnitPrice != null
+          ? { unitPrice: item.cartUnitPrice }
+          : {}),
+        ...(item.cartVariantId ? { variantId: item.cartVariantId } : {}),
+      })),
       paymentMethod,
     });
   };
@@ -173,9 +226,17 @@ export default function StaffSales() {
               <Text style={styles.sectionTitle}>Current Sale</Text>
               {cart.map((item) => (
                 <CartItem
-                  key={item._id}
-                  item={{ ...item, quantity: item.cartQuantity }}
-                  onRemove={() => removeFromCart(item._id)}
+                  key={cartKey(item)}
+                  item={{
+                    ...item,
+                    quantity: item.cartQuantity,
+                    variantName: item.cartVariantName,
+                    bundleComponentNames: item.bundleItems?.map(
+                      (b) => products.find((p) => p._id === b.product)?.name || 'item'
+                    ),
+                  }}
+                  unitPrice={item.cartUnitPrice}
+                  onRemove={() => removeFromCart(cartKey(item))}
                 />
               ))}
               <CartSummary
@@ -214,7 +275,31 @@ export default function StaffSales() {
         onClose={() => { setQuantityModalVisible(false); setSelectedProduct(null); }}
         onConfirm={confirmAdd}
         productName={selectedProduct?.name || ''}
-        maxStock={selectedProduct?.quantity || 0}
+        maxStock={
+          selectedProduct && selectedProduct.trackInventory && selectedProduct.productType !== 'bundle'
+            ? selectedProduct.quantity
+            : Infinity
+        }
+        unitOfMeasure={
+          selectedProduct?.productType === 'weighted' || selectedProduct?.productType === 'refillable'
+            ? selectedProduct.unitOfMeasure
+            : 'unit'
+        }
+        priceEditable={
+          selectedProduct?.productType === 'variable' ||
+          (selectedProduct?.productType === 'service' && !!selectedProduct.allowPriceOverride)
+        }
+        defaultPrice={selectedProduct?.sellingPrice}
+        minPrice={selectedProduct?.productType === 'variable' ? selectedProduct.minPrice : undefined}
+        maxPrice={selectedProduct?.productType === 'variable' ? selectedProduct.maxPrice : undefined}
+      />
+
+      <VariantPickerModal
+        visible={variantModalVisible}
+        onClose={() => { setVariantModalVisible(false); setSelectedProduct(null); }}
+        onConfirm={confirmVariantAdd}
+        productName={selectedProduct?.name || ''}
+        variants={selectedProduct?.variants || []}
       />
 
       <SaleDetailsModal
@@ -254,8 +339,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     margin: Spacing.md,
     padding: Spacing.md,
-    borderRadius: 16,
-    elevation: 2,
+    borderRadius: BorderRadius.lg,
+    ...Shadows.sm,
   },
   sectionTitle: {
     fontSize: Typography.size.body,

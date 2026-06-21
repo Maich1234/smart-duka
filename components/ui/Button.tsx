@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 
 interface ButtonProps {
   title: string;
@@ -43,22 +44,23 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getBackgroundColor = () => {
-    if (disabled) return Colors.border;
+    if (disabled) return Colors.disabledBackground;
     switch (variant) {
       case 'primary': return Colors.primary;
-      case 'secondary': return Colors.success;
+      case 'secondary': return Colors.divider;
       case 'danger': return Colors.danger;
       default: return 'transparent';
     }
   };
 
   const getTextColor = () => {
-    if (disabled) return Colors.textSecondary;
+    if (disabled) return Colors.textDisabled;
     switch (variant) {
       case 'primary':
-      case 'secondary':
       case 'danger':
         return '#FFFFFF';
+      case 'secondary':
+        return Colors.textPrimary;
       case 'outline':
       case 'ghost':
         return Colors.primary;
@@ -123,7 +125,7 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',

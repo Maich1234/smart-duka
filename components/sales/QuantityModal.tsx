@@ -6,14 +6,22 @@ import { BottomSheet } from '../ui/BottomSheet';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import type { UnitOfMeasure } from '@/services/products';
 
 interface QuantityModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (quantity: number) => void;
+  onConfirm: (quantity: number, unitPrice?: number) => void;
   productName: string;
   maxStock: number;
   loading?: boolean;
+  /** When set to a real unit (kg/g/l/ml), allows decimal quantities and labels the field accordingly */
+  unitOfMeasure?: UnitOfMeasure;
+  /** When true, shows an editable price field alongside quantity */
+  priceEditable?: boolean;
+  defaultPrice?: number;
+  minPrice?: number;
+  maxPrice?: number;
 }
 
 export const QuantityModal: React.FC<QuantityModalProps> = ({
@@ -23,24 +31,71 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
   productName,
   maxStock,
   loading = false,
+  unitOfMeasure = 'unit',
+  priceEditable = false,
+  defaultPrice,
+  minPrice,
+  maxPrice,
 }) => {
+  const isDecimal = unitOfMeasure !== 'unit';
   const [quantity, setQuantity] = useState('1');
+  const [price, setPrice] = useState(defaultPrice != null ? String(defaultPrice) : '');
+
+  React.useEffect(() => {
+    if (visible) {
+      setQuantity(isDecimal ? '' : '1');
+      setPrice(defaultPrice != null ? String(defaultPrice) : '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const handleConfirm = () => {
-    const qty = parseInt(quantity);
-    if (!isNaN(qty) && qty > 0 && qty <= maxStock) {
-      onConfirm(qty);
-    } else {
-      Alert.alert('Invalid Quantity', `Quantity must be between 1 and ${maxStock}`);
+    const qty = isDecimal ? parseFloat(quantity) : parseInt(quantity, 10);
+    if (isNaN(qty) || qty <= 0 || qty > maxStock) {
+      Alert.alert('Invalid Quantity', `Quantity must be greater than 0${maxStock < Infinity ? ` and at most ${maxStock}` : ''}`);
+      return;
     }
+
+    let unitPrice: number | undefined;
+    if (priceEditable) {
+      unitPrice = parseFloat(price);
+      if (isNaN(unitPrice) || unitPrice <= 0) {
+        Alert.alert('Invalid Price', 'Enter a valid price greater than 0');
+        return;
+      }
+      if (minPrice != null && unitPrice < minPrice) {
+        Alert.alert('Invalid Price', `Price cannot be below ${minPrice}`);
+        return;
+      }
+      if (maxPrice != null && unitPrice > maxPrice) {
+        Alert.alert('Invalid Price', `Price cannot exceed ${maxPrice}`);
+        return;
+      }
+    }
+
+    onConfirm(qty, unitPrice);
   };
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       <Text style={styles.title}>Add to Cart</Text>
       <Text style={styles.productName}>{productName}</Text>
-      <Text style={styles.maxStock}>Available: {maxStock}</Text>
-      <Input label="Quantity" value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
+      {maxStock < Infinity && <Text style={styles.maxStock}>Available: {maxStock}</Text>}
+      <Input
+        label={isDecimal ? `Quantity (${unitOfMeasure})` : 'Quantity'}
+        value={quantity}
+        onChangeText={setQuantity}
+        keyboardType={isDecimal ? 'decimal-pad' : 'numeric'}
+        placeholder={isDecimal ? `e.g. 0.5` : undefined}
+      />
+      {priceEditable && (
+        <Input
+          label={`Price${minPrice != null || maxPrice != null ? ` (${minPrice ?? 0}–${maxPrice ?? '∞'})` : ''}`}
+          value={price}
+          onChangeText={setPrice}
+          keyboardType="numeric"
+        />
+      )}
       <View style={styles.buttonRow}>
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
         <Button title="Add" onPress={handleConfirm} loading={loading} style={styles.flexBtn} />

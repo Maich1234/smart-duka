@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { Sale } from '@/services/sales';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { PUBLIC_WEB_URL } from '@/constants/config';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 
 interface ReceiptPreviewProps {
@@ -70,6 +72,13 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ sale, shopName, 
 
       <Text style={styles.dash}>{DASH}</Text>
       <Text style={styles.thanks}>Thank you, dear customer!</Text>
+
+      {!!sale.receiptToken && (
+        <View style={styles.qrSection}>
+          <QRCode value={`${PUBLIC_WEB_URL}/r/${sale.receiptToken}`} size={120} />
+          <Text style={styles.qrHint}>Scan to verify this receipt & rate your service</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -196,5 +205,19 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     textAlign: 'center',
     marginTop: Spacing.xs,
+  },
+  qrSection: {
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  qrHint: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+    maxWidth: 180,
   },
 });

@@ -10,6 +10,7 @@ import {
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 import { Ionicons } from '@expo/vector-icons';
 
 interface InputProps extends TextInputProps {
@@ -48,7 +49,11 @@ export const Input: React.FC<InputProps> = ({
       <View
         style={[
           styles.inputContainer,
-          { borderColor: getBorderColor(), backgroundColor: Colors.surface },
+          {
+            borderColor: getBorderColor(),
+            borderWidth: isFocused ? 2 : 1,
+            backgroundColor: Colors.surface,
+          },
         ]}
       >
         {leftIcon && (
@@ -89,7 +94,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
   },
   input: {

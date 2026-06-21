@@ -21,6 +21,10 @@ export interface OwnerDashboardData {
     createdAt: string;
     staff: { name: string };
   }>;
+  ratingSummary: {
+    avgStars: number;
+    totalRatings: number;
+  };
 }
 
 export interface StaffDashboardData {

@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Alert, StyleSheet, View, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { ScrollView, Alert, StyleSheet, View, ActivityIndicator, KeyboardAvoidingView, Platform, Text, Switch } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/context/AuthContext';
 import { getShopConfig, updateShopConfig } from '@/services/shop';
 import { changePassword } from '@/services/auth';
+import {
+  getNotificationsPreference,
+  setNotificationsPreference,
+  registerDeviceForNotifications,
+  unregisterDeviceFromNotifications,
+} from '@/services/notifications';
 import { ShopSettingsForm } from '@/components/profile/ShopSettingsForm';
 import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
+import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/Colors';
+import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
 export default function OwnerProfile() {
@@ -18,10 +26,22 @@ export default function OwnerProfile() {
   const [loadingShop, setLoadingShop] = useState(true);
   const [updatingShop, setUpdatingShop] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   useEffect(() => {
     loadShop();
+    getNotificationsPreference().then(setNotificationsEnabled);
   }, []);
+
+  const handleToggleNotifications = async (enabled: boolean) => {
+    setNotificationsEnabled(enabled);
+    await setNotificationsPreference(enabled);
+    if (enabled) {
+      await registerDeviceForNotifications();
+    } else {
+      await unregisterDeviceFromNotifications();
+    }
+  };
 
   const loadShop = async () => {
     try {
@@ -68,7 +88,12 @@ export default function OwnerProfile() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
+      >
         <ShopSettingsForm
           shop={shop}
           onChange={(field, value) => setShop({ ...shop, [field]: value })}
@@ -76,6 +101,17 @@ export default function OwnerProfile() {
           loading={updatingShop}
         />
         <AccountInfo name={user?.name || ''} email={user?.email || ''} role={user?.role || ''} />
+
+        <Card style={styles.notificationsCard}>
+          <View style={styles.notificationsRow}>
+            <View style={styles.notificationsInfo}>
+              <Text style={styles.notificationsTitle}>Push Notifications</Text>
+              <Text style={styles.notificationsSubtitle}>Sales anomalies & low-stock alerts</Text>
+            </View>
+            <Switch value={notificationsEnabled} onValueChange={handleToggleNotifications} />
+          </View>
+        </Card>
+
         <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
         <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
       </ScrollView>
@@ -88,4 +124,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, padding: Spacing.md },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   logoutButton: { marginTop: Spacing.md, marginBottom: Spacing.xl },
+
+  notificationsCard: { marginBottom: Spacing.md },
+  notificationsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  notificationsInfo: { flex: 1, marginRight: Spacing.md },
+  notificationsTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  notificationsSubtitle: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
 });

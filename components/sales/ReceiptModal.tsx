@@ -1,17 +1,11 @@
 import React, { useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import { printHtml } from '@/utils/printReceipt';
-import { buildReceiptHtml } from '@/utils/receiptHtml';
+import { Text, StyleSheet, ScrollView } from 'react-native';
+import { BottomSheet } from '../ui/BottomSheet';
+import { Button } from '../ui/Button';
 import { ReceiptPreview } from './ReceiptPreview';
 import { Sale } from '@/services/sales';
+import { printHtml } from '@/utils/printReceipt';
+import { buildReceiptHtml } from '@/utils/receiptHtml';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -51,65 +45,25 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   if (!sale) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <Text style={styles.heading}>Sale Complete</Text>
+    <BottomSheet visible={visible} onClose={onClose}>
+      <Text style={styles.heading}>Sale Complete</Text>
 
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} />
-          </ScrollView>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} />
+      </ScrollView>
 
-          <TouchableOpacity
-            style={[styles.printBtn, printing && styles.printBtnDisabled]}
-            onPress={handlePrint}
-            activeOpacity={0.85}
-            disabled={printing}
-          >
-            {printing ? (
-              <ActivityIndicator color={Colors.white} />
-            ) : (
-              <Text style={styles.printBtnText}>Print Receipt</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.skipBtn} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.skipBtnText}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
+      <Button title="Print Receipt" onPress={handlePrint} loading={printing} style={styles.printBtn} />
+      <Button title="Done" variant="outline" onPress={onClose} />
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    paddingTop: Spacing.sm,
-    maxHeight: '90%',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: Spacing.md,
-  },
   heading: {
     fontSize: Typography.size.h3,
     fontFamily: Typography.fontFamilyBold,
@@ -124,27 +78,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   printBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: Spacing.sm,
-  },
-  printBtnDisabled: {
-    opacity: 0.7,
-  },
-  printBtnText: {
-    color: Colors.white,
-    fontFamily: Typography.fontFamilySemiBold,
-    fontSize: Typography.size.body,
-  },
-  skipBtn: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  skipBtnText: {
-    fontSize: Typography.size.body,
-    color: Colors.textSecondary,
   },
 });

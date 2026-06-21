@@ -6,6 +6,10 @@ export interface SaleItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  variantId?: string;
+  variantName?: string;
+  unitOfMeasure?: string;
+  productType?: string;
 }
 
 export interface Sale {
@@ -21,12 +25,18 @@ export interface Sale {
   };
   createdAt: string;
   updatedAt: string;
+  /** Only present on createSale/getSaleById responses — used to build the receipt QR code */
+  receiptToken?: string;
 }
 
 export interface CreateSaleData {
   items: Array<{
     productId: string;
     quantity: number;
+    /** Override for 'variable'/'service' (price-override-enabled) products */
+    unitPrice?: number;
+    /** Required for 'configurable' products */
+    variantId?: string;
   }>;
   paymentMethod: 'cash' | 'mpesa';
 }

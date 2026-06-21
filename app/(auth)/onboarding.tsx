@@ -15,6 +15,7 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Button } from '@/components/ui/Button';
+import { Screen } from '@/components/ui/Screen';
 import { useAuthStore } from '@/store/authStore';
 
 const { width } = Dimensions.get('window');
@@ -73,7 +74,7 @@ export default function OnboardingScreen() {
   const isLast = index === SLIDES.length - 1;
 
   return (
-    <View style={styles.container}>
+    <Screen backgroundColor={Colors.background} scroll={false} padded={false}>
       <TouchableOpacity onPress={finish} style={styles.skip}>
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
@@ -108,20 +109,19 @@ export default function OnboardingScreen() {
         onPress={handleNext}
         style={styles.button}
       />
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  skip: { position: 'absolute', top: Spacing.xl, right: Spacing.lg, zIndex: 1 },
+  skip: { position: 'absolute', top: Spacing.md, right: Spacing.lg, zIndex: 1 },
   skipText: { color: Colors.textSecondary, fontFamily: Typography.fontFamilySemiBold, fontSize: Typography.size.body },
   slide: { width, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl },
   iconCircle: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#E6F4F2',
+    backgroundColor: Colors.primarySubtle,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.xl,

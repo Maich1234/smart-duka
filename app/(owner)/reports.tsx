@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import { getSalesReport, type ReportPeriod } from '@/services/reports';
+import { getRatingsSummary } from '@/services/ratings';
+import { getDepletionAnalytics } from '@/services/analytics';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { Card } from '@/components/ui/Card';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 import { formatCurrency } from '@/utils/formatters';
 
 const PERIODS: { value: ReportPeriod; label: string }[] = [
@@ -29,7 +33,19 @@ export default function OwnerReports() {
     queryFn: () => getSalesReport(period),
   });
 
+  const { data: ratingsData } = useQuery({
+    queryKey: ['ratingsSummary'],
+    queryFn: getRatingsSummary,
+  });
+
+  const { data: depletionData } = useQuery({
+    queryKey: ['depletionAnalytics'],
+    queryFn: () => getDepletionAnalytics(),
+  });
+
   const report = data?.data;
+  const ratingsSummary = ratingsData?.data;
+  const depletion = depletionData?.data;
 
   if (isLoading) {
     return (
@@ -83,11 +99,11 @@ export default function OwnerReports() {
 
         <View style={styles.paymentSplit}>
           <View style={styles.paymentItem}>
-            <View style={[styles.dot, { backgroundColor: '#16A34A' }]} />
+            <View style={[styles.dot, { backgroundColor: Colors.success }]} />
             <Text style={styles.paymentText}>Cash {formatCurrency(report?.summary.cashTotal || 0, currency)}</Text>
           </View>
           <View style={styles.paymentItem}>
-            <View style={[styles.dot, { backgroundColor: '#2563EB' }]} />
+            <View style={[styles.dot, { backgroundColor: Colors.info }]} />
             <Text style={styles.paymentText}>M-Pesa {formatCurrency(report?.summary.mpesaTotal || 0, currency)}</Text>
           </View>
         </View>
@@ -146,6 +162,86 @@ export default function OwnerReports() {
           ))
         )}
       </Card>
+
+      <Text style={styles.sectionTitle}>Customer Ratings</Text>
+      <Card style={styles.summaryCard}>
+        {!ratingsSummary || ratingsSummary.totalRatings === 0 ? (
+          <Text style={styles.empty}>No customer ratings yet</Text>
+        ) : (
+          <>
+            <View style={styles.ratingHeader}>
+              <Text style={styles.ratingAvg}>{ratingsSummary.avgStars.toFixed(1)}</Text>
+              <View>
+                <View style={styles.starRow}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Ionicons
+                      key={s}
+                      name={s <= Math.round(ratingsSummary.avgStars) ? 'star' : 'star-outline'}
+                      size={16}
+                      color={Colors.warning}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.ratingCount}>{ratingsSummary.totalRatings} ratings</Text>
+              </View>
+            </View>
+
+            {ratingsSummary.byStaff.length > 0 && (
+              <View style={styles.staffRatings}>
+                {ratingsSummary.byStaff.map((s, i) => (
+                  <View key={s.staffId} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
+                    <View style={styles.listRowInfo}>
+                      <Text style={styles.listRowTitle} numberOfLines={1}>{s.staffName}</Text>
+                      <Text style={styles.listRowSubtitle}>{s.totalRatings} ratings</Text>
+                    </View>
+                    <Text style={styles.listRowValue}>{s.avgStars.toFixed(1)} ★</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        )}
+      </Card>
+
+      <Text style={styles.sectionTitle}>Stock Velocity</Text>
+      <Card style={styles.listCard}>
+        {!depletion || (depletion.fastMovers.length === 0 && depletion.slowMovers.length === 0) ? (
+          <Text style={styles.empty}>Not enough sales history yet</Text>
+        ) : (
+          <>
+            {depletion.fastMovers.length > 0 && (
+              <>
+                <Text style={styles.velocitySubLabel}>Fast Movers</Text>
+                {depletion.fastMovers.slice(0, 5).map((p, i) => (
+                  <View key={p.productId} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
+                    <View style={styles.listRowInfo}>
+                      <Text style={styles.listRowTitle} numberOfLines={1}>{p.name}</Text>
+                      <Text style={styles.listRowSubtitle}>{p.avgDailyVelocity.toFixed(1)}/day</Text>
+                    </View>
+                    <Text style={styles.listRowValue}>
+                      {p.daysUntilStockout != null ? `${Math.round(p.daysUntilStockout)}d left` : '—'}
+                    </Text>
+                  </View>
+                ))}
+              </>
+            )}
+            {depletion.slowMovers.length > 0 && (
+              <>
+                <Text style={[styles.velocitySubLabel, depletion.fastMovers.length > 0 && styles.velocitySubLabelSpaced]}>Slow Movers</Text>
+                {depletion.slowMovers.slice(0, 5).map((p, i) => (
+                  <View key={p.productId} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
+                    <View style={styles.listRowInfo}>
+                      <Text style={styles.listRowTitle} numberOfLines={1}>{p.name}</Text>
+                      <Text style={styles.listRowSubtitle}>{p.avgDailyVelocity.toFixed(2)}/day</Text>
+                    </View>
+                    <Text style={styles.listRowValue}>{p.quantity} in stock</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </Card>
     </ScrollView>
   );
 }
@@ -158,13 +254,13 @@ const styles = StyleSheet.create({
   periodToggle: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     padding: 4,
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  periodBtn: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: 9 },
+  periodBtn: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: BorderRadius.sm },
   periodBtnActive: { backgroundColor: Colors.primary },
   periodBtnText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary },
   periodBtnTextActive: { color: Colors.white },
@@ -178,7 +274,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
   paymentSplit: { flexDirection: 'row', gap: Spacing.lg, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.divider },
   paymentItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 8, height: 8, borderRadius: BorderRadius.xs },
   paymentText: { fontSize: Typography.size.small, color: Colors.textSecondary },
 
   sectionTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary, marginBottom: Spacing.sm, marginTop: Spacing.xs },
@@ -188,7 +284,7 @@ const styles = StyleSheet.create({
   barColumn: { alignItems: 'center', width: 56 },
   barValue: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginBottom: 4, height: 14 },
   barTrack: { height: MAX_BAR_HEIGHT, justifyContent: 'flex-end' },
-  bar: { width: 22, backgroundColor: Colors.primary, borderRadius: 6 },
+  bar: { width: 22, backgroundColor: Colors.primary, borderRadius: BorderRadius.sm },
   barLabel: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: Spacing.xs, width: 56, textAlign: 'center' },
 
   listCard: { padding: Spacing.md, marginBottom: Spacing.md },
@@ -199,4 +295,13 @@ const styles = StyleSheet.create({
   listRowSubtitle: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
   listRowValue: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.success },
   empty: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center', paddingVertical: Spacing.sm },
+
+  ratingHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingBottom: Spacing.sm },
+  ratingAvg: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
+  starRow: { flexDirection: 'row', gap: 2 },
+  ratingCount: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 4 },
+  staffRatings: { borderTopWidth: 1, borderTopColor: Colors.divider, marginTop: Spacing.sm, paddingTop: Spacing.xs },
+
+  velocitySubLabel: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, color: Colors.textTertiary, marginBottom: Spacing.xs },
+  velocitySubLabelSpaced: { marginTop: Spacing.sm },
 });

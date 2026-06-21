@@ -3,6 +3,7 @@ import { View, TouchableOpacity, ViewProps, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { Shadows } from '@/constants/Shadows';
+import { BorderRadius } from '@/constants/BorderRadius';
 
 interface CardProps extends ViewProps {
   elevation?: 'sm' | 'md' | 'lg';
@@ -47,7 +48,7 @@ export const Card: React.FC<CardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    borderRadius: BorderRadius.lg,
     overflow: 'hidden',
   },
 });

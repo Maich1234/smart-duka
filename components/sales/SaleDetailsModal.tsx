@@ -45,7 +45,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Sale Details</Text>
         <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} />
 
