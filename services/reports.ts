@@ -17,6 +17,8 @@ export interface ReportSummary {
   cashTotal: number;
   mpesaTotal: number;
   averageSale: number;
+  expenseTotal: number;
+  netProfit: number;
 }
 
 export interface TopProduct {

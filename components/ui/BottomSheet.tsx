@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, View, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { Modal, View, Pressable, StyleSheet, Platform } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
@@ -31,7 +32,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View

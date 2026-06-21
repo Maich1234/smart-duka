@@ -273,6 +273,8 @@ const getReportsData = (period: ReportPeriod): SalesReportData => {
       cashTotal,
       mpesaTotal,
       averageSale,
+      expenseTotal: 0,
+      netProfit: totalRevenue,
     },
     series,
     topProducts: [

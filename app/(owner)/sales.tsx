@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { getSales, type Sale } from '@/services/sales';
+import { getSales, type Sale, type SalesResponse } from '@/services/sales';
 import { getStaff } from '@/services/staff';
 import { getShopConfig } from '@/services/shop';
 import { SalesFilters } from '@/components/sales/SalesFilters';
@@ -23,13 +23,25 @@ export default function OwnerSales() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const { data: salesData, isLoading, refetch } = useQuery({
+  const {
+    data: salesData,
+    isLoading,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['sales', startDate, endDate, staffId],
-    queryFn: () => getSales({
+    queryFn: ({ pageParam }) => getSales({
       startDate: startDate?.toISOString(),
       endDate: endDate?.toISOString(),
       staffId: staffId || undefined,
+      page: pageParam,
+      limit: 20,
     }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage: SalesResponse) =>
+      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
   });
 
   const { data: staffData } = useQuery({
@@ -43,7 +55,7 @@ export default function OwnerSales() {
   });
   const thankYouNote = shopConfigData?.data.receiptThankYouNote;
 
-  const sales = salesData?.data || [];
+  const sales = salesData?.pages.flatMap((page) => page.data) || [];
   const staffList = staffData?.data || [];
 
   const clearFilters = () => {
@@ -73,6 +85,8 @@ export default function OwnerSales() {
         onRefresh={refetch}
         onPressSale={(sale) => { setSelectedSale(sale); setModalVisible(true); }}
         showStaff
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        isFetchingNextPage={isFetchingNextPage}
       />
 
       {showStartPicker && (

@@ -12,6 +12,10 @@ interface SalesListProps {
   onRefresh: () => void;
   onPressSale: (sale: any) => void;
   showStaff?: boolean;
+  /** Called when the user scrolls near the end of the list — fetch the next page here. */
+  onEndReached?: () => void;
+  /** Whether the next page is currently being fetched (shows a footer spinner). */
+  isFetchingNextPage?: boolean;
 }
 
 export const SalesList: React.FC<SalesListProps> = ({
@@ -20,6 +24,8 @@ export const SalesList: React.FC<SalesListProps> = ({
   onRefresh,
   onPressSale,
   showStaff = false,
+  onEndReached,
+  isFetchingNextPage = false,
 }) => {
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -38,6 +44,9 @@ export const SalesList: React.FC<SalesListProps> = ({
       contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} />}
       ListEmptyComponent={<EmptyState title="No sales found" />}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={isFetchingNextPage ? <LoadingState fullscreen={false} size={48} /> : null}
     />
   );
 };

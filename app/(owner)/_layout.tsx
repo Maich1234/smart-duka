@@ -92,6 +92,13 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="expenses"
+        options={{
+          title: 'Expenses',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',

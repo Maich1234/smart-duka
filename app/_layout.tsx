@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Alert } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider } from '@/context/AuthContext';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { useAuthStore, type AuthState } from '@/store/authStore';
-import { onForegroundMessage } from '@/services/notifications';
+import { onForegroundMessage, onTokenRefresh } from '@/services/notifications';
 
 SplashScreen.preventAutoHideAsync();
 // Cross-fade the native splash into the first screen instead of a hard cut,
@@ -67,6 +68,14 @@ export default function RootLayout() {
     return unsubscribe;
   }, []);
 
+  // Keeps the backend's copy of the FCM token in sync whenever Firebase
+  // rotates it — without this, a rotated token silently breaks push
+  // notifications for the device until the next manual re-login.
+  useEffect(() => {
+    const unsubscribe = onTokenRefresh();
+    return unsubscribe;
+  }, []);
+
   if (!fontsLoaded) return null;
 
   return (
@@ -75,19 +84,21 @@ export default function RootLayout() {
       persistOptions={{ persister: asyncStoragePersister, maxAge: 1000 * 60 * 60 * 24 }}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <AuthProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="splash" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(owner)" />
-              <Stack.Screen name="(staff)" />
-              <Stack.Screen name="(public)" />
-              <Stack.Screen name="(help)" />
-            </Stack>
-            <OfflineIndicator />
-          </AuthProvider>
-        </SafeAreaProvider>
+        <KeyboardProvider>
+          <SafeAreaProvider>
+            <AuthProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="splash" />
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(owner)" />
+                <Stack.Screen name="(staff)" />
+                <Stack.Screen name="(public)" />
+                <Stack.Screen name="(help)" />
+              </Stack>
+              <OfflineIndicator />
+            </AuthProvider>
+          </SafeAreaProvider>
+        </KeyboardProvider>
       </GestureHandlerRootView>
     </PersistQueryClientProvider>
   );

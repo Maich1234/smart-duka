@@ -62,6 +62,19 @@ export default function OwnerDashboard() {
         </Card>
       </TouchableOpacity>
 
+      <TouchableOpacity onPress={() => router.push('/(owner)/expenses')} activeOpacity={0.7}>
+        <Card style={styles.reportsCard}>
+          <View style={[styles.reportsIcon, styles.expensesIcon]}>
+            <Ionicons name="cash-outline" size={22} color={Colors.accentDark} />
+          </View>
+          <View style={styles.reportsTextWrap}>
+            <Text style={styles.reportsTitle}>Expenses</Text>
+            <Text style={styles.reportsSubtitle}>Track rent, supplies &amp; more</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
+        </Card>
+      </TouchableOpacity>
+
       <StatsRow
         products={dashboard?.totalProducts || 0}
         stockValue={dashboard?.currentStockValue || 0}
@@ -96,6 +109,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: Spacing.sm,
   },
+  expensesIcon: { backgroundColor: Colors.accentSubtle },
   reportsTextWrap: { flex: 1 },
   reportsTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
   reportsSubtitle: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },

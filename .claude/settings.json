@@ -68,11 +68,38 @@
       "Bash(curl -s -o /dev/null -w \"help slug: %{http_code}\\\\n\" \"http://localhost:8099/\\(help\\)/product-types\")",
       "Bash(pkill -f \"expo start --web --port 8099\")",
       "Bash(pkill -f \"Metro Bundler\")",
-      "Bash(jobs -l)"
+      "Bash(jobs -l)",
+      "Bash(node --check src/controllers/reportController.js)",
+      "Bash(node --check src/controllers/shopController.js)",
+      "Bash(node --check src/validations/shopValidation.js)",
+      "Bash(node --check src/models/Shop.js)",
+      "Bash(git -C /home/maich/Documents/smart-duka status --porcelain android)",
+      "Bash(date -r android -Iseconds)",
+      "Bash(./gradlew :app:assembleDebug -x lint --console=plain)",
+      "Bash(curl -s -X GET http://localhost:5050/api/v1/shop -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMzNiOTBhOWIzZDY0YjE1MmZkOWI3ZCIsImlhdCI6MTc4MjA2ODk5NSwiZXhwIjoxNzgyMDc2MTk1fQ.fr04O3andKBMPT1FaLOoVyISNg7Rsmgz3K7_HaV7YyY')",
+      "Bash(curl -s http://localhost:5050/api/v1/reports/sales?period=daily -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMzNiOTBhOWIzZDY0YjE1MmZkOWI3ZCIsImlhdCI6MTc4MjA2ODk5NSwiZXhwIjoxNzgyMDc2MTk1fQ.fr04O3andKBMPT1FaLOoVyISNg7Rsmgz3K7_HaV7YyY')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -X PUT http://localhost:5050/api/v1/shop -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMzNiOTBhOWIzZDY0YjE1MmZkOWI3ZCIsImlhdCI6MTc4MjA2ODk5NSwiZXhwIjoxNzgyMDc2MTk1fQ.fr04O3andKBMPT1FaLOoVyISNg7Rsmgz3K7_HaV7YyY' -H 'Content-Type: application/json' -d '{\"name\":\"64sip&Scoop\",\"address\":\"\",\"phone\":\"\",\"email\":\"\",\"taxRate\":0,\"currency\":\"KES\",\"receiptThankYouNote\":\"\"}')",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(find / -maxdepth 4 -iname \"*.deb\" -name \"*chrome*\")",
+      "Bash(pip show *)",
+      "Bash(python3 -c \"import playwright\")",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=0 node -e ' *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/)",
+      "Bash(node verify-sales.js)",
+      "Bash(curl -s -X POST http://localhost:5050/api/v1/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"mainamichael2849@gmail.com\",\"password\":\"VerifyTest123!\"}')",
+      "Bash(pkill -f \"nodemon src/server.js\")",
+      "Bash(git -C /home/maich/Documents/smart-duka status --short -- constants/config.ts)",
+      "Bash(git -C /home/maich/Documents/smart-duka-backend status --short)",
+      "Bash(node --check src/controllers/expenseController.js)"
     ],
     "additionalDirectories": [
       "/tmp",
-      "/home/maich/Documents/smart-duka/app/(owner)/inventory"
+      "/home/maich/Documents/smart-duka/app/(owner)/inventory",
+      "/home/maich/Documents/smart-duka-backend/src/models",
+      "/home/maich/Documents/smart-duka-backend/src/validations",
+      "/home/maich/Documents/smart-duka-backend/src/controllers",
+      "/home/maich/Documents/smart-duka-backend/src/routes/v1"
     ]
   },
   "enabledPlugins": {

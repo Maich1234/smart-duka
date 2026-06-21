@@ -1,5 +1,6 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
@@ -32,7 +33,7 @@ export const Screen: React.FC<ScreenProps> = ({
 }) => {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor }, style]} edges={edges as Edge[]}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {scroll ? (
           <ScrollView
             style={styles.flex}

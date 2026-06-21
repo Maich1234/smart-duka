@@ -4,6 +4,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { useQuery } from '@tanstack/react-query';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { getSalesReport, type ReportPeriod } from '@/services/reports';
 import { getRatingsSummary } from '@/services/ratings';
 import { getDepletionAnalytics } from '@/services/analytics';
@@ -91,6 +92,12 @@ export default function OwnerReports() {
             <Text style={styles.statValue}>{formatCurrency(report?.summary.averageSale || 0, currency)}</Text>
             <Text style={styles.statLabel}>Avg. Sale</Text>
           </View>
+          <View style={styles.summaryStat}>
+            <Text style={[styles.statValue, styles.netProfitValue, (report?.summary.netProfit || 0) < 0 && styles.netProfitNegative]}>
+              {formatCurrency(report?.summary.netProfit || 0, currency)}
+            </Text>
+            <Text style={styles.statLabel}>Net Profit</Text>
+          </View>
         </View>
 
         <View style={styles.paymentSplit}>
@@ -104,6 +111,14 @@ export default function OwnerReports() {
           </View>
         </View>
       </Card>
+
+      <TouchableOpacity onPress={() => router.push('/(owner)/expenses')} activeOpacity={0.7}>
+        <Card style={styles.expensesLinkCard}>
+          <Ionicons name="cash-outline" size={18} color={Colors.accentDark} />
+          <Text style={styles.expensesLinkText}>View &amp; record expenses</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Card>
+      </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>Trend</Text>
       <Card style={styles.chartCard}>
@@ -258,6 +273,8 @@ const styles = StyleSheet.create({
   summaryStat: { flex: 1 },
   statValue: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
   statLabel: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
+  netProfitValue: { color: Colors.accentDark },
+  netProfitNegative: { color: Colors.danger },
   paymentSplit: { flexDirection: 'row', gap: Spacing.lg, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.divider },
   paymentItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   dot: { width: 8, height: 8, borderRadius: BorderRadius.xs },
@@ -267,6 +284,9 @@ const styles = StyleSheet.create({
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   chartCard: { padding: Spacing.md, marginBottom: Spacing.md },
+
+  expensesLinkCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, marginBottom: Spacing.md },
+  expensesLinkText: { flex: 1, fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
 
   listCard: { padding: Spacing.md, marginBottom: Spacing.md },
   listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },

@@ -4,7 +4,11 @@ import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/store/authStore';
 import { login as loginApi, getProfile } from '@/services/auth';
 import { clearAll } from '@/utils/storage';
-import { registerDeviceForNotifications, unregisterDeviceFromNotifications } from '@/services/notifications';
+import {
+  registerDeviceForNotifications,
+  unregisterDeviceFromNotifications,
+  getNotificationsPreference,
+} from '@/services/notifications';
 
 interface AuthContextType {
   user: ReturnType<typeof useAuthStore.getState>['user'];
@@ -31,6 +35,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedUser = useAuthStore.getState().user;
         if (storedUser) {
           await getProfile();
+          // Re-registers this device's FCM token on every app start (not
+          // just at login) — otherwise a token that rotated or never made
+          // it to the backend (e.g. permission granted after first login)
+          // stays out of sync until the user manually logs out/in again.
+          if (storedUser.role === 'owner' && (await getNotificationsPreference())) {
+            registerDeviceForNotifications();
+          }
         }
       } catch {
         await clearAll();
@@ -51,7 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuth(userData, token);
         // Only owners receive sales-anomaly/low-stock pushes — skip the
         // permission prompt for staff, who'd never get a notification.
-        if (userData.role === 'owner') {
+        // Also respect a previously-saved "notifications off" preference.
+        if (userData.role === 'owner' && (await getNotificationsPreference())) {
           registerDeviceForNotifications();
         }
         return { success: true, role: userData.role };

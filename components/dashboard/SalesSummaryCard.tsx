@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Card } from '../ui/Card';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
+import { Shadows } from '@/constants/Shadows';
 import { formatCurrency } from '@/utils/formatters';
 
 interface SalesSummaryCardProps {
@@ -20,9 +22,15 @@ export const SalesSummaryCard: React.FC<SalesSummaryCardProps> = ({
   transactions,
 }) => {
   return (
-    <Card style={styles.card}>
+    <LinearGradient
+      colors={[Colors.primary, Colors.primaryDark]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.card}
+    >
       <Text style={styles.title}>Today’s Sales</Text>
       <Text style={styles.total}>{formatCurrency(total)}</Text>
+      <View style={styles.divider} />
       <View style={styles.row}>
         <View style={styles.item}>
           <Text style={styles.label}>Cash</Text>
@@ -34,17 +42,24 @@ export const SalesSummaryCard: React.FC<SalesSummaryCardProps> = ({
         </View>
       </View>
       <Text style={styles.transactions}>Transactions: {transactions}</Text>
-    </Card>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  card: { padding: Spacing.lg, marginHorizontal: Spacing.md, marginVertical: Spacing.sm },
-  title: { fontSize: Typography.size.small, color: Colors.textSecondary, marginBottom: Spacing.xs },
-  total: { fontSize: Typography.size.h1, fontFamily: Typography.fontFamilyBold, color: Colors.success, marginBottom: Spacing.md },
+  card: {
+    padding: Spacing.lg,
+    marginHorizontal: Spacing.md,
+    marginVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    ...Shadows.lg,
+  },
+  title: { fontSize: Typography.size.small, color: 'rgba(255,255,255,0.8)', marginBottom: Spacing.xs },
+  total: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.white, marginBottom: Spacing.md },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.18)', marginBottom: Spacing.md },
   row: { flexDirection: 'row', marginBottom: Spacing.md },
   item: { flex: 1 },
-  label: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  value: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  transactions: { fontSize: Typography.size.small, color: Colors.textSecondary },
+  label: { fontSize: Typography.size.small, color: 'rgba(255,255,255,0.75)' },
+  value: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.white },
+  transactions: { fontSize: Typography.size.small, color: 'rgba(255,255,255,0.75)' },
 });
