@@ -31,7 +31,11 @@ export async function buildReceiptHtml(
     .map(
       (item) => `
       <tr>
-        <td style="padding:3px 0;font-size:11px">${escapeHtml(item.productName)}</td>
+        <td style="padding:3px 0;font-size:11px">${escapeHtml(item.productName)}${
+          item.discountAmount && item.discountAmount > 0 && item.appliedPromotionLabel
+            ? `<br><span style="font-size:9px;color:#16a34a">${escapeHtml(item.appliedPromotionLabel)}</span>`
+            : ''
+        }</td>
         <td style="text-align:center;padding:3px 4px;font-size:11px">x${item.quantity}</td>
         <td style="text-align:right;padding-left:6px;font-size:11px;font-weight:bold">${formatCurrency(item.subtotal, currency)}</td>
       </tr>`

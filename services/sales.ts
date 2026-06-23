@@ -6,6 +6,8 @@ export interface SaleItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  discountAmount?: number;
+  appliedPromotionLabel?: string;
   variantId?: string;
   variantName?: string;
   unitOfMeasure?: string;

@@ -23,6 +23,13 @@ export interface VariantForm {
   lowStockAlert: string;
 }
 
+export interface PromotionForm {
+  label: string;
+  buyQty: string;
+  freeQty: string;
+  isActive: boolean;
+}
+
 export interface ProductFormData {
   name: string;
   category: string;
@@ -38,6 +45,8 @@ export interface ProductFormData {
   allowPriceOverride: boolean;
   bundleItems: BundleItemForm[];
   variants: VariantForm[];
+  hasPromotions: boolean;
+  promotions: PromotionForm[];
 }
 
 interface ProductFormProps {
@@ -103,6 +112,17 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   };
   const removeVariant = (index: number) => {
     update({ variants: form.variants.filter((_, i) => i !== index) });
+  };
+
+  const addPromotion = () => {
+    update({ promotions: [...form.promotions, { label: '', buyQty: '4', freeQty: '1', isActive: true }] });
+  };
+  const updatePromotion = (index: number, patch: Partial<PromotionForm>) => {
+    const next = form.promotions.map((p, i) => (i === index ? { ...p, ...patch } : p));
+    update({ promotions: next });
+  };
+  const removePromotion = (index: number) => {
+    update({ promotions: form.promotions.filter((_, i) => i !== index) });
   };
 
   return (
@@ -185,6 +205,64 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           <Text style={styles.switchLabel}>Allow price override at checkout</Text>
           <Switch value={form.allowPriceOverride} onValueChange={(v) => update({ allowPriceOverride: v })} />
         </View>
+      )}
+
+      {form.productType !== 'bundle' && form.productType !== 'configurable' && (
+        <>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Enable promotions / discounts</Text>
+            <Switch value={form.hasPromotions} onValueChange={(v) => update({ hasPromotions: v })} />
+          </View>
+
+          {form.hasPromotions && (
+            <>
+              <View style={styles.sectionLabelRow}>
+                <Text style={styles.sectionLabel}>Promotions</Text>
+              </View>
+              {form.promotions.map((promo, i) => (
+                <View key={i} style={styles.variantCard}>
+                  <View style={styles.variantHeader}>
+                    <View style={styles.flexInput}>
+                      <Input
+                        placeholder="Label (e.g. Buy 4 Get 1 Free)"
+                        value={promo.label}
+                        onChangeText={(t) => updatePromotion(i, { label: t })}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removePromotion(i)}
+                      style={styles.removeBtn}
+                      hitSlop={HIT_SLOP}
+                      accessibilityLabel="Remove promotion"
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.row}>
+                    <View style={styles.flexInput}>
+                      <Input
+                        placeholder="Buy Qty"
+                        value={promo.buyQty}
+                        onChangeText={(t) => updatePromotion(i, { buyQty: t })}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={styles.flexInput}>
+                      <Input
+                        placeholder="Free Qty"
+                        value={promo.freeQty}
+                        onChangeText={(t) => updatePromotion(i, { freeQty: t })}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))}
+              <Button title="+ Add Promotion" variant="outline" size="sm" onPress={addPromotion} />
+            </>
+          )}
+        </>
       )}
 
       {form.productType !== 'standard' && form.productType !== 'weighted' && form.productType !== 'refillable' && form.productType !== 'bundle' && form.productType !== 'configurable' && (

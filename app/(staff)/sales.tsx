@@ -16,6 +16,7 @@ import { VariantPickerModal } from '@/components/sales/VariantPickerModal';
 import { SaleCard } from '@/components/sales/SaleCard';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
 import { ReceiptModal } from '@/components/sales/ReceiptModal';
+import { applyBestPromotion } from '@/utils/promotions';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -152,7 +153,11 @@ export default function StaffSales() {
     setCart((prev) => prev.filter((item) => cartKey(item) !== key));
   };
 
-  const totalAmount = cart.reduce((sum, item) => sum + (item.cartUnitPrice ?? item.sellingPrice) * item.cartQuantity, 0);
+  const cartPromoResults = cart.map((item) =>
+    applyBestPromotion(item.promotions, item.cartQuantity, item.cartUnitPrice ?? item.sellingPrice)
+  );
+  const totalAmount = cartPromoResults.reduce((sum, r) => sum + r.subtotal, 0);
+  const totalSavings = cartPromoResults.reduce((sum, r) => sum + r.discountAmount, 0);
 
   const handleCheckout = () => {
     if (cart.length === 0) {
@@ -254,6 +259,7 @@ export default function StaffSales() {
               ))}
               <CartSummary
                 total={totalAmount}
+                totalSavings={totalSavings}
                 paymentMethod={paymentMethod}
                 onPaymentMethodChange={setPaymentMethod}
                 onCheckout={handleCheckout}

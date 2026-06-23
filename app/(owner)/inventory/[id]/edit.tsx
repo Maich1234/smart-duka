@@ -11,6 +11,7 @@ const EMPTY_FORM: ProductFormData = {
   name: '', category: '', sellingPrice: '', costPrice: '', quantity: '', lowStockAlert: '5',
   productType: 'standard', unitOfMeasure: 'unit', trackInventory: true,
   minPrice: '', maxPrice: '', allowPriceOverride: false, bundleItems: [], variants: [],
+  hasPromotions: false, promotions: [],
 };
 
 export default function EditProductScreen() {
@@ -47,6 +48,13 @@ export default function EditProductScreen() {
           costPrice: String(v.costPrice ?? ''),
           quantity: String(v.quantity),
           lowStockAlert: String(v.lowStockAlert),
+        })),
+        hasPromotions: (product.promotions?.length || 0) > 0,
+        promotions: (product.promotions || []).map((p) => ({
+          label: p.label || '',
+          buyQty: String(p.buyQty),
+          freeQty: String(p.freeQty),
+          isActive: p.isActive ?? true,
         })),
       });
       setSeeded(true);
@@ -121,6 +129,13 @@ export default function EditProductScreen() {
         quantity: parseInt(v.quantity) || 0,
         lowStockAlert: parseInt(v.lowStockAlert) || 5,
       }));
+    }
+    if (!isCompositeType) {
+      payload.promotions = form.hasPromotions
+        ? form.promotions
+            .filter((p) => p.buyQty && p.freeQty)
+            .map((p) => ({ label: p.label, buyQty: parseInt(p.buyQty) || 1, freeQty: parseInt(p.freeQty) || 1, isActive: p.isActive }))
+        : [];
     }
 
     updateMutation.mutate(payload);

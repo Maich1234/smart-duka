@@ -59,7 +59,8 @@ export default function OwnerProfile() {
   const handleShopUpdate = async () => {
     setUpdatingShop(true);
     try {
-      await updateShopConfig(shop);
+      const { name, address, phone, email, taxRate, currency, receiptThankYouNote } = shop;
+      await updateShopConfig({ name, address, phone, email, taxRate, currency, receiptThankYouNote });
       Alert.alert('Success', 'Shop information updated');
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Update failed');

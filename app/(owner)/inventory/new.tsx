@@ -10,6 +10,7 @@ const EMPTY_FORM: ProductFormData = {
   name: '', category: '', sellingPrice: '', costPrice: '', quantity: '', lowStockAlert: '5',
   productType: 'standard', unitOfMeasure: 'unit', trackInventory: true,
   minPrice: '', maxPrice: '', allowPriceOverride: false, bundleItems: [], variants: [],
+  hasPromotions: false, promotions: [],
 };
 
 export default function NewProductScreen() {
@@ -83,6 +84,13 @@ export default function NewProductScreen() {
         quantity: parseInt(v.quantity) || 0,
         lowStockAlert: parseInt(v.lowStockAlert) || 5,
       }));
+    }
+    if (!isCompositeType) {
+      payload.promotions = form.hasPromotions
+        ? form.promotions
+            .filter((p) => p.buyQty && p.freeQty)
+            .map((p) => ({ label: p.label, buyQty: parseInt(p.buyQty) || 1, freeQty: parseInt(p.freeQty) || 1, isActive: p.isActive }))
+        : [];
     }
 
     createMutation.mutate(payload);

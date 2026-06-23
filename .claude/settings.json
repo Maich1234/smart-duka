@@ -95,7 +95,10 @@
       "Bash(which chromium-cli; ls /usr/local/bin 2>/dev/null | grep -i chrom; npm ls -g 2>/dev/null | grep -i playwright; find / -maxdepth 4 -iname \"chromium-cli*\" 2>/dev/null)",
       "Read(//usr/local/bin/**)",
       "Bash(emulator -list-avds)",
-      "Bash(curl -sI --max-time 5 https://registry.npmjs.org/playwright)"
+      "Bash(curl -sI --max-time 5 https://registry.npmjs.org/playwright)",
+      "Bash(grep -n -iB2 -A2 \"discount\\\\|promo\" /home/maich/Documents/smart-duka/constants/helpTopics.ts)",
+      "Bash(cat src/models/Product.js)",
+      "Bash(cat src/models/Sale.js)"
     ],
     "additionalDirectories": [
       "/tmp",
@@ -103,7 +106,8 @@
       "/home/maich/Documents/smart-duka-backend/src/models",
       "/home/maich/Documents/smart-duka-backend/src/validations",
       "/home/maich/Documents/smart-duka-backend/src/controllers",
-      "/home/maich/Documents/smart-duka-backend/src/routes/v1"
+      "/home/maich/Documents/smart-duka-backend/src/routes/v1",
+      "/home/maich/Documents/smart-duka-backend/src/services"
     ]
   },
   "enabledPlugins": {

@@ -67,9 +67,14 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
 
       {sale.items.map((item, index) => (
         <View key={index} style={styles.itemRow}>
-          <Text style={[styles.itemName, { flex: 3 }]} numberOfLines={1}>
-            {item.productName}
-          </Text>
+          <View style={{ flex: 3 }}>
+            <Text style={styles.itemName} numberOfLines={1}>
+              {item.productName}
+            </Text>
+            {!!item.discountAmount && item.discountAmount > 0 && (
+              <Text style={styles.promoLabel} numberOfLines={1}>{item.appliedPromotionLabel}</Text>
+            )}
+          </View>
           <Text style={[styles.itemMeta, styles.center, { width: 36 }]}>x{item.quantity}</Text>
           <Text style={[styles.itemMeta, styles.right, { width: 90 }]}>{formatCurrency(item.subtotal, currency)}</Text>
         </View>
@@ -189,6 +194,10 @@ const styles = StyleSheet.create({
   itemMeta: {
     fontSize: Typography.size.small,
     color: Colors.textSecondary,
+  },
+  promoLabel: {
+    fontSize: Typography.size.caption,
+    color: Colors.success,
   },
   center: {
     textAlign: 'center',

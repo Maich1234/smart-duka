@@ -7,7 +7,8 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Motion } from '@/constants/Motion';
 import { formatCurrency } from '@/utils/formatters';
-import type { BundleItem, UnitOfMeasure } from '@/services/products';
+import { applyBestPromotion } from '@/utils/promotions';
+import type { BundleItem, ProductPromotion, UnitOfMeasure } from '@/services/products';
 
 interface CartItemProps {
   item: {
@@ -19,6 +20,7 @@ interface CartItemProps {
     bundleItems?: BundleItem[];
     bundleComponentNames?: string[];
     variantName?: string;
+    promotions?: ProductPromotion[];
   };
   /** Overrides item.sellingPrice when set — used for variable/service/configurable lines */
   unitPrice?: number;
@@ -27,7 +29,7 @@ interface CartItemProps {
 
 export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove }) => {
   const price = unitPrice ?? item.sellingPrice;
-  const subtotal = price * item.quantity;
+  const { subtotal, discountAmount, appliedPromotionLabel } = applyBestPromotion(item.promotions, item.quantity, price);
   const isDecimalUnit = !!item.unitOfMeasure && item.unitOfMeasure !== 'unit';
   const quantityLabel = isDecimalUnit ? `${item.quantity} ${item.unitOfMeasure}` : `x${item.quantity}`;
 
@@ -46,6 +48,11 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove })
         <Text style={styles.price}>{formatCurrency(price)}</Text>
         {!!item.bundleComponentNames?.length && (
           <Text style={styles.includes} numberOfLines={1}>Includes: {item.bundleComponentNames.join(', ')}</Text>
+        )}
+        {discountAmount > 0 && (
+          <Text style={styles.promo} numberOfLines={1}>
+            {appliedPromotionLabel} applied · saved {formatCurrency(discountAmount)}
+          </Text>
         )}
       </View>
       <View style={styles.controls}>
@@ -78,6 +85,7 @@ const styles = StyleSheet.create({
   name: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
   price: { fontSize: Typography.size.small, color: Colors.textSecondary },
   includes: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
+  promo: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   quantity: { fontSize: Typography.size.body, color: Colors.textPrimary, minWidth: 40, textAlign: 'center' },
   subtotal: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.success, minWidth: 70, textAlign: 'right' },

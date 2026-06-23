@@ -18,6 +18,13 @@ export interface ProductVariant {
   lowStockAlert: number;
 }
 
+export interface ProductPromotion {
+  label?: string;
+  buyQty: number;
+  freeQty: number;
+  isActive?: boolean;
+}
+
 export interface Product {
   _id: string;
   name: string;
@@ -37,6 +44,7 @@ export interface Product {
   allowPriceOverride?: boolean;
   bundleItems?: BundleItem[];
   variants?: ProductVariant[];
+  promotions?: ProductPromotion[];
 }
 
 export interface ProductsResponse {
@@ -72,6 +80,7 @@ export interface CreateProductData {
   allowPriceOverride?: boolean;
   bundleItems?: BundleItem[];
   variants?: Omit<ProductVariant, '_id'>[];
+  promotions?: ProductPromotion[];
 }
 
 export interface UpdateProductData {
@@ -90,6 +99,7 @@ export interface UpdateProductData {
   allowPriceOverride?: boolean;
   bundleItems?: BundleItem[];
   variants?: Omit<ProductVariant, '_id'>[];
+  promotions?: ProductPromotion[];
 }
 
 /**

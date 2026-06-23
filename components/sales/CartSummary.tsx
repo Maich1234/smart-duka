@@ -8,6 +8,7 @@ import { formatCurrency } from '@/utils/formatters';
 
 interface CartSummaryProps {
   total: number;
+  totalSavings?: number;
   paymentMethod: 'cash' | 'mpesa';
   onPaymentMethodChange: (method: 'cash' | 'mpesa') => void;
   onCheckout: () => void;
@@ -16,6 +17,7 @@ interface CartSummaryProps {
 
 export const CartSummary: React.FC<CartSummaryProps> = ({
   total,
+  totalSavings = 0,
   paymentMethod,
   onPaymentMethodChange,
   onCheckout,
@@ -23,6 +25,9 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
 }) => {
   return (
     <View style={styles.container}>
+      {totalSavings > 0 && (
+        <Text style={styles.savings}>You saved {formatCurrency(totalSavings)}</Text>
+      )}
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Total</Text>
         <Text style={styles.totalAmount}>{formatCurrency(total)}</Text>
@@ -53,6 +58,7 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.md },
   totalLabel: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
   totalAmount: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
+  savings: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.success, textAlign: 'right', marginBottom: Spacing.xs },
   paymentRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   paymentBtn: { flex: 1 },
 });
