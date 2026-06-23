@@ -231,6 +231,46 @@ export const HELP_TOPICS: HelpTopic[] = [
     relatedSlugs: ['product-types', 'adding-products', 'managing-stock'],
   },
   {
+    slug: 'discounts',
+    title: 'Discounts & Promotions',
+    category: 'Products & Inventory',
+    summary: 'How "Buy X Get Y Free" promotions work, and how they\'re different from Variable Price.',
+    keywords: ['discount', 'promotion', 'buy get free', 'bogo', 'offer', 'deal'],
+    sections: [
+      {
+        paragraphs: [
+          'Smart Duka\'s discounts are "Buy X Get Y Free" promotions set up on individual products — there\'s no separate percentage-off or coupon-code discount, and cashiers never type in a discount at checkout.',
+        ],
+      },
+      {
+        heading: 'Setting up a promotion',
+        paragraphs: [
+          'On a product\'s form (any type except Bundle or Variants), switch on "Enable promotions / discounts" and add one or more rows: a label, a Buy Qty, and a Free Qty.',
+        ],
+        example: 'Label "Buy 4 Get 1 Free", Buy Qty 4, Free Qty 1 — every 5th item in a qualifying purchase is free.',
+      },
+      {
+        heading: 'How it applies at checkout',
+        paragraphs: [
+          'There\'s nothing for staff to turn on — the moment a customer buys enough of a product to qualify, Smart Duka applies the best available promotion for that product automatically and reduces the total. If a product has more than one promotion, only the one that saves the customer the most is used; they don\'t stack.',
+        ],
+      },
+      {
+        heading: 'On the receipt',
+        paragraphs: [
+          'When a promotion applies, the receipt shows the promotion label and the amount saved, so the customer can see why the total is lower than item price × quantity.',
+        ],
+      },
+      {
+        heading: 'Not the same as Variable Price',
+        paragraphs: [
+          'Variable Price products let staff type a different price within a min/max range at checkout (see "Understanding Product Types") — that\'s a per-sale price choice. Promotions are a fixed, automatic rule tied to quantity bought, and apply the same way every time.',
+        ],
+      },
+    ],
+    relatedSlugs: ['product-types', 'adding-products', 'recording-sales', 'receipts-and-ratings'],
+  },
+  {
     slug: 'staff-permissions',
     title: 'Staff & Permissions',
     category: 'Staff & Permissions',
@@ -291,7 +331,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         ],
       },
     ],
-    relatedSlugs: ['product-types', 'receipts-and-ratings'],
+    relatedSlugs: ['product-types', 'discounts', 'receipts-and-ratings'],
   },
   {
     slug: 'sales-reports',
@@ -358,7 +398,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         ],
       },
     ],
-    relatedSlugs: ['recording-sales', 'sales-reports', 'shop-settings'],
+    relatedSlugs: ['recording-sales', 'discounts', 'sales-reports', 'shop-settings'],
   },
   {
     slug: 'shop-settings',

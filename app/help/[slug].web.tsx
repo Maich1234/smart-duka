@@ -19,7 +19,7 @@ export default function HelpTopicScreen() {
         <ErrorState
           title="Topic not found"
           subtitle="This help topic doesn't exist."
-          onRetry={() => router.replace('/(help)')}
+          onRetry={() => router.replace('/help')}
         />
       </View>
     );

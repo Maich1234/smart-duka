@@ -16,7 +16,7 @@ import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { router } from 'expo-router';
+import { openHelp } from '@/utils/openHelp';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -96,7 +96,7 @@ export default function OwnerProfile() {
         <Button
           title="Help & Learning Center"
           variant="outline"
-          onPress={() => router.push('/(help)')}
+          onPress={() => openHelp()}
           style={styles.helpButton}
         />
 

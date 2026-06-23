@@ -7,7 +7,7 @@ import { changePassword } from '@/services/auth';
 import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { Button } from '@/components/ui/Button';
-import { router } from 'expo-router';
+import { openHelp } from '@/utils/openHelp';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 
@@ -38,7 +38,7 @@ export default function StaffProfile() {
         <Button
           title="Help & Learning Center"
           variant="outline"
-          onPress={() => router.push('/(help)')}
+          onPress={() => openHelp()}
           style={styles.helpButton}
         />
         <AccountInfo name={user.name} email={user.email} role={user.role} />

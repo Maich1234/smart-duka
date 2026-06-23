@@ -1,10 +1,10 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { openHelp } from '@/utils/openHelp';
 
 interface HelpLinkProps {
   slug: string;
@@ -17,7 +17,7 @@ export const HelpLink: React.FC<HelpLinkProps> = ({ slug, label = 'Learn more', 
   return (
     <TouchableOpacity
       style={[styles.row, style]}
-      onPress={() => router.push(`/(help)/${slug}`)}
+      onPress={() => openHelp(slug)}
       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
       activeOpacity={0.7}
     >

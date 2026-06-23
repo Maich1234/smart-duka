@@ -93,7 +93,10 @@ export default function RootLayout() {
                 <Stack.Screen name="(owner)" />
                 <Stack.Screen name="(staff)" />
                 <Stack.Screen name="(public)" />
-                <Stack.Screen name="(help)" />
+                {/* app/help/*.web.tsx has the real Help Center content;
+                    app/help/*.tsx is a native fallback that immediately
+                    redirects to the hosted web page (see openHelp()). */}
+                <Stack.Screen name="help" />
               </Stack>
               <OfflineIndicator />
             </AuthProvider>

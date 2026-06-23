@@ -12,7 +12,7 @@ import { Spacing } from '@/constants/Spacing';
 
 function TopicRow({ topic }: { topic: HelpTopic }) {
   return (
-    <Card style={styles.topicCard} onPress={() => router.push(`/(help)/${topic.slug}`)}>
+    <Card style={styles.topicCard} onPress={() => router.push(`/help/${topic.slug}`)}>
       <View style={styles.topicRow}>
         <View style={styles.topicText}>
           <Text style={styles.topicTitle}>{topic.title}</Text>
