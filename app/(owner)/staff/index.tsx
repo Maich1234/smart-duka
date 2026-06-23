@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { Motion } from '@/constants/Motion';
 
 export default function OwnerStaffList() {
   const tabBarHeight = useBottomTabBarHeight();
@@ -29,7 +31,7 @@ export default function OwnerStaffList() {
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Staff</Text>
         <Button title="Add Staff" onPress={() => router.push('/(owner)/staff/new')} size="sm" />
@@ -39,14 +41,18 @@ export default function OwnerStaffList() {
         showsVerticalScrollIndicator={false}
         data={staffList}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <StaffCard staff={item} onPress={() => router.push(`/(owner)/staff/${item._id}`)} />
+        renderItem={({ item, index }) => (
+          <StaffCard
+            staff={item}
+            isLast={index === staffList.length - 1}
+            onPress={() => router.push(`/(owner)/staff/${item._id}`)}
+          />
         )}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
+        contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
         ListEmptyComponent={<EmptyState title="No staff found" subtitle="Add a team member to get started." />}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -56,7 +62,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
   },

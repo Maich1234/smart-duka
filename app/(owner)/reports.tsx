@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useQuery } from '@tanstack/react-query';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -9,13 +10,15 @@ import { getSalesReport, type ReportPeriod } from '@/services/reports';
 import { getRatingsSummary } from '@/services/ratings';
 import { getDepletionAnalytics } from '@/services/analytics';
 import { useAuthStore, type AuthState } from '@/store/authStore';
-import { Card } from '@/components/ui/Card';
+import { Section } from '@/components/ui/Section';
+import { ListRow } from '@/components/ui/ListRow';
 import { TrendChart } from '@/components/reports/TrendChart';
 import { HelpLink } from '@/components/help/HelpLink';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
+import { Motion } from '@/constants/Motion';
 import { formatCurrency } from '@/utils/formatters';
 
 const PERIODS: { value: ReportPeriod; label: string }[] = [
@@ -56,10 +59,11 @@ export default function OwnerReports() {
   const series = report?.series || [];
 
   return (
-    <ScrollView
+    <Animated.ScrollView
+      entering={FadeIn.duration(Motion.duration.slow)}
       style={styles.container}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ padding: Spacing.md, paddingBottom: tabBarHeight + Spacing.lg }}
+      contentContainerStyle={{ padding: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
       <Text style={styles.title}>Sales Reports</Text>
@@ -79,91 +83,91 @@ export default function OwnerReports() {
         ))}
       </View>
 
-      <Card style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Total Revenue</Text>
-        <Text style={styles.summaryValue}>{formatCurrency(report?.summary.totalRevenue || 0, currency)}</Text>
+      <View style={styles.hero}>
+        <Text style={styles.heroLabel}>Total Revenue</Text>
+        <Text style={styles.heroValue}>{formatCurrency(report?.summary.totalRevenue || 0, currency)}</Text>
+      </View>
 
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryStat}>
-            <Text style={styles.statValue}>{report?.summary.totalTransactions || 0}</Text>
-            <Text style={styles.statLabel}>Transactions</Text>
-          </View>
-          <View style={styles.summaryStat}>
-            <Text style={styles.statValue}>{formatCurrency(report?.summary.averageSale || 0, currency)}</Text>
-            <Text style={styles.statLabel}>Avg. Sale</Text>
-          </View>
-          <View style={styles.summaryStat}>
-            <Text style={[styles.statValue, styles.netProfitValue, (report?.summary.netProfit || 0) < 0 && styles.netProfitNegative]}>
-              {formatCurrency(report?.summary.netProfit || 0, currency)}
-            </Text>
-            <Text style={styles.statLabel}>Net Profit</Text>
-          </View>
+      <View style={styles.statsRow}>
+        <View style={styles.statCell}>
+          <Text style={styles.statValue}>{report?.summary.totalTransactions || 0}</Text>
+          <Text style={styles.statLabel}>Transactions</Text>
         </View>
-
-        <View style={styles.paymentSplit}>
-          <View style={styles.paymentItem}>
-            <View style={[styles.dot, { backgroundColor: Colors.success }]} />
-            <Text style={styles.paymentText}>Cash {formatCurrency(report?.summary.cashTotal || 0, currency)}</Text>
-          </View>
-          <View style={styles.paymentItem}>
-            <View style={[styles.dot, { backgroundColor: Colors.info }]} />
-            <Text style={styles.paymentText}>M-Pesa {formatCurrency(report?.summary.mpesaTotal || 0, currency)}</Text>
-          </View>
+        <View style={[styles.statCell, styles.statCellDivider]}>
+          <Text style={styles.statValue}>{formatCurrency(report?.summary.averageSale || 0, currency)}</Text>
+          <Text style={styles.statLabel}>Avg. Sale</Text>
         </View>
-      </Card>
+        <View style={styles.statCell}>
+          <Text
+            style={[
+              styles.statValue,
+              styles.netProfitPositive,
+              (report?.summary.netProfit || 0) < 0 && styles.netProfitNegative,
+            ]}
+          >
+            {formatCurrency(report?.summary.netProfit || 0, currency)}
+          </Text>
+          <Text style={styles.statLabel}>Net Profit</Text>
+        </View>
+      </View>
 
-      <TouchableOpacity onPress={() => router.push('/(owner)/expenses')} activeOpacity={0.7}>
-        <Card style={styles.expensesLinkCard}>
-          <Ionicons name="cash-outline" size={18} color={Colors.accentDark} />
-          <Text style={styles.expensesLinkText}>View &amp; record expenses</Text>
-          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-        </Card>
-      </TouchableOpacity>
+      <View style={styles.paymentSplit}>
+        <View style={styles.paymentItem}>
+          <View style={[styles.dot, { backgroundColor: Colors.success }]} />
+          <Text style={styles.paymentText}>Cash {formatCurrency(report?.summary.cashTotal || 0, currency)}</Text>
+        </View>
+        <View style={styles.paymentItem}>
+          <View style={[styles.dot, { backgroundColor: Colors.info }]} />
+          <Text style={styles.paymentText}>M-Pesa {formatCurrency(report?.summary.mpesaTotal || 0, currency)}</Text>
+        </View>
+      </View>
 
-      <Text style={styles.sectionTitle}>Trend</Text>
-      <Card style={styles.chartCard}>
+      <ListRow
+        title="View & record expenses"
+        icon="cash-outline"
+        chevron
+        isLast
+        style={styles.expensesLink}
+        onPress={() => router.push('/(owner)/expenses')}
+      />
+
+      <Section title="Trend">
         <TrendChart series={series} />
-      </Card>
+      </Section>
 
-      <Text style={styles.sectionTitle}>Top Products</Text>
-      <Card style={styles.listCard}>
+      <Section title="Top Products">
         {(report?.topProducts.length || 0) === 0 ? (
           <Text style={styles.empty}>No sales in this period</Text>
         ) : (
           report?.topProducts.map((p, i) => (
-            <View key={p.productName} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
-              <View style={styles.listRowInfo}>
-                <Text style={styles.listRowTitle} numberOfLines={1}>{p.productName}</Text>
-                <Text style={styles.listRowSubtitle}>{p.quantitySold} sold</Text>
-              </View>
-              <Text style={styles.listRowValue}>{formatCurrency(p.revenue, currency)}</Text>
-            </View>
+            <ListRow
+              key={p.productName}
+              title={p.productName}
+              subtitle={`${p.quantitySold} sold`}
+              trailing={<Text style={styles.rowValue}>{formatCurrency(p.revenue, currency)}</Text>}
+              isLast={i === report.topProducts.length - 1}
+            />
           ))
         )}
-      </Card>
+      </Section>
 
-      <Text style={styles.sectionTitle}>By Staff</Text>
-      <Card style={styles.listCard}>
+      <Section title="By Staff">
         {(report?.byStaff.length || 0) === 0 ? (
           <Text style={styles.empty}>No sales in this period</Text>
         ) : (
           report?.byStaff.map((s, i) => (
-            <View key={s.staffName} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
-              <View style={styles.listRowInfo}>
-                <Text style={styles.listRowTitle} numberOfLines={1}>{s.staffName}</Text>
-                <Text style={styles.listRowSubtitle}>{s.transactionCount} sales</Text>
-              </View>
-              <Text style={styles.listRowValue}>{formatCurrency(s.total, currency)}</Text>
-            </View>
+            <ListRow
+              key={s.staffName}
+              title={s.staffName}
+              subtitle={`${s.transactionCount} sales`}
+              trailing={<Text style={styles.rowValue}>{formatCurrency(s.total, currency)}</Text>}
+              isLast={i === report.byStaff.length - 1}
+            />
           ))
         )}
-      </Card>
+      </Section>
 
-      <View style={styles.sectionTitleRow}>
-        <Text style={styles.sectionTitle}>Customer Ratings</Text>
-        <HelpLink slug="receipts-and-ratings" />
-      </View>
-      <Card style={styles.summaryCard}>
+      <Section title="Customer Ratings" action={<HelpLink slug="receipts-and-ratings" />}>
         {!ratingsSummary || ratingsSummary.totalRatings === 0 ? (
           <Text style={styles.empty}>No customer ratings yet</Text>
         ) : (
@@ -185,66 +189,62 @@ export default function OwnerReports() {
               </View>
             </View>
 
-            {ratingsSummary.byStaff.length > 0 && (
-              <View style={styles.staffRatings}>
-                {ratingsSummary.byStaff.map((s, i) => (
-                  <View key={s.staffId} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
-                    <View style={styles.listRowInfo}>
-                      <Text style={styles.listRowTitle} numberOfLines={1}>{s.staffName}</Text>
-                      <Text style={styles.listRowSubtitle}>{s.totalRatings} ratings</Text>
-                    </View>
-                    <Text style={styles.listRowValue}>{s.avgStars.toFixed(1)} ★</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+            {ratingsSummary.byStaff.map((s, i) => (
+              <ListRow
+                key={s.staffId}
+                title={s.staffName}
+                subtitle={`${s.totalRatings} ratings`}
+                trailing={<Text style={styles.rowValue}>{s.avgStars.toFixed(1)} ★</Text>}
+                isLast={i === ratingsSummary.byStaff.length - 1}
+              />
+            ))}
           </>
         )}
-      </Card>
+      </Section>
 
-      <View style={styles.sectionTitleRow}>
-        <Text style={styles.sectionTitle}>Stock Velocity</Text>
-        <HelpLink slug="sales-reports" />
-      </View>
-      <Card style={styles.listCard}>
+      <Section title="Stock Velocity" action={<HelpLink slug="sales-reports" />}>
         {!depletion || (depletion.fastMovers.length === 0 && depletion.slowMovers.length === 0) ? (
           <Text style={styles.empty}>Not enough sales history yet</Text>
         ) : (
           <>
             {depletion.fastMovers.length > 0 && (
               <>
-                <Text style={styles.velocitySubLabel}>Fast Movers</Text>
-                {depletion.fastMovers.slice(0, 5).map((p, i) => (
-                  <View key={p.productId} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
-                    <View style={styles.listRowInfo}>
-                      <Text style={styles.listRowTitle} numberOfLines={1}>{p.name}</Text>
-                      <Text style={styles.listRowSubtitle}>{p.avgDailyVelocity.toFixed(1)}/day</Text>
-                    </View>
-                    <Text style={styles.listRowValue}>
-                      {p.daysUntilStockout != null ? `${Math.round(p.daysUntilStockout)}d left` : '—'}
-                    </Text>
-                  </View>
+                <Text style={styles.subLabel}>Fast Movers</Text>
+                {depletion.fastMovers.slice(0, 5).map((p, i, arr) => (
+                  <ListRow
+                    key={p.productId}
+                    title={p.name}
+                    subtitle={`${p.avgDailyVelocity.toFixed(1)}/day`}
+                    trailing={
+                      <Text style={styles.rowValue}>
+                        {p.daysUntilStockout != null ? `${Math.round(p.daysUntilStockout)}d left` : '—'}
+                      </Text>
+                    }
+                    isLast={i === arr.length - 1 && depletion.slowMovers.length === 0}
+                  />
                 ))}
               </>
             )}
             {depletion.slowMovers.length > 0 && (
               <>
-                <Text style={[styles.velocitySubLabel, depletion.fastMovers.length > 0 && styles.velocitySubLabelSpaced]}>Slow Movers</Text>
-                {depletion.slowMovers.slice(0, 5).map((p, i) => (
-                  <View key={p.productId} style={[styles.listRow, i > 0 && styles.listRowBorder]}>
-                    <View style={styles.listRowInfo}>
-                      <Text style={styles.listRowTitle} numberOfLines={1}>{p.name}</Text>
-                      <Text style={styles.listRowSubtitle}>{p.avgDailyVelocity.toFixed(2)}/day</Text>
-                    </View>
-                    <Text style={styles.listRowValue}>{p.quantity} in stock</Text>
-                  </View>
+                <Text style={[styles.subLabel, depletion.fastMovers.length > 0 && styles.subLabelSpaced]}>
+                  Slow Movers
+                </Text>
+                {depletion.slowMovers.slice(0, 5).map((p, i, arr) => (
+                  <ListRow
+                    key={p.productId}
+                    title={p.name}
+                    subtitle={`${p.avgDailyVelocity.toFixed(2)}/day`}
+                    trailing={<Text style={styles.rowValue}>{p.quantity} in stock</Text>}
+                    isLast={i === arr.length - 1}
+                  />
                 ))}
               </>
             )}
           </>
         )}
-      </Card>
-    </ScrollView>
+      </Section>
+    </Animated.ScrollView>
   );
 }
 
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
     padding: 4,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -266,43 +266,49 @@ const styles = StyleSheet.create({
   periodBtnText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary },
   periodBtnTextActive: { color: Colors.white },
 
-  summaryCard: { padding: Spacing.lg, marginBottom: Spacing.md },
-  summaryLabel: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  summaryValue: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginTop: 2, marginBottom: Spacing.md },
-  summaryRow: { flexDirection: 'row', marginBottom: Spacing.md },
-  summaryStat: { flex: 1 },
+  hero: { marginBottom: Spacing.md },
+  heroLabel: { fontSize: Typography.size.small, color: Colors.textSecondary },
+  heroValue: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginTop: 2 },
+
+  statsRow: {
+    flexDirection: 'row',
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.divider,
+    marginBottom: Spacing.md,
+  },
+  statCell: { flex: 1, alignItems: 'center' },
+  statCellDivider: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: Colors.divider },
   statValue: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
-  statLabel: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
-  netProfitValue: { color: Colors.accentDark },
+  netProfitPositive: { color: Colors.accentDark },
   netProfitNegative: { color: Colors.danger },
-  paymentSplit: { flexDirection: 'row', gap: Spacing.lg, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.divider },
+  statLabel: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
+
+  paymentSplit: { flexDirection: 'row', gap: Spacing.lg, marginBottom: Spacing.lg },
   paymentItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   dot: { width: 8, height: 8, borderRadius: BorderRadius.xs },
   paymentText: { fontSize: Typography.size.small, color: Colors.textSecondary },
 
-  sectionTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary, marginBottom: Spacing.sm, marginTop: Spacing.xs },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  expensesLink: { marginBottom: Spacing.lg },
 
-  chartCard: { padding: Spacing.md, marginBottom: Spacing.md },
-
-  expensesLinkCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, marginBottom: Spacing.md },
-  expensesLinkText: { flex: 1, fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-
-  listCard: { padding: Spacing.md, marginBottom: Spacing.md },
-  listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },
-  listRowBorder: { borderTopWidth: 1, borderTopColor: Colors.divider },
-  listRowInfo: { flex: 1, marginRight: Spacing.sm },
-  listRowTitle: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  listRowSubtitle: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
-  listRowValue: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.success },
   empty: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center', paddingVertical: Spacing.sm },
 
-  ratingHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingBottom: Spacing.sm },
-  ratingAvg: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
+  rowValue: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+
+  ratingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+    marginBottom: Spacing.xs,
+  },
+  ratingAvg: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.accentDark },
   starRow: { flexDirection: 'row', gap: 2 },
   ratingCount: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 4 },
-  staffRatings: { borderTopWidth: 1, borderTopColor: Colors.divider, marginTop: Spacing.sm, paddingTop: Spacing.xs },
 
-  velocitySubLabel: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary, marginBottom: Spacing.xs },
-  velocitySubLabelSpaced: { marginTop: Spacing.sm },
+  subLabel: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary, marginBottom: Spacing.xs },
+  subLabelSpaced: { marginTop: Spacing.sm },
 });

@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
-    marginHorizontal: Spacing.md,
+    marginHorizontal: Spacing.lg,
     marginVertical: Spacing.sm,
   },
   input: {

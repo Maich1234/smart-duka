@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { Motion } from '@/constants/Motion';
 import { formatCurrency } from '@/utils/formatters';
 import type { BundleItem, UnitOfMeasure } from '@/services/products';
 
@@ -30,7 +32,12 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove })
   const quantityLabel = isDecimalUnit ? `${item.quantity} ${item.unitOfMeasure}` : `x${item.quantity}`;
 
   return (
-    <View style={styles.container}>
+    <Animated.View
+      style={styles.container}
+      entering={FadeIn.duration(Motion.duration.base)}
+      exiting={FadeOut.duration(Motion.duration.fast)}
+      layout={LinearTransition.duration(Motion.duration.slow)}
+    >
       <View style={styles.info}>
         <Text style={styles.name}>
           {item.name}
@@ -54,7 +61,7 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove })
           <Ionicons name="trash-outline" size={20} color={Colors.danger} />
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

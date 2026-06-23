@@ -19,8 +19,6 @@ import { ReceiptModal } from '@/components/sales/ReceiptModal';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { BorderRadius } from '@/constants/BorderRadius';
-import { Shadows } from '@/constants/Shadows';
 import { usePermission } from '@/utils/permissions';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -191,10 +189,15 @@ export default function StaffSales() {
           showsVerticalScrollIndicator={false}
           data={mySales}
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <SaleCard sale={item} showStaff={false} onPress={() => { setSelectedSale(item); setDetailsModalVisible(true); }} />
+          renderItem={({ item, index }) => (
+            <SaleCard
+              sale={item}
+              showStaff={false}
+              isLast={index === mySales.length - 1}
+              onPress={() => { setSelectedSale(item); setDetailsModalVisible(true); }}
+            />
           )}
-          contentContainerStyle={{ padding: Spacing.md, paddingBottom: tabBarHeight + Spacing.lg }}
+          contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
           ListEmptyComponent={<EmptyState title="No sales yet" />}
         />
         <SaleDetailsModal
@@ -219,11 +222,12 @@ export default function StaffSales() {
         showsVerticalScrollIndicator={false}
         data={products}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ProductCard
             product={item}
             showCostPrice={false}
             showActions={false}
+            isLast={index === products.length - 1}
             onPress={() => addToCart(item)}
           />
         )}
@@ -265,11 +269,12 @@ export default function StaffSales() {
             {mySales.length === 0 ? (
               <EmptyState title="No sales yet" />
             ) : (
-              mySales.map((sale) => (
+              mySales.map((sale, i) => (
                 <SaleCard
                   key={sale._id}
                   sale={sale}
                   showStaff={false}
+                  isLast={i === mySales.length - 1}
                   onPress={() => { setSelectedSale(sale); setDetailsModalVisible(true); }}
                 />
               ))
@@ -341,17 +346,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.size.h2,
     fontFamily: Typography.fontFamilyBold,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     marginBottom: Spacing.sm,
     color: Colors.textPrimary,
   },
   cartSection: {
-    backgroundColor: Colors.surface,
-    margin: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    ...Shadows.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
   },
   sectionTitle: {
     fontSize: Typography.size.body,
@@ -359,5 +364,5 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     color: Colors.textPrimary,
   },
-  historySection: { paddingHorizontal: Spacing.md, marginBottom: Spacing.xl },
+  historySection: { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg, marginBottom: Spacing.xl },
 });

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, FlatList, RefreshControl, Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -15,6 +16,7 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
+import { Motion } from '@/constants/Motion';
 
 type VelocityFilter = 'all' | 'fast' | 'slow' | 'stockout';
 
@@ -89,7 +91,7 @@ export default function OwnerInventory() {
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.container}>
       <InventoryHeader onAddPress={() => router.push('/(owner)/inventory/new')} searchValue={search} onSearchChange={setSearch} />
 
       {depletion && (depletion.fastMovers.length > 0 || depletion.stockoutSoon.length > 0) && (
@@ -125,11 +127,12 @@ export default function OwnerInventory() {
         showsVerticalScrollIndicator={false}
         data={filteredProducts}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ProductCard
             product={item}
             showCostPrice
             showActions
+            isLast={index === filteredProducts.length - 1}
             onPress={() => router.push(`/(owner)/inventory/${item._id}/edit`)}
             onEdit={() => router.push(`/(owner)/inventory/${item._id}/edit`)}
             onDelete={() => handleDelete(item._id)}
@@ -151,7 +154,7 @@ export default function OwnerInventory() {
         productName={selectedProductForStock?.name || ''}
         loading={stockMutation.isPending}
       />
-    </View>
+    </Animated.View>
   );
 }
 

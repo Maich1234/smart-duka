@@ -38,10 +38,15 @@ export const SalesList: React.FC<SalesListProps> = ({
       showsVerticalScrollIndicator={false}
       data={sales}
       keyExtractor={(item) => item._id}
-      renderItem={({ item }) => (
-        <SaleCard sale={item} showStaff={showStaff} onPress={() => onPressSale(item)} />
+      renderItem={({ item, index }) => (
+        <SaleCard
+          sale={item}
+          showStaff={showStaff}
+          isLast={index === sales.length - 1}
+          onPress={() => onPressSale(item)}
+        />
       )}
-      contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
+      contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} />}
       ListEmptyComponent={<EmptyState title="No sales found" />}
       onEndReached={onEndReached}

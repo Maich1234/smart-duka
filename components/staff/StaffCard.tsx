@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Card } from '../ui/Card';
+import { Text, StyleSheet } from 'react-native';
+import { ListRow } from '../ui/ListRow';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
-import { Spacing } from '@/constants/Spacing';
 
 interface StaffCardProps {
   staff: {
@@ -15,37 +13,26 @@ interface StaffCardProps {
     isActive: boolean;
   };
   onPress: () => void;
+  isLast?: boolean;
 }
 
-export const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
+export const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress, isLast = false }) => {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <Card style={styles.card}>
-        <View style={styles.content}>
-          <View style={styles.info}>
-            <Text style={styles.name}>{staff.name}</Text>
-            <Text style={styles.email}>{staff.email}</Text>
-            {staff.phone && <Text style={styles.phone}>{staff.phone}</Text>}
-            <View style={styles.statusBadge}>
-              <Text style={[styles.status, { color: staff.isActive ? Colors.success : Colors.danger }]}>
-                {staff.isActive ? 'Active' : 'Inactive'}
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
-        </View>
-      </Card>
-    </TouchableOpacity>
+    <ListRow
+      title={staff.name}
+      subtitle={staff.phone ? `${staff.email} · ${staff.phone}` : staff.email}
+      chevron
+      isLast={isLast}
+      onPress={onPress}
+      trailing={
+        <Text style={[styles.status, { color: staff.isActive ? Colors.success : Colors.danger }]}>
+          {staff.isActive ? 'Active' : 'Inactive'}
+        </Text>
+      }
+    />
   );
 };
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: Spacing.md, marginVertical: Spacing.xs, padding: Spacing.md },
-  content: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  info: { flex: 1 },
-  name: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  email: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  phone: { fontSize: Typography.size.small, color: Colors.textSecondary, marginTop: 2 },
-  statusBadge: { marginTop: 4 },
-  status: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold },
+  status: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, marginRight: 4 },
 });

@@ -1,19 +1,20 @@
 import React from 'react';
-import { ScrollView, View, Text, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getStaffDashboard } from '@/services/dashboard';
 import { SalesSummaryCard } from '@/components/dashboard/SalesSummaryCard';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
-import { Card } from '@/components/ui/Card';
+import { ListRow } from '@/components/ui/ListRow';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { Motion } from '@/constants/Motion';
 
 export default function StaffDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
@@ -31,7 +32,8 @@ export default function StaffDashboard() {
   const dashboard = data?.data;
 
   return (
-    <ScrollView
+    <Animated.ScrollView
+      entering={FadeIn.duration(Motion.duration.slow)}
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
@@ -50,22 +52,20 @@ export default function StaffDashboard() {
       />
 
       {canManageExpenses && (
-        <TouchableOpacity onPress={() => router.push('/(staff)/expenses')} activeOpacity={0.7}>
-          <Card style={styles.expensesCard}>
-            <View style={styles.expensesIcon}>
-              <Ionicons name="cash-outline" size={22} color={Colors.accentDark} />
-            </View>
-            <View style={styles.expensesTextWrap}>
-              <Text style={styles.expensesTitle}>Expenses</Text>
-              <Text style={styles.expensesSubtitle}>Track rent, supplies &amp; more</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
-          </Card>
-        </TouchableOpacity>
+        <View style={styles.navSection}>
+          <ListRow
+            title="Expenses"
+            subtitle="Track rent, supplies & more"
+            icon="cash-outline"
+            chevron
+            isLast
+            onPress={() => router.push('/(staff)/expenses')}
+          />
+        </View>
       )}
 
       <RecentTransactions transactions={dashboard?.recentSales || []} showStaff={false} />
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
@@ -74,24 +74,5 @@ const styles = StyleSheet.create({
   header: { padding: Spacing.lg, paddingBottom: Spacing.sm },
   greeting: { fontSize: Typography.size.body, color: Colors.textSecondary },
   name: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
-
-  expensesCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    padding: Spacing.md,
-  },
-  expensesIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.accentSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.sm,
-  },
-  expensesTextWrap: { flex: 1 },
-  expensesTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  expensesSubtitle: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
+  navSection: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg },
 });

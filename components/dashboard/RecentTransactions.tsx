@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { Card } from '../ui/Card';
+import { View, Text, StyleSheet } from 'react-native';
+import { Section } from '../ui/Section';
+import { ListRow } from '../ui/ListRow';
 import { EmptyState } from '../ui/EmptyState';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -23,38 +24,34 @@ interface RecentTransactionsProps {
 
 export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transactions, showStaff = false }) => {
   return (
-    <Card style={styles.card}>
-      <Text style={styles.title}>Recent Sales</Text>
-      <FlatList
-        data={transactions}
-        keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <View>
-              <Text style={styles.invoice}>{item.invoiceNumber}</Text>
-              <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
-              {showStaff && item.staff && <Text style={styles.staff}>by {item.staff.name}</Text>}
-            </View>
-            <View>
-              <Text style={styles.amount}>{formatCurrency(item.totalAmount)}</Text>
-              <Text style={styles.method}>{item.paymentMethod.toUpperCase()}</Text>
-            </View>
-          </View>
+    <View style={styles.container}>
+      <Section title="Recent Sales">
+        {transactions.length === 0 ? (
+          <EmptyState title="No sales yet" />
+        ) : (
+          transactions.map((item, i) => (
+            <ListRow
+              key={item._id}
+              title={item.invoiceNumber}
+              subtitle={`${formatDate(item.createdAt)}${showStaff && item.staff ? ` · by ${item.staff.name}` : ''}`}
+              isLast={i === transactions.length - 1}
+              trailing={
+                <View style={styles.amountWrap}>
+                  <Text style={styles.amount}>{formatCurrency(item.totalAmount)}</Text>
+                  <Text style={styles.method}>{item.paymentMethod.toUpperCase()}</Text>
+                </View>
+              }
+            />
+          ))
         )}
-        scrollEnabled={false}
-        ListEmptyComponent={<EmptyState title="No sales yet" />}
-      />
-    </Card>
+      </Section>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: Spacing.md, marginVertical: Spacing.sm, padding: Spacing.lg, marginBottom: Spacing.xl },
-  title: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, marginBottom: Spacing.md, color: Colors.textPrimary },
-  item: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  invoice: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  date: { fontSize: Typography.size.caption, color: Colors.textSecondary },
-  staff: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
-  amount: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.success, textAlign: 'right' },
-  method: { fontSize: Typography.size.caption, color: Colors.textSecondary, textAlign: 'right' },
+  container: { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg },
+  amountWrap: { alignItems: 'flex-end' },
+  amount: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  method: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
 });

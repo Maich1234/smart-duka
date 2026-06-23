@@ -1,13 +1,7 @@
 import React from 'react';
-import {
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
+import { Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { AnimatedPressable } from './AnimatedPressable';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -87,7 +81,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       onPress={handlePress}
       disabled={disabled || loading}
       style={[
@@ -101,7 +95,6 @@ export const Button: React.FC<ButtonProps> = ({
         },
         style,
       ]}
-      activeOpacity={0.8}
     >
       {loading ? (
         <ActivityIndicator color={getTextColor()} />
@@ -119,7 +112,7 @@ export const Button: React.FC<ButtonProps> = ({
           {title}
         </Text>
       )}
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 };
 

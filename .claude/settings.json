@@ -91,7 +91,11 @@
       "Bash(pkill -f \"nodemon src/server.js\")",
       "Bash(git -C /home/maich/Documents/smart-duka status --short -- constants/config.ts)",
       "Bash(git -C /home/maich/Documents/smart-duka-backend status --short)",
-      "Bash(node --check src/controllers/expenseController.js)"
+      "Bash(node --check src/controllers/expenseController.js)",
+      "Bash(which chromium-cli; ls /usr/local/bin 2>/dev/null | grep -i chrom; npm ls -g 2>/dev/null | grep -i playwright; find / -maxdepth 4 -iname \"chromium-cli*\" 2>/dev/null)",
+      "Read(//usr/local/bin/**)",
+      "Bash(emulator -list-avds)",
+      "Bash(curl -sI --max-time 5 https://registry.npmjs.org/playwright)"
     ],
     "additionalDirectories": [
       "/tmp",

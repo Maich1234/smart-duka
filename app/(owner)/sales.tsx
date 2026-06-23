@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.size.h2,
     fontFamily: Typography.fontFamilyBold,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     marginBottom: Spacing.md,
     color: Colors.textPrimary,

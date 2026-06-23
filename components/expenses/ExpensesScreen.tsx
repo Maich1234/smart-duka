@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, FlatList, RefreshControl, Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Card } from '@/components/ui/Card';
+import { ListRow } from '@/components/ui/ListRow';
 import { Button } from '@/components/ui/Button';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -23,6 +24,7 @@ import { usePermission } from '@/utils/permissions';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { Motion } from '@/constants/Motion';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 
 const CATEGORY_ICONS: Record<ExpenseCategory, keyof typeof Ionicons.glyphMap> = {
@@ -112,43 +114,39 @@ export const ExpensesScreen: React.FC = () => {
   const summary = summaryData?.data;
 
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Expenses</Text>
         <Button title="Add Expense" onPress={openAdd} size="sm" />
       </View>
 
-      <Card style={styles.summaryCard}>
+      <View style={styles.summary}>
         <Text style={styles.summaryLabel}>Total Recorded</Text>
         <Text style={styles.summaryValue}>{formatCurrency(summary?.total || 0, currency)}</Text>
-      </Card>
+      </View>
 
       <FlatList
         showsVerticalScrollIndicator={false}
         data={expenses}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => openEdit(item)} activeOpacity={0.7}>
-            <Card style={styles.expenseCard}>
-              <View style={styles.expenseIcon}>
-                <Ionicons name={CATEGORY_ICONS[item.category]} size={20} color={Colors.accentDark} />
-              </View>
-              <View style={styles.expenseInfo}>
-                <Text style={styles.expenseCategory}>{item.category.charAt(0).toUpperCase() + item.category.slice(1)}</Text>
-                <Text style={styles.expenseMeta} numberOfLines={1}>
-                  {item.description ? `${item.description} · ` : ''}{formatDate(item.date)}
-                </Text>
-              </View>
+        renderItem={({ item, index }) => (
+          <ListRow
+            title={item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+            subtitle={`${item.description ? `${item.description} · ` : ''}${formatDate(item.date)}`}
+            icon={CATEGORY_ICONS[item.category]}
+            isLast={index === expenses.length - 1}
+            onPress={() => openEdit(item)}
+            trailing={
               <View style={styles.expenseRight}>
                 <Text style={styles.expenseAmount}>{formatCurrency(item.amount, currency)}</Text>
                 <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="trash-outline" size={16} color={Colors.danger} />
                 </TouchableOpacity>
               </View>
-            </Card>
-          </TouchableOpacity>
+            }
+          />
         )}
-        contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingBottom: tabBarHeight + Spacing.lg }}
+        contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
         ListEmptyComponent={
           <EmptyState title="No expenses recorded" subtitle="Add your first expense to start tracking spending." />
@@ -162,7 +160,7 @@ export const ExpensesScreen: React.FC = () => {
         expense={editingExpense}
         loading={saveMutation.isPending}
       />
-    </View>
+    </Animated.View>
   );
 };
 
@@ -171,26 +169,13 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg },
   empty: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center' },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
   title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
 
-  summaryCard: { marginHorizontal: Spacing.md, marginBottom: Spacing.md, padding: Spacing.lg },
+  summary: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg },
   summaryLabel: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  summaryValue: { fontSize: Typography.size.h1, fontFamily: Typography.fontFamilyBold, color: Colors.accentDark, marginTop: 2 },
+  summaryValue: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginTop: 2 },
 
-  expenseCard: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm, padding: Spacing.md },
-  expenseIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.accentSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.sm,
-  },
-  expenseInfo: { flex: 1, marginRight: Spacing.sm },
-  expenseCategory: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  expenseMeta: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
   expenseRight: { alignItems: 'flex-end', gap: Spacing.xs },
   expenseAmount: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
 });

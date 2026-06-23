@@ -4,8 +4,6 @@ import { Button } from '../ui/Button';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { BorderRadius } from '@/constants/BorderRadius';
-import { Shadows } from '@/constants/Shadows';
 import { formatCurrency } from '@/utils/formatters';
 
 interface CartSummaryProps {
@@ -51,10 +49,10 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { padding: Spacing.md, backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, marginTop: Spacing.sm, ...Shadows.sm },
+  container: { paddingTop: Spacing.md, marginTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.divider },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.md },
   totalLabel: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  totalAmount: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, color: Colors.success },
+  totalAmount: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
   paymentRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   paymentBtn: { flex: 1 },
 });
