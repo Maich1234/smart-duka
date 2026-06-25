@@ -18,6 +18,8 @@ interface SaleDetailsModalProps {
   shopPhone?: string;
   currency?: string;
   thankYouNote?: string;
+  logoUrl?: string;
+  motto?: string;
 }
 
 export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
@@ -28,6 +30,8 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   shopPhone,
   currency,
   thankYouNote,
+  logoUrl,
+  motto,
 }) => {
   const [printing, setPrinting] = useState(false);
 
@@ -35,7 +39,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
     if (!sale) return;
     setPrinting(true);
     try {
-      const html = await buildReceiptHtml(sale, shopName, shopPhone, currency, undefined, thankYouNote);
+      const html = await buildReceiptHtml(sale, shopName, shopPhone, currency, undefined, thankYouNote, logoUrl, motto);
       await printHtml(html);
     } catch {
       // Likely the user dismissed the system print sheet — not a real failure.
@@ -50,7 +54,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
     <BottomSheet visible={visible} onClose={onClose}>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Sale Details</Text>
-        <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} thankYouNote={thankYouNote} />
+        <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} thankYouNote={thankYouNote} logoUrl={logoUrl} motto={motto} />
 
         <View style={styles.buttonRow}>
           <Button title="Close" variant="outline" onPress={onClose} style={styles.flexBtn} />

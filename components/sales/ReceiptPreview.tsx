@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Sale } from '@/services/sales';
 import { HelpLink } from '@/components/help/HelpLink';
@@ -18,6 +18,8 @@ interface ReceiptPreviewProps {
   servedByName?: string;
   /** Owner-configurable closing message; falls back to the default thank-you line */
   thankYouNote?: string;
+  logoUrl?: string;
+  motto?: string;
 }
 
 const DASH = '- - - - - - - - - - - - - - - - - - -';
@@ -29,10 +31,16 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
   currency,
   servedByName,
   thankYouNote,
+  logoUrl,
+  motto,
 }) => {
   return (
     <View style={styles.receipt}>
+      {!!logoUrl && (
+        <Image source={{ uri: logoUrl }} style={styles.logo} resizeMode="contain" />
+      )}
       <Text style={styles.shopName}>{shopName}</Text>
+      {!!motto && <Text style={styles.motto}>{motto}</Text>}
       {!!shopPhone && <Text style={styles.shopPhone}>{shopPhone}</Text>}
       <Text style={styles.poweredBy}>Smart Duka POS</Text>
 
@@ -113,10 +121,23 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  logo: {
+    width: 72,
+    height: 72,
+    alignSelf: 'center',
+    marginBottom: Spacing.xs,
+  },
   shopName: {
     fontFamily: Typography.fontFamilyBold,
     fontSize: Typography.size.h3,
     color: Colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  motto: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
     textAlign: 'center',
     marginBottom: 2,
   },

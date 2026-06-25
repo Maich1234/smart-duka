@@ -56,29 +56,39 @@ export default function NewStaffScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]} keyboardShouldPersistTaps="handled">
-        <Input label="Full Name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} />
-        <Input label="Email" value={form.email} onChangeText={(t) => setForm({ ...form, email: t })} autoCapitalize="none" keyboardType="email-address" />
-        <Input label="Password" value={form.password} onChangeText={(t) => setForm({ ...form, password: t })} secureTextEntry />
-        <Input label="Phone (optional)" value={form.phone} onChangeText={(t) => setForm({ ...form, phone: t })} keyboardType="phone-pad" />
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>BASIC INFORMATION</Text>
+          <Input label="Full Name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} />
+          <Input label="Email" value={form.email} onChangeText={(t) => setForm({ ...form, email: t })} autoCapitalize="none" keyboardType="email-address" />
+          <Input label="Phone (optional)" value={form.phone} onChangeText={(t) => setForm({ ...form, phone: t })} keyboardType="phone-pad" />
+        </View>
 
-        <TouchableOpacity
-          style={styles.permissionsRow}
-          onPress={() => router.push('/(owner)/staff/permissions')}
-          activeOpacity={0.7}
-        >
-          <View>
-            <Text style={styles.permissionsLabel}>Permissions</Text>
-            <Text style={styles.permissionsCount}>{permissions.length} selected</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
-        </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ACCOUNT</Text>
+          <Input label="Password" value={form.password} onChangeText={(t) => setForm({ ...form, password: t })} secureTextEntry />
+        </View>
 
-        <Button title="Add Staff" onPress={handleSave} loading={saveMutation.isPending} style={styles.button} />
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ACCESS</Text>
+          <TouchableOpacity style={styles.permissionsRow} onPress={() => router.push('/(owner)/staff/permissions')} activeOpacity={0.7}>
+            <View style={styles.permissionsIcon}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} />
+            </View>
+            <View style={styles.permissionsText}>
+              <Text style={styles.permissionsLabel}>Permissions</Text>
+              <Text style={styles.permissionsCount}>{permissions.length} permission{permissions.length !== 1 ? 's' : ''} selected</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+
+        <Button title="Add Staff Member" onPress={handleSave} loading={saveMutation.isPending} style={styles.button} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -86,20 +96,39 @@ export default function NewStaffScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
+  content: { padding: Spacing.lg },
+  section: { marginBottom: Spacing.lg },
+  sectionLabel: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 0.8,
+    marginBottom: Spacing.sm,
+  },
   permissionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Spacing.md,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
-  permissionsLabel: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  permissionsIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionsText: { flex: 1 },
+  permissionsLabel: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
   permissionsCount: { fontSize: Typography.size.small, color: Colors.textSecondary, marginTop: 2 },
   button: { marginTop: Spacing.sm },
 });

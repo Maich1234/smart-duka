@@ -7,15 +7,17 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
 import { createSale, getMySales, type Sale } from '@/services/sales';
 import { getShopConfig } from '@/services/shop';
+import { getPaymentStatus } from '@/services/paymentConfig';
 import { ProductCard } from '@/components/inventory/ProductCard';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { CartItem } from '@/components/sales/CartItem';
-import { CartSummary } from '@/components/sales/CartSummary';
+import { CartSummary, isValidKenyanPhone } from '@/components/sales/CartSummary';
 import { QuantityModal } from '@/components/sales/QuantityModal';
 import { VariantPickerModal } from '@/components/sales/VariantPickerModal';
 import { SaleCard } from '@/components/sales/SaleCard';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
 import { ReceiptModal } from '@/components/sales/ReceiptModal';
+import { MpesaPaymentModal } from '@/components/payments/MpesaPaymentModal';
 import { applyBestPromotion } from '@/utils/promotions';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -49,6 +51,9 @@ export default function StaffSales() {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [receiptVisible, setReceiptVisible] = useState(false);
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [mpesaModalVisible, setMpesaModalVisible] = useState(false);
+  const [pendingMpesaTransactionId, setPendingMpesaTransactionId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -69,6 +74,15 @@ export default function StaffSales() {
     queryFn: getShopConfig,
   });
   const thankYouNote = shopConfigData?.data.receiptThankYouNote;
+  const shopLogoUrl = shopConfigData?.data.logoUrl;
+  const shopMotto = shopConfigData?.data.motto;
+
+  const { data: paymentStatusData } = useQuery({
+    queryKey: ['paymentStatus'],
+    queryFn: getPaymentStatus,
+    enabled: canRecordSale,
+  });
+  const mpesaEnabled = paymentStatusData?.data?.mpesa?.isConfigured ?? false;
 
   const createSaleMutation = useMutation({
     mutationFn: createSale,
@@ -159,22 +173,43 @@ export default function StaffSales() {
   const totalAmount = cartPromoResults.reduce((sum, r) => sum + r.subtotal, 0);
   const totalSavings = cartPromoResults.reduce((sum, r) => sum + r.discountAmount, 0);
 
+  const buildSaleItems = () => cart.map((item) => ({
+    productId: item._id,
+    quantity: item.cartQuantity,
+    ...((item.productType === 'variable' || item.productType === 'service') && item.cartUnitPrice != null
+      ? { unitPrice: item.cartUnitPrice }
+      : {}),
+    ...(item.cartVariantId ? { variantId: item.cartVariantId } : {}),
+  }));
+
   const handleCheckout = () => {
     if (cart.length === 0) {
       Alert.alert('Empty Cart', 'Add at least one product before checking out.');
       return;
     }
+    if (paymentMethod === 'mpesa') {
+      if (!mpesaEnabled) {
+        Alert.alert('M-Pesa Not Configured', 'The shop owner has not connected an M-Pesa Business account yet.');
+        return;
+      }
+      if (!isValidKenyanPhone(customerPhone)) {
+        Alert.alert('Invalid Phone', 'Enter a valid Kenyan number (e.g. +254712345678).');
+        return;
+      }
+      setMpesaModalVisible(true);
+      return;
+    }
+    createSaleMutation.mutate({ items: buildSaleItems(), paymentMethod });
+  };
+
+  const handleMpesaSuccess = (transactionId: string) => {
+    setMpesaModalVisible(false);
+    setPendingMpesaTransactionId(transactionId);
     createSaleMutation.mutate({
-      items: cart.map((item) => ({
-        productId: item._id,
-        quantity: item.cartQuantity,
-        ...((item.productType === 'variable' || item.productType === 'service') && item.cartUnitPrice != null
-          ? { unitPrice: item.cartUnitPrice }
-          : {}),
-        ...(item.cartVariantId ? { variantId: item.cartVariantId } : {}),
-      })),
-      paymentMethod,
-    });
+      items: buildSaleItems(),
+      paymentMethod: 'mpesa',
+      mpesaTransactionId: transactionId,
+    } as any);
   };
 
   if (!canRecordSale && !canViewSales) {
@@ -198,7 +233,6 @@ export default function StaffSales() {
             <SaleCard
               sale={item}
               showStaff={false}
-              isLast={index === mySales.length - 1}
               onPress={() => { setSelectedSale(item); setDetailsModalVisible(true); }}
             />
           )}
@@ -213,6 +247,8 @@ export default function StaffSales() {
           shopPhone={user?.shop?.phone}
           currency={user?.shop?.currency}
           thankYouNote={thankYouNote}
+          logoUrl={shopLogoUrl}
+          motto={shopMotto}
         />
       </View>
     );
@@ -261,9 +297,13 @@ export default function StaffSales() {
                 total={totalAmount}
                 totalSavings={totalSavings}
                 paymentMethod={paymentMethod}
-                onPaymentMethodChange={setPaymentMethod}
+                onPaymentMethodChange={(m) => { setPaymentMethod(m); if (m === 'cash') setCustomerPhone(''); }}
                 onCheckout={handleCheckout}
                 loading={createSaleMutation.isPending}
+                mpesaEnabled={mpesaEnabled}
+                customerPhone={customerPhone}
+                onCustomerPhoneChange={setCustomerPhone}
+                currency={user?.shop?.currency}
               />
             </View>
           ) : null
@@ -280,7 +320,6 @@ export default function StaffSales() {
                   key={sale._id}
                   sale={sale}
                   showStaff={false}
-                  isLast={i === mySales.length - 1}
                   onPress={() => { setSelectedSale(sale); setDetailsModalVisible(true); }}
                 />
               ))
@@ -329,6 +368,9 @@ export default function StaffSales() {
         shopName={user?.shop?.name || 'Smart Duka'}
         shopPhone={user?.shop?.phone}
         currency={user?.shop?.currency}
+        thankYouNote={thankYouNote}
+        logoUrl={shopLogoUrl}
+        motto={shopMotto}
       />
 
       <ReceiptModal
@@ -340,6 +382,18 @@ export default function StaffSales() {
         currency={user?.shop?.currency}
         servedByName={user?.name}
         thankYouNote={thankYouNote}
+        logoUrl={shopLogoUrl}
+        motto={shopMotto}
+      />
+
+      <MpesaPaymentModal
+        visible={mpesaModalVisible}
+        phoneNumber={customerPhone}
+        amount={totalAmount}
+        accountReference={undefined}
+        currency={user?.shop?.currency}
+        onSuccess={handleMpesaSuccess}
+        onCancel={() => setMpesaModalVisible(false)}
       />
     </View>
   );

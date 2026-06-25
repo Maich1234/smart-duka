@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { getProducts, createProduct, type CreateProductData } from '@/services/products';
+import { getShopConfig } from '@/services/shop';
 import { Screen } from '@/components/ui/Screen';
 import { ProductForm, type ProductFormData } from '@/components/inventory/ProductForm';
 
@@ -21,6 +22,8 @@ export default function NewProductScreen() {
     queryKey: ['products', ''],
     queryFn: () => getProducts({ search: '' }),
   });
+  const { data: shopData } = useQuery({ queryKey: ['shop'], queryFn: getShopConfig });
+  const currency = shopData?.data?.currency ?? 'KES';
   const availableProducts = (data?.data || []).filter((p) =>
     ['standard', 'variable', 'weighted', 'refillable'].includes(p.productType)
   );
@@ -63,7 +66,7 @@ export default function NewProductScreen() {
       trackInventory: isCompositeType ? false : form.trackInventory,
     };
 
-    if (form.productType === 'weighted' || form.productType === 'refillable') {
+    if (form.unitOfMeasure && form.unitOfMeasure !== 'unit') {
       payload.unitOfMeasure = form.unitOfMeasure;
     }
     if (form.productType === 'variable') {
@@ -106,6 +109,7 @@ export default function NewProductScreen() {
         isEditing={false}
         loading={createMutation.isPending}
         availableProducts={availableProducts}
+        currency={currency}
       />
     </Screen>
   );

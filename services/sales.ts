@@ -19,7 +19,7 @@ export interface Sale {
   invoiceNumber: string;
   items: SaleItem[];
   totalAmount: number;
-  paymentMethod: 'cash' | 'mpesa';
+  paymentMethod: 'cash' | 'mpesa' | 'card';
   staff: {
     _id: string;
     name: string;
@@ -29,6 +29,9 @@ export interface Sale {
   updatedAt: string;
   /** Only present on createSale/getSaleById responses — used to build the receipt QR code */
   receiptToken?: string;
+  // M-Pesa fields (populated for mpesa payment method)
+  mpesaTransactionId?: string;
+  mpesaReceiptNumber?: string;
 }
 
 export interface CreateSaleData {
@@ -40,7 +43,27 @@ export interface CreateSaleData {
     /** Required for 'configurable' products */
     variantId?: string;
   }>;
-  paymentMethod: 'cash' | 'mpesa';
+  paymentMethod: 'cash' | 'mpesa' | 'card';
+  /** For M-Pesa sales: links the confirmed STK Push transaction */
+  mpesaTransactionId?: string;
+}
+
+export interface SalesStats {
+  totalSales: number;
+  cashTotal: number;
+  mpesaTotal: number;
+  cardTotal: number;
+  cashCount: number;
+  mpesaCount: number;
+  cardCount: number;
+  transactionCount: number;
+  avgSale: number;
+  percentageChange: number;
+}
+
+export interface SalesStatsResponse {
+  success: boolean;
+  data: SalesStats;
 }
 
 export interface SalesResponse {
@@ -78,7 +101,7 @@ export const getSales = async (params?: {
   startDate?: string;
   endDate?: string;
   staffId?: string;
-  paymentMethod?: 'cash' | 'mpesa';
+  paymentMethod?: 'cash' | 'mpesa' | 'card';
   page?: number;
   limit?: number;
 }): Promise<SalesResponse> => {
@@ -91,6 +114,14 @@ export const getSales = async (params?: {
  */
 export const getSaleById = async (id: string): Promise<SaleResponse> => {
   const response = await api.get(`/sales/${id}`);
+  return response.data;
+};
+
+/**
+ * Get aggregated sales stats for the current month (for the sales page hero card)
+ */
+export const getSalesStats = async (): Promise<SalesStatsResponse> => {
+  const response = await api.get('/sales/stats');
   return response.data;
 };
 

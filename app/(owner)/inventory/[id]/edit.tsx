@@ -4,6 +4,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getProductById, getProducts, updateProduct, type UpdateProductData } from '@/services/products';
+import { getShopConfig } from '@/services/shop';
 import { Screen } from '@/components/ui/Screen';
 import { ProductForm, type ProductFormData } from '@/components/inventory/ProductForm';
 
@@ -65,6 +66,8 @@ export default function EditProductScreen() {
     queryKey: ['products', ''],
     queryFn: () => getProducts({ search: '' }),
   });
+  const { data: shopData } = useQuery({ queryKey: ['shop'], queryFn: getShopConfig });
+  const currency = shopData?.data?.currency ?? 'KES';
   const availableProducts = (productsData?.data || []).filter(
     (p) => p._id !== id && ['standard', 'variable', 'weighted', 'refillable'].includes(p.productType)
   );
@@ -108,7 +111,7 @@ export default function EditProductScreen() {
       trackInventory: isCompositeType ? false : form.trackInventory,
     };
 
-    if (form.productType === 'weighted' || form.productType === 'refillable') {
+    if (form.unitOfMeasure && form.unitOfMeasure !== 'unit') {
       payload.unitOfMeasure = form.unitOfMeasure;
     }
     if (form.productType === 'variable') {
@@ -155,6 +158,7 @@ export default function EditProductScreen() {
         isEditing
         loading={updateMutation.isPending}
         availableProducts={availableProducts}
+        currency={currency}
       />
     </Screen>
   );

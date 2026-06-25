@@ -19,6 +19,8 @@ interface ReceiptModalProps {
   currency?: string;
   servedByName?: string;
   thankYouNote?: string;
+  logoUrl?: string;
+  motto?: string;
 }
 
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({
@@ -30,6 +32,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   currency,
   servedByName,
   thankYouNote,
+  logoUrl,
+  motto,
 }) => {
   const [printing, setPrinting] = useState(false);
 
@@ -37,7 +41,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     if (!sale) return;
     setPrinting(true);
     try {
-      const html = await buildReceiptHtml(sale, shopName, shopPhone, currency, servedByName, thankYouNote);
+      const html = await buildReceiptHtml(sale, shopName, shopPhone, currency, servedByName, thankYouNote, logoUrl, motto);
       await printHtml(html);
     } catch {
       // Most rejections here are the user dismissing the system print sheet,
@@ -66,6 +70,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           currency={currency}
           servedByName={servedByName}
           thankYouNote={thankYouNote}
+          logoUrl={logoUrl}
+          motto={motto}
         />
       </ScrollView>
 

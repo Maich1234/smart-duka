@@ -7,10 +7,12 @@ export interface Shop {
   phone: string;
   email: string;
   taxRate: number;
+  country: string;
   currency: string;
   isActive: boolean;
-  /** Custom closing message printed at the bottom of every receipt */
   receiptThankYouNote?: string;
+  logoUrl?: string;
+  motto?: string;
 }
 
 export interface ShopConfigResponse {
@@ -24,8 +26,11 @@ export interface UpdateShopConfigData {
   phone?: string;
   email?: string;
   taxRate?: number;
+  country?: string;
   currency?: string;
   receiptThankYouNote?: string;
+  logoUrl?: string;
+  motto?: string;
 }
 
 export const getShopConfig = async (): Promise<ShopConfigResponse> => {
@@ -36,4 +41,13 @@ export const getShopConfig = async (): Promise<ShopConfigResponse> => {
 export const updateShopConfig = async (data: UpdateShopConfigData): Promise<ShopConfigResponse> => {
   const res = await api.put('/shop', data);
   return res.data;
+};
+
+export const uploadShopLogo = async (uri: string, mimeType: string): Promise<{ logoUrl: string }> => {
+  const form = new FormData();
+  form.append('logo', { uri, name: 'logo.jpg', type: mimeType } as any);
+  const res = await api.post('/shop/logo', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.data;
 };

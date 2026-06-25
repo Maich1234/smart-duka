@@ -1,34 +1,108 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { LoadingState } from '@/components/ui/LoadingState';
+import {
+  View,
+  Text,
+  StyleSheet,
+  RefreshControl,
+  TouchableOpacity,
+} from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { getSalesReport, type ReportPeriod } from '@/services/reports';
 import { getRatingsSummary } from '@/services/ratings';
 import { getDepletionAnalytics } from '@/services/analytics';
 import { useAuthStore, type AuthState } from '@/store/authStore';
-import { Section } from '@/components/ui/Section';
-import { ListRow } from '@/components/ui/ListRow';
-import { TrendChart } from '@/components/reports/TrendChart';
-import { HelpLink } from '@/components/help/HelpLink';
+import { PeriodSegmentControl } from '@/components/reports/PeriodSegmentControl';
+import { HeroRevenueCard } from '@/components/reports/HeroRevenueCard';
+import {
+  InsightCards,
+  QuickShortcuts,
+  TopProductsLeaderboard,
+  StaffPerformanceSection,
+  RatingsModule,
+  StockIntelligence,
+} from '@/components/reports/ReportSections';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
+import { Shadows } from '@/constants/Shadows';
 import { Motion } from '@/constants/Motion';
-import { formatCurrency } from '@/utils/formatters';
 
-const PERIODS: { value: ReportPeriod; label: string }[] = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-];
+// ─── page header ──────────────────────────────────────────────────────────────
+
+function ReportsHeader() {
+  return (
+    <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={h.container}>
+      <View style={h.left}>
+        <Text style={h.title}>Reports</Text>
+        <Text style={h.subtitle}>Track performance and grow your business</Text>
+      </View>
+      <TouchableOpacity style={h.iconBtn} activeOpacity={0.7}>
+        <Ionicons name="options-outline" size={18} color={Colors.textSecondary} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+const h = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  left: {
+    flex: 1,
+    gap: 3,
+  },
+  title: {
+    fontSize: Typography.size.h1,
+    fontFamily: Typography.fontFamilyBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.6,
+    lineHeight: 36,
+  },
+  subtitle: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    ...Shadows.sm,
+  },
+});
+
+// ─── screen ───────────────────────────────────────────────────────────────────
+
+const EMPTY_SUMMARY = {
+  totalRevenue: 0,
+  totalTransactions: 0,
+  cashTotal: 0,
+  mpesaTotal: 0,
+  averageSale: 0,
+  expenseTotal: 0,
+  netProfit: 0,
+};
 
 export default function OwnerReports() {
   const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const user = useAuthStore((s: AuthState) => s.user);
   const currency = user?.shop?.currency;
   const [period, setPeriod] = useState<ReportPeriod>('daily');
@@ -48,267 +122,138 @@ export default function OwnerReports() {
     queryFn: () => getDepletionAnalytics(),
   });
 
+  if (isLoading) return <LoadingState />;
+
   const report = data?.data;
   const ratingsSummary = ratingsData?.data;
   const depletion = depletionData?.data;
-
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  const series = report?.series || [];
+  const series = report?.series ?? [];
+  const summary = report?.summary ?? EMPTY_SUMMARY;
 
   return (
-    <Animated.ScrollView
-      entering={FadeIn.duration(Motion.duration.slow)}
-      style={styles.container}
+    <>
+      <StatusBar style="dark" />
+      <Animated.ScrollView
+        entering={FadeIn.duration(Motion.duration.slow)}
+        style={s.root}
+      contentContainerStyle={[
+        s.content,
+        {
+          paddingTop: insets.top + Spacing.lg,
+          paddingBottom: tabBarHeight + Spacing.xl,
+        },
+      ]}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ padding: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
-      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          tintColor={Colors.primary}
+          progressViewOffset={insets.top}
+        />
+      }
     >
-      <Text style={styles.title}>Sales Reports</Text>
+      {/* ── dashboard header ───────────────────────────────────────── */}
+      <ReportsHeader />
 
-      <View style={styles.periodToggle}>
-        {PERIODS.map((p) => (
-          <TouchableOpacity
-            key={p.value}
-            style={[styles.periodBtn, period === p.value && styles.periodBtnActive]}
-            onPress={() => setPeriod(p.value)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.periodBtnText, period === p.value && styles.periodBtnTextActive]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* ── period selector ────────────────────────────────────────── */}
+      <Animated.View entering={FadeInDown.duration(340).delay(40)}>
+        <PeriodSegmentControl value={period} onChange={setPeriod} />
+      </Animated.View>
 
-      <View style={styles.hero}>
-        <Text style={styles.heroLabel}>Total Revenue</Text>
-        <Text style={styles.heroValue}>{formatCurrency(report?.summary.totalRevenue || 0, currency)}</Text>
-      </View>
+      <View style={s.gap} />
 
-      <View style={styles.statsRow}>
-        <View style={styles.statCell}>
-          <Text style={styles.statValue}>{report?.summary.totalTransactions || 0}</Text>
-          <Text style={styles.statLabel}>Transactions</Text>
-        </View>
-        <View style={[styles.statCell, styles.statCellDivider]}>
-          <Text style={styles.statValue}>{formatCurrency(report?.summary.averageSale || 0, currency)}</Text>
-          <Text style={styles.statLabel}>Avg. Sale</Text>
-        </View>
-        <View style={styles.statCell}>
-          <Text
-            style={[
-              styles.statValue,
-              styles.netProfitPositive,
-              (report?.summary.netProfit || 0) < 0 && styles.netProfitNegative,
-            ]}
-          >
-            {formatCurrency(report?.summary.netProfit || 0, currency)}
-          </Text>
-          <Text style={styles.statLabel}>Net Profit</Text>
-        </View>
-      </View>
-
-      <View style={styles.paymentSplit}>
-        <View style={styles.paymentItem}>
-          <View style={[styles.dot, { backgroundColor: Colors.success }]} />
-          <Text style={styles.paymentText}>Cash {formatCurrency(report?.summary.cashTotal || 0, currency)}</Text>
-        </View>
-        <View style={styles.paymentItem}>
-          <View style={[styles.dot, { backgroundColor: Colors.info }]} />
-          <Text style={styles.paymentText}>M-Pesa {formatCurrency(report?.summary.mpesaTotal || 0, currency)}</Text>
-        </View>
-      </View>
-
-      <ListRow
-        title="View & record expenses"
-        icon="cash-outline"
-        chevron
-        isLast
-        style={styles.expensesLink}
-        onPress={() => router.push('/(owner)/expenses')}
+      {/* ── hero revenue card with embedded chart ──────────────────── */}
+      <HeroRevenueCard
+        summary={summary}
+        series={series}
+        currency={currency}
+        period={period}
       />
 
-      <Section title="Trend">
-        <TrendChart series={series} />
-      </Section>
+      <View style={s.gap} />
 
-      <Section title="Top Products">
-        {(report?.topProducts.length || 0) === 0 ? (
-          <Text style={styles.empty}>No sales in this period</Text>
-        ) : (
-          report?.topProducts.map((p, i) => (
-            <ListRow
-              key={p.productName}
-              title={p.productName}
-              subtitle={`${p.quantitySold} sold`}
-              trailing={<Text style={styles.rowValue}>{formatCurrency(p.revenue, currency)}</Text>}
-              isLast={i === report.topProducts.length - 1}
-            />
-          ))
-        )}
-      </Section>
+      {/* ── insight carousel ───────────────────────────────────────── */}
+      <InsightCards
+        summary={summary}
+        series={series}
+        currency={currency}
+        period={period}
+      />
 
-      <Section title="By Staff">
-        {(report?.byStaff.length || 0) === 0 ? (
-          <Text style={styles.empty}>No sales in this period</Text>
-        ) : (
-          report?.byStaff.map((s, i) => (
-            <ListRow
-              key={s.staffName}
-              title={s.staffName}
-              subtitle={`${s.transactionCount} sales`}
-              trailing={<Text style={styles.rowValue}>{formatCurrency(s.total, currency)}</Text>}
-              isLast={i === report.byStaff.length - 1}
-            />
-          ))
-        )}
-      </Section>
+      <View style={s.gap} />
 
-      <Section title="Customer Ratings" action={<HelpLink slug="receipts-and-ratings" />}>
-        {!ratingsSummary || ratingsSummary.totalRatings === 0 ? (
-          <Text style={styles.empty}>No customer ratings yet</Text>
-        ) : (
-          <>
-            <View style={styles.ratingHeader}>
-              <Text style={styles.ratingAvg}>{ratingsSummary.avgStars.toFixed(1)}</Text>
-              <View>
-                <View style={styles.starRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Ionicons
-                      key={s}
-                      name={s <= Math.round(ratingsSummary.avgStars) ? 'star' : 'star-outline'}
-                      size={16}
-                      color={Colors.warning}
-                    />
-                  ))}
-                </View>
-                <Text style={styles.ratingCount}>{ratingsSummary.totalRatings} ratings</Text>
-              </View>
-            </View>
+      {/* ── quick-access shortcuts ─────────────────────────────────── */}
+      <QuickShortcuts />
 
-            {ratingsSummary.byStaff.map((s, i) => (
-              <ListRow
-                key={s.staffId}
-                title={s.staffName}
-                subtitle={`${s.totalRatings} ratings`}
-                trailing={<Text style={styles.rowValue}>{s.avgStars.toFixed(1)} ★</Text>}
-                isLast={i === ratingsSummary.byStaff.length - 1}
-              />
-            ))}
-          </>
-        )}
-      </Section>
+      <View style={s.sectionGap} />
 
-      <Section title="Stock Velocity" action={<HelpLink slug="sales-reports" />}>
-        {!depletion || (depletion.fastMovers.length === 0 && depletion.slowMovers.length === 0) ? (
-          <Text style={styles.empty}>Not enough sales history yet</Text>
-        ) : (
-          <>
-            {depletion.fastMovers.length > 0 && (
-              <>
-                <Text style={styles.subLabel}>Fast Movers</Text>
-                {depletion.fastMovers.slice(0, 5).map((p, i, arr) => (
-                  <ListRow
-                    key={p.productId}
-                    title={p.name}
-                    subtitle={`${p.avgDailyVelocity.toFixed(1)}/day`}
-                    trailing={
-                      <Text style={styles.rowValue}>
-                        {p.daysUntilStockout != null ? `${Math.round(p.daysUntilStockout)}d left` : '—'}
-                      </Text>
-                    }
-                    isLast={i === arr.length - 1 && depletion.slowMovers.length === 0}
-                  />
-                ))}
-              </>
-            )}
-            {depletion.slowMovers.length > 0 && (
-              <>
-                <Text style={[styles.subLabel, depletion.fastMovers.length > 0 && styles.subLabelSpaced]}>
-                  Slow Movers
-                </Text>
-                {depletion.slowMovers.slice(0, 5).map((p, i, arr) => (
-                  <ListRow
-                    key={p.productId}
-                    title={p.name}
-                    subtitle={`${p.avgDailyVelocity.toFixed(2)}/day`}
-                    trailing={<Text style={styles.rowValue}>{p.quantity} in stock</Text>}
-                    isLast={i === arr.length - 1}
-                  />
-                ))}
-              </>
-            )}
-          </>
-        )}
-      </Section>
-    </Animated.ScrollView>
+      {/* ── section divider ────────────────────────────────────────── */}
+      <Animated.View entering={FadeInDown.duration(320).delay(280)} style={s.dividerRow}>
+        <View style={s.dividerLine} />
+        <Text style={s.dividerLabel}>Detailed Analytics</Text>
+        <View style={s.dividerLine} />
+      </Animated.View>
+
+      <View style={s.sectionGap} />
+
+      {/* ── top products leaderboard ───────────────────────────────── */}
+      <TopProductsLeaderboard
+        products={report?.topProducts ?? []}
+        currency={currency}
+      />
+
+      <View style={s.sectionGap} />
+
+      {/* ── staff performance ──────────────────────────────────────── */}
+      <StaffPerformanceSection
+        staff={report?.byStaff ?? []}
+        currency={currency}
+      />
+
+      <View style={s.sectionGap} />
+
+      {/* ── customer ratings ───────────────────────────────────────── */}
+      <RatingsModule ratings={ratingsSummary} />
+
+      <View style={s.sectionGap} />
+
+      {/* ── stock intelligence ─────────────────────────────────────── */}
+      <StockIntelligence depletion={depletion} />
+      </Animated.ScrollView>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginBottom: Spacing.md },
-
-  periodToggle: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    padding: 4,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+const s = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: Colors.background,
   },
-  periodBtn: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: BorderRadius.sm },
-  periodBtnActive: { backgroundColor: Colors.primary },
-  periodBtnText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary },
-  periodBtnTextActive: { color: Colors.white },
-
-  hero: { marginBottom: Spacing.md },
-  heroLabel: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  heroValue: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginTop: 2 },
-
-  statsRow: {
-    flexDirection: 'row',
-    paddingVertical: Spacing.md,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: Colors.divider,
-    marginBottom: Spacing.md,
+  content: {
+    paddingHorizontal: Spacing.lg,
   },
-  statCell: { flex: 1, alignItems: 'center' },
-  statCellDivider: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: Colors.divider },
-  statValue: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
-  netProfitPositive: { color: Colors.accentDark },
-  netProfitNegative: { color: Colors.danger },
-  statLabel: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
-
-  paymentSplit: { flexDirection: 'row', gap: Spacing.lg, marginBottom: Spacing.lg },
-  paymentItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  dot: { width: 8, height: 8, borderRadius: BorderRadius.xs },
-  paymentText: { fontSize: Typography.size.small, color: Colors.textSecondary },
-
-  expensesLink: { marginBottom: Spacing.lg },
-
-  empty: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center', paddingVertical: Spacing.sm },
-
-  rowValue: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-
-  ratingHeader: {
+  gap: {
+    height: Spacing.md,
+  },
+  sectionGap: {
+    height: Spacing.lg,
+  },
+  dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    paddingBottom: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
-    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
   },
-  ratingAvg: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.accentDark },
-  starRow: { flexDirection: 'row', gap: 2 },
-  ratingCount: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 4 },
-
-  subLabel: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary, marginBottom: Spacing.xs },
-  subLabelSpaced: { marginTop: Spacing.sm },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerLabel: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
 });

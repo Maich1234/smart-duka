@@ -1,7 +1,7 @@
 import api from './api';
 
 export type ProductType = 'standard' | 'variable' | 'weighted' | 'refillable' | 'service' | 'bundle' | 'configurable';
-export type UnitOfMeasure = 'unit' | 'kg' | 'g' | 'l' | 'ml';
+export type UnitOfMeasure = 'unit' | 'kg' | 'g' | 'l' | 'ml' | 'dozen' | 'pack' | 'box' | 'bag' | 'lb' | 'oz' | 'm' | 'cm' | 'ton';
 
 export interface BundleItem {
   product: string;

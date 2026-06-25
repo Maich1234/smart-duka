@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": [
+        "applinks:smart-duka--fqsxcq2wom.expo.app",
+        "applinks:smart-duka.expo.app"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +26,31 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.wabunifu.smartduka",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "smart-duka--fqsxcq2wom.expo.app"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "smart-duka.expo.app"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -44,7 +72,14 @@
       ],
       "@react-native-community/datetimepicker",
       "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      "@react-native-firebase/messaging",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Smart Duka to access your photos to set a business logo.",
+          "cameraPermission": "Allow Smart Duka to use the camera to capture a business logo."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

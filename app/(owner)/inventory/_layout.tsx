@@ -15,8 +15,8 @@ export default function InventoryStackLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="new" options={{ title: 'Add Product' }} />
-      <Stack.Screen name="[id]/edit" options={{ title: 'Edit Product' }} />
+      <Stack.Screen name="new" options={{ headerShown: false }} />
+      <Stack.Screen name="[id]/edit" options={{ headerShown: false }} />
     </Stack>
   );
 }

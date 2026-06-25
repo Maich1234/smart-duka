@@ -84,10 +84,16 @@ export const Input: React.FC<InputProps> = ({
             />
           </TouchableOpacity>
         )}
-        {rightIcon && !secureTextEntry && onRightIconPress && (
-          <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon}>
-            <Ionicons name={rightIcon} size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
+        {rightIcon && !secureTextEntry && (
+          onRightIconPress ? (
+            <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon}>
+              <Ionicons name={rightIcon} size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.rightIcon}>
+              <Ionicons name={rightIcon} size={20} color={Colors.textSecondary} />
+            </View>
+          )
         )}
       </View>
       {error && <Text style={[styles.error, { color: Colors.danger }]}>{error}</Text>}

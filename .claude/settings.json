@@ -98,7 +98,8 @@
       "Bash(curl -sI --max-time 5 https://registry.npmjs.org/playwright)",
       "Bash(grep -n -iB2 -A2 \"discount\\\\|promo\" /home/maich/Documents/smart-duka/constants/helpTopics.ts)",
       "Bash(cat src/models/Product.js)",
-      "Bash(cat src/models/Sale.js)"
+      "Bash(cat src/models/Sale.js)",
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\('expo:', pkg.dependencies.expo\\)\")"
     ],
     "additionalDirectories": [
       "/tmp",

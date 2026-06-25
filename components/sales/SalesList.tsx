@@ -11,11 +11,11 @@ interface SalesListProps {
   isLoading: boolean;
   onRefresh: () => void;
   onPressSale: (sale: any) => void;
+  currency?: string;
   showStaff?: boolean;
-  /** Called when the user scrolls near the end of the list — fetch the next page here. */
   onEndReached?: () => void;
-  /** Whether the next page is currently being fetched (shows a footer spinner). */
   isFetchingNextPage?: boolean;
+  listHeader?: React.ReactElement;
 }
 
 export const SalesList: React.FC<SalesListProps> = ({
@@ -23,9 +23,11 @@ export const SalesList: React.FC<SalesListProps> = ({
   isLoading,
   onRefresh,
   onPressSale,
+  currency,
   showStaff = false,
   onEndReached,
   isFetchingNextPage = false,
+  listHeader,
 }) => {
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -38,14 +40,15 @@ export const SalesList: React.FC<SalesListProps> = ({
       showsVerticalScrollIndicator={false}
       data={sales}
       keyExtractor={(item) => item._id}
-      renderItem={({ item, index }) => (
+      renderItem={({ item }) => (
         <SaleCard
           sale={item}
+          currency={currency}
           showStaff={showStaff}
-          isLast={index === sales.length - 1}
           onPress={() => onPressSale(item)}
         />
       )}
+      ListHeaderComponent={listHeader}
       contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} />}
       ListEmptyComponent={<EmptyState title="No sales found" />}

@@ -25,7 +25,9 @@ export async function buildReceiptHtml(
   shopPhone?: string,
   currency?: string,
   servedByName?: string,
-  thankYouNote?: string
+  thankYouNote?: string,
+  logoUrl?: string,
+  motto?: string
 ): Promise<string> {
   const rows = sale.items
     .map(
@@ -42,12 +44,31 @@ export async function buildReceiptHtml(
     )
     .join('');
 
+  const logoSection = logoUrl?.trim()
+    ? `<div style="text-align:center;margin-bottom:6px"><img src="${escapeHtml(logoUrl)}" style="max-width:80px;max-height:80px;object-fit:contain" /></div>`
+    : '';
+
+  const mottoLine = motto?.trim()
+    ? `<p style="text-align:center;margin:0 0 4px;font-size:9px;font-style:italic;color:#555">${escapeHtml(motto)}</p>`
+    : '';
+
   const phoneLine = shopPhone
     ? `<p style="text-align:center;margin:0 0 4px;font-size:10px;color:#444">${escapeHtml(shopPhone)}</p>`
     : '';
 
+  // M-Pesa confirmation details (only shown for mpesa payment method)
+  const mpesaSection = sale.paymentMethod === 'mpesa' && sale.mpesaReceiptNumber
+    ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;margin:8px 0">
+        <p style="margin:0 0 3px;font-size:9px;font-weight:bold;color:#15803d;text-align:center">LIPA NA M-PESA CONFIRMED</p>
+        <table style="width:100%;font-size:9px">
+          <tr><td><b>Receipt</b></td><td style="text-align:right;font-family:monospace">${escapeHtml(sale.mpesaReceiptNumber)}</td></tr>
+          ${(sale as any).mpesaPhoneNumber ? `<tr><td><b>Customer</b></td><td style="text-align:right">${escapeHtml((sale as any).mpesaPhoneNumber)}</td></tr>` : ''}
+        </table>
+      </div>`
+    : '';
+
   const qrSection = sale.receiptToken
-    ? `<div style="text-align:center;margin-top:14px">
+    ? `<div style="text-align:center;margin-top:14px;padding-top:10px;border-top:1px dashed #000">
         ${await QRCode.toString(`${PUBLIC_WEB_URL}/r/${sale.receiptToken}`, { type: 'svg', margin: 1, width: 120 })}
         <p style="margin:4px 0 0;font-size:9px;color:#666">Scan to verify this receipt &amp; rate your service</p>
       </div>`
@@ -57,7 +78,9 @@ export async function buildReceiptHtml(
 <html>
 <head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="font-family:'Courier New',monospace;width:280px;margin:0 auto;padding:16px 8px;color:#000">
+  ${logoSection}
   <h2 style="text-align:center;margin:0 0 2px;font-size:16px">${escapeHtml(shopName)}</h2>
+  ${mottoLine}
   ${phoneLine}
   <p style="text-align:center;margin:0 0 10px;font-size:9px;color:#666">Smart Duka POS</p>
   <hr style="border:none;border-top:1px dashed #000;margin:8px 0">
@@ -67,6 +90,7 @@ export async function buildReceiptHtml(
     <tr><td><b>Served By</b></td><td style="text-align:right">${escapeHtml(sale.staff?.name ?? servedByName ?? '-')}</td></tr>
     <tr><td><b>Payment</b></td><td style="text-align:right">${sale.paymentMethod.toUpperCase()}</td></tr>
   </table>
+  ${mpesaSection}
   <hr style="border:none;border-top:1px dashed #000;margin:8px 0">
   <table style="width:100%;border-collapse:collapse">
     <thead>

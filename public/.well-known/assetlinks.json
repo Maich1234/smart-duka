@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wabunifu.smartduka",
+      "sha256_cert_fingerprints": [
+        "D5:73:4E:4A:2B:0A:45:E6:DD:05:F5:72:25:32:0D:3C:56:EC:96:E9:32:1B:C2:12:17:D4:22:ED:23:CB:72:9A",
+        "A9:27:EA:13:FC:3D:FB:11:16:F0:FD:82:91:16:87:16:41:33:3E:11:2A:2C:74:DE:9A:8F:56:7D:65:6E:7D:2A"
+      ]
+    }
+  }
+]

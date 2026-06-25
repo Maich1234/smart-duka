@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { AnimatedPressable } from './AnimatedPressable';
 import { Colors } from '@/constants/Colors';
@@ -17,6 +18,7 @@ interface ButtonProps {
   style?: ViewStyle;
   textStyle?: TextStyle;
   haptic?: boolean;
+  leftIcon?: keyof typeof Ionicons.glyphMap;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -29,6 +31,7 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
   haptic = true,
+  leftIcon,
 }) => {
   const handlePress = () => {
     if (haptic && !disabled && !loading) {
@@ -99,18 +102,28 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator color={getTextColor()} />
       ) : (
-        <Text
-          style={[
-            styles.text,
-            {
-              color: getTextColor(),
-              fontSize: size === 'sm' ? Typography.size.small : size === 'md' ? Typography.size.body : Typography.size.h3,
-            },
-            textStyle,
-          ]}
-        >
-          {title}
-        </Text>
+        <>
+          {leftIcon && (
+            <Ionicons
+              name={leftIcon}
+              size={size === 'sm' ? 14 : size === 'md' ? 18 : 20}
+              color={getTextColor()}
+              style={{ marginRight: 6 }}
+            />
+          )}
+          <Text
+            style={[
+              styles.text,
+              {
+                color: getTextColor(),
+                fontSize: size === 'sm' ? Typography.size.small : size === 'md' ? Typography.size.body : Typography.size.h3,
+              },
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
+        </>
       )}
     </AnimatedPressable>
   );
