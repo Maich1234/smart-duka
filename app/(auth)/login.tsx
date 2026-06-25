@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Pressable,
+} from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -13,10 +20,11 @@ import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(1, 'Password required'),
+  email: z.string().email('Enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -24,8 +32,16 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginScreen() {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
-  const { email: prefillEmail, verified } = useLocalSearchParams<{ email?: string; verified?: string }>();
-  const { control, handleSubmit, setError, formState: { errors } } = useForm<LoginForm>({
+  const { email: prefillEmail, verified } = useLocalSearchParams<{
+    email?: string;
+    verified?: string;
+  }>();
+  const {
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: prefillEmail || '' },
   });
@@ -38,7 +54,9 @@ export default function LoginScreen() {
       if (verified === '1') {
         router.replace('/(auth)/onboarding');
       } else {
-        router.replace(result.role === 'owner' ? '/(owner)/dashboard' : '/(staff)/dashboard');
+        router.replace(
+          result.role === 'owner' ? '/(owner)/dashboard' : '/(staff)/dashboard'
+        );
       }
       return;
     }
@@ -46,96 +64,172 @@ export default function LoginScreen() {
       router.push({ pathname: '/(auth)/verify-email', params: { email: data.email } });
       return;
     }
-    setError('password', { message: result.message || 'Login failed' });
+    setError('password', { message: result.message || 'Incorrect email or password' });
   };
 
   return (
     <Screen
-      backgroundColor={Colors.background}
+      backgroundColor={Colors.surface}
       padded={false}
       contentContainerStyle={styles.scrollContent}
     >
       <StatusBar style="dark" />
       <View style={styles.inner}>
-        <AuthHeader />
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
+        <AuthHeader
+          headline="Welcome Back"
+          description="Manage your business with confidence."
+        />
 
-        {verified === '1' && (
-          <View style={styles.successBanner}>
-            <Text style={styles.successBannerText}>Email verified! Please sign in to continue.</Text>
+        {verified === '1' ? (
+          <View style={styles.verifiedBanner}>
+            <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+            <Text style={styles.verifiedText}>
+              Email verified — sign in to continue
+            </Text>
           </View>
-        )}
+        ) : null}
 
         <Controller
           control={control}
           name="email"
           render={({ field: { onChange, value } }) => (
             <Input
-              label="Email"
+              label="Email address"
               placeholder="you@example.com"
               value={value}
               onChangeText={onChange}
               error={errors.email?.message}
               autoCapitalize="none"
               keyboardType="email-address"
+              leftIcon="mail-outline"
+              returnKeyType="next"
             />
           )}
         />
+
         <Controller
           control={control}
           name="password"
           render={({ field: { onChange, value } }) => (
             <Input
               label="Password"
-              placeholder="••••••"
+              placeholder="Enter your password"
               value={value}
               onChangeText={onChange}
               secureTextEntry
               error={errors.password?.message}
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit(onSubmit)}
             />
           )}
         />
 
-        <Button title="Sign In" onPress={handleSubmit(onSubmit)} loading={loading} style={styles.button} />
-
-        <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')} style={styles.link}>
-          <Text style={styles.linkText}>Forgot password?</Text>
+        <TouchableOpacity
+          onPress={() => router.push('/(auth)/forgot-password')}
+          style={styles.forgotLink}
+          hitSlop={{ top: 8, bottom: 8 }}
+        >
+          <Text style={styles.forgotText}>Forgot password?</Text>
         </TouchableOpacity>
 
-        <View style={styles.registerRow}>
-          <Text style={styles.registerText}>Do not have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text style={styles.registerLink}>Create Shop</Text>
-          </TouchableOpacity>
+        <Button
+          title="Sign In"
+          onPress={handleSubmit(onSubmit)}
+          loading={loading}
+          style={styles.button}
+          size="lg"
+        />
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerLabel}>or</Text>
+          <View style={styles.dividerLine} />
         </View>
+
+        <Pressable
+          onPress={() => router.push('/(auth)/register')}
+          style={styles.createRow}
+        >
+          <Text style={styles.createText}>New to Smart Duka?</Text>
+          <Text style={styles.createLink}> Create your shop</Text>
+          <Ionicons name="arrow-forward" size={14} color={Colors.primary} style={styles.createArrow} />
+        </Pressable>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { flexGrow: 1, justifyContent: 'center' },
-  inner: { padding: Spacing.lg },
-  title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginBottom: Spacing.xs },
-  subtitle: { fontSize: Typography.size.body, color: Colors.textSecondary, marginBottom: Spacing.xl },
-  successBanner: {
-    backgroundColor: Colors.successSubtle,
-    borderRadius: 10,
-    padding: Spacing.sm,
-    marginBottom: Spacing.lg,
-    marginTop: -Spacing.md,
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
-  successBannerText: {
+  inner: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xl,
+  },
+  verifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: Colors.successSubtle,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    marginBottom: Spacing.lg,
+  },
+  verifiedText: {
     color: Colors.success,
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
-    textAlign: 'center',
+    flex: 1,
   },
-  button: { marginTop: Spacing.md },
-  link: { marginTop: Spacing.md, alignSelf: 'center' },
-  linkText: { color: Colors.primary, fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold },
-  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.xl },
-  registerText: { color: Colors.textSecondary, fontSize: Typography.size.small },
-  registerLink: { color: Colors.primary, fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginBottom: Spacing.lg,
+    marginTop: -Spacing.xs,
+  },
+  forgotText: {
+    color: Colors.primary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  button: {
+    borderRadius: BorderRadius.lg,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerLabel: {
+    fontSize: Typography.size.small,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+    paddingHorizontal: 4,
+  },
+  createRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+  },
+  createLink: {
+    color: Colors.primary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  createArrow: {
+    marginLeft: 2,
+  },
 });

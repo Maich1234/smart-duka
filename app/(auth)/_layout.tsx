@@ -1,56 +1,32 @@
+import React from 'react';
 import { Stack } from 'expo-router';
-import { useTheme } from '@/hooks/useTheme';
+import { Colors } from '@/constants/Colors';
 
 export default function AuthLayout() {
-  const { colors } = useTheme();
-
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: '600' },
-        headerShadowVisible: false,
-        // headerBackTitleVisible: false,
-        contentStyle: { backgroundColor: colors.background },
+        headerShown: false,
+        contentStyle: { backgroundColor: Colors.surface },
+        animation: 'fade_from_bottom',
       }}
     >
-      <Stack.Screen
-        name="login"
-        options={{
-          title: 'Sign In',
-          headerShown: false,
-        }}
-      />
+      <Stack.Screen name="login" />
       <Stack.Screen
         name="register"
-        options={{
-          title: 'Create Account',
-          presentation: 'modal',
-        }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="forgot-password"
-        options={{
-          title: 'Reset Password',
-          presentation: 'modal',
-        }}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="verify-email"
-        options={{
-          title: 'Verify Email',
-          headerBackVisible: false,
-          gestureEnabled: false,
-        }}
+        options={{ gestureEnabled: false }}
       />
       <Stack.Screen
         name="onboarding"
-        options={{
-          headerShown: false,
-          gestureEnabled: false,
-        }}
+        options={{ gestureEnabled: false }}
       />
     </Stack>
   );

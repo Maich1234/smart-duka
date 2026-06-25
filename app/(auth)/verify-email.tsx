@@ -1,43 +1,56 @@
-import React, { useState } from 'react';
-import { Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useTheme } from '@/hooks/useTheme';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/components/ui/Screen';
+import { Button } from '@/components/ui/Button';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { Spacing } from '@/constants/Spacing';
+import { OTPInput } from '@/components/auth/OTPInput';
+import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
+import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 import { verifyEmail, resendVerificationEmail } from '@/services/auth';
+import * as Haptics from 'expo-haptics';
 
-const codeSchema = z.object({
-  code: z.string().length(6, 'Code must be 6 digits'),
-});
-
-type CodeForm = z.infer<typeof codeSchema>;
+const RESEND_SECONDS = 60;
 
 export default function VerifyEmailScreen() {
-  const { colors } = useTheme();
   const { email } = useLocalSearchParams<{ email: string }>();
+  const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState('');
+  const [formError, setFormError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [countdown, setCountdown] = useState(RESEND_SECONDS);
 
-  const { control, handleSubmit, formState: { errors } } = useForm<CodeForm>({
-    resolver: zodResolver(codeSchema),
-    defaultValues: { code: '' },
-  });
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
-  const onSubmit = async (data: CodeForm) => {
+  const startCountdown = useCallback(() => {
+    setCountdown(RESEND_SECONDS);
+  }, []);
+
+  const onSubmit = async () => {
+    if (code.length < 6) {
+      setCodeError('Please enter the full 6-digit code');
+      return;
+    }
     setLoading(true);
+    setCodeError('');
+    setFormError('');
     try {
-      await verifyEmail(email, data.code);
+      await verifyEmail(email, code);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace({ pathname: '/(auth)/login', params: { email, verified: '1' } });
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Invalid verification code');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setCodeError(error.response?.data?.message || 'Invalid or expired code. Try again.');
     } finally {
       setLoading(false);
     }
@@ -45,54 +58,101 @@ export default function VerifyEmailScreen() {
 
   const handleResend = async () => {
     setResending(true);
+    setFormError('');
     try {
       await resendVerificationEmail(email);
-      Alert.alert('Sent', 'A new verification code has been sent to your email');
+      startCountdown();
+      setCode('');
+      setCodeError('');
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to resend code');
+      setFormError(error.response?.data?.message || 'Could not resend code. Try again.');
     } finally {
       setResending(false);
     }
   };
 
+  const maskEmail = (e: string) => {
+    const [local, domain] = e.split('@');
+    if (!domain) return e;
+    const masked = local.slice(0, 2) + '***';
+    return `${masked}@${domain}`;
+  };
+
+  const canResend = countdown <= 0;
+
   return (
-    <Screen backgroundColor={colors.background} padded={false} contentContainerStyle={styles.container}>
-        <AuthHeader />
-        <Card style={styles.card}>
-          <Text style={[styles.title, { color: colors.text }]}>Verify Your Email</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Enter the 6-digit code sent to {email}
+    <Screen
+      backgroundColor={Colors.surface}
+      padded={false}
+      contentContainerStyle={styles.container}
+    >
+      <View style={styles.inner}>
+        <AuthHeader
+          headline="Verify Your Email"
+          description={`We sent a 6-digit code to ${maskEmail(email || '')}. Check your inbox.`}
+        />
+
+        {/* Email chip */}
+        <View style={styles.emailChip}>
+          <Ionicons name="mail-outline" size={15} color={Colors.primary} />
+          <Text style={styles.emailChipText} numberOfLines={1}>
+            {email}
           </Text>
+        </View>
 
-          <Controller
-            control={control}
-            name="code"
-            render={({ field: { onChange, value } }) => (
-              <Input
-                label="Verification Code"
-                placeholder="123456"
-                value={value}
-                onChangeText={onChange}
-                error={errors.code?.message}
-                keyboardType="number-pad"
-                maxLength={6}
-              />
-            )}
-          />
+        <OTPInput
+          value={code}
+          onChange={(v) => {
+            setCode(v);
+            if (codeError) setCodeError('');
+          }}
+          error={codeError}
+        />
 
-          <Button
-            title="Verify Email"
-            onPress={handleSubmit(onSubmit)}
-            loading={loading}
-            style={styles.button}
-          />
+        {formError ? (
+          <View style={styles.inlineError}>
+            <Ionicons name="alert-circle-outline" size={15} color={Colors.danger} />
+            <Text style={styles.inlineErrorText}>{formError}</Text>
+          </View>
+        ) : null}
 
-          <TouchableOpacity onPress={handleResend} disabled={resending} style={styles.resendLink}>
-            <Text style={[styles.link, { color: colors.primary }]}>
-              {resending ? 'Sending...' : "Didn't get a code? Resend"}
+        <Button
+          title="Verify Email"
+          onPress={onSubmit}
+          loading={loading}
+          style={styles.button}
+          size="lg"
+          disabled={code.length < 6}
+        />
+
+        {/* Resend row */}
+        <View style={styles.resendRow}>
+          <Text style={styles.resendPrompt}>Didn't get the code?</Text>
+          {canResend ? (
+            <TouchableOpacity
+              onPress={handleResend}
+              disabled={resending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.resendLink}>
+                {resending ? 'Sending…' : 'Resend code'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.resendCountdown}>
+              Resend in {countdown}s
             </Text>
-          </TouchableOpacity>
-        </Card>
+          )}
+        </View>
+
+        {/* Hint */}
+        <View style={styles.hint}>
+          <Ionicons name="information-circle-outline" size={14} color={Colors.textTertiary} />
+          <Text style={styles.hintText}>
+            Check your spam folder if you don't see the email.
+          </Text>
+        </View>
+      </View>
     </Screen>
   );
 }
@@ -101,31 +161,82 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: Spacing.md,
   },
-  card: {
-    padding: Spacing.lg,
+  inner: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xl,
   },
-  title: {
-    fontSize: Typography.fontSize.xxl,
-    fontWeight: Typography.fontWeight.bold,
-    marginBottom: Spacing.xs,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: Typography.fontSize.sm,
-    textAlign: 'center',
+  emailChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primarySubtle,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 7,
     marginBottom: Spacing.lg,
   },
+  emailChipText: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
+    maxWidth: 220,
+  },
+  inlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.dangerSubtle,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    marginBottom: Spacing.sm,
+  },
+  inlineErrorText: {
+    flex: 1,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: Colors.danger,
+  },
   button: {
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+  },
+  resendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: Spacing.lg,
+  },
+  resendPrompt: {
+    fontSize: Typography.size.small,
+    color: Colors.textSecondary,
+    fontFamily: Typography.fontFamily,
   },
   resendLink: {
-    marginTop: Spacing.lg,
-    alignItems: 'center',
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
   },
-  link: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
+  resendCountdown: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textTertiary,
+  },
+  hint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: Spacing.xl,
+    paddingHorizontal: Spacing.xs,
+  },
+  hintText: {
+    flex: 1,
+    fontSize: Typography.size.caption,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+    lineHeight: 18,
   },
 });
