@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ export default function NewStaffScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { permissions, setPermissions, reset } = useStaffDraftStore();
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
+  const { toast } = useAlert();
 
   useEffect(() => {
     setPermissions(DEFAULT_STAFF_PERMISSIONS);
@@ -43,14 +45,16 @@ export default function NewStaffScreen() {
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to add staff');
+      toast({ type: 'error', message: error.response?.data?.message || 'Failed to add staff' });
     },
   });
 
   const handleSave = () => {
-    if (!form.name || !form.email) return Alert.alert('Error', 'Name and email are required');
+    if (!form.name || !form.email) {
+      return toast({ type: 'error', message: 'Name and email are required' });
+    }
     if (!form.password || form.password.length < 6) {
-      return Alert.alert('Error', 'Password must be at least 6 characters');
+      return toast({ type: 'error', message: 'Password must be at least 6 characters' });
     }
     saveMutation.mutate();
   };

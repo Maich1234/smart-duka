@@ -5,13 +5,13 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   TouchableOpacity,
   Switch,
   RefreshControl,
   ScrollView,
   Dimensions,
 } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -174,6 +174,7 @@ const HELP_ITEMS: HelpItem[] = [
 export default function OwnerProfile() {
   const { user, logout } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
+  const { toast } = useAlert();
 
   const [shop, setShop] = useState({
     name: '',
@@ -244,9 +245,9 @@ export default function OwnerProfile() {
     try {
       const { name, address, phone, email, taxRate, country, currency, receiptThankYouNote, logoUrl, motto } = shop;
       await updateShopConfig({ name, address, phone, email, taxRate, country, currency, receiptThankYouNote, logoUrl, motto } as any);
-      Alert.alert('Success', 'Shop information updated');
+      toast({ type: 'success', message: 'Shop information updated' });
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Update failed');
+      toast({ type: 'error', message: error.response?.data?.message || 'Update failed' });
     } finally {
       setUpdatingShop(false);
     }
@@ -255,7 +256,7 @@ export default function OwnerProfile() {
   const handlePickLogo = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to your photo library to upload a logo.');
+      toast({ type: 'warning', message: 'Please allow access to your photo library to upload a logo.' });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -271,7 +272,7 @@ export default function OwnerProfile() {
       const { logoUrl } = await uploadShopLogo(asset.uri, asset.mimeType ?? 'image/jpeg');
       setShop((prev) => ({ ...prev, logoUrl }));
     } catch (error: any) {
-      Alert.alert('Upload failed', error.response?.data?.message || 'Could not upload logo');
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not upload logo' });
     } finally {
       setUploadingLogo(false);
     }
@@ -281,9 +282,9 @@ export default function OwnerProfile() {
     setUpdatingPassword(true);
     try {
       await changePassword(current, newPwd);
-      Alert.alert('Success', 'Password changed successfully');
+      toast({ type: 'success', message: 'Password changed successfully' });
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Password change failed');
+      toast({ type: 'error', message: error.response?.data?.message || 'Password change failed' });
     } finally {
       setUpdatingPassword(false);
     }

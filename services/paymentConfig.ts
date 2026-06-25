@@ -16,6 +16,9 @@ export interface MpesaConfigDetails {
   consumerKeySet: boolean;
   consumerSecretSet: boolean;
   passkeySet: boolean;
+  consumerKeyMasked: string | null;
+  consumerSecretMasked: string | null;
+  passkeyMasked: string | null;
   configuredAt: string | null;
 }
 
@@ -23,9 +26,9 @@ export interface SaveMpesaConfigPayload {
   environment: 'sandbox' | 'production';
   businessName: string;
   shortcode: string;
-  consumerKey: string;
-  consumerSecret: string;
-  passkey: string;
+  consumerKey?: string;
+  consumerSecret?: string;
+  passkey?: string;
 }
 
 /** Fetches M-Pesa enabled/disabled status — safe for all authenticated users, no credentials. */

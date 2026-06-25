@@ -5,10 +5,10 @@ import {
   FlatList,
   ScrollView,
   RefreshControl,
-  Alert,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -71,6 +71,7 @@ export default function OwnerInventory() {
   const [selectedProductForStock, setSelectedProductForStock] = useState<Product | null>(null);
   const [velocityFilter, setVelocityFilter] = useState<VelocityFilter>('all');
   const queryClient = useQueryClient();
+  const { alert, toast } = useAlert();
 
   const { data: depletionData } = useQuery({
     queryKey: ['depletionAnalytics'],
@@ -87,7 +88,7 @@ export default function OwnerInventory() {
     mutationFn: deleteProduct,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
     onError: (error: any) =>
-      Alert.alert('Error', error.response?.data?.message || 'Deletion failed'),
+      toast({ type: 'error', message: error.response?.data?.message || 'Deletion failed' }),
   });
 
   const stockMutation = useMutation({
@@ -96,17 +97,22 @@ export default function OwnerInventory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setStockModalVisible(false);
-      Alert.alert('Success', 'Stock updated successfully');
+      toast({ type: 'success', message: 'Stock updated successfully' });
     },
     onError: (error: any) =>
-      Alert.alert('Error', error.response?.data?.message || 'Stock update failed'),
+      toast({ type: 'error', message: error.response?.data?.message || 'Stock update failed' }),
   });
 
   const handleDelete = (id: string) => {
-    Alert.alert('Delete Product', 'This action cannot be undone. Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(id) },
-    ]);
+    alert({
+      type: 'confirm',
+      title: 'Delete Product',
+      message: 'This action cannot be undone. Are you sure?',
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
+        { label: 'Delete', variant: 'danger', onPress: () => deleteMutation.mutate(id) },
+      ],
+    });
   };
 
   const openStockModal = (product: Product) => {

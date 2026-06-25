@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Alert, Text } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Text } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
@@ -40,6 +41,7 @@ export default function StaffSales() {
   const tabBarHeight = useBottomTabBarHeight();
   const canRecordSale = usePermission('record_sale');
   const canViewSales = usePermission('view_sales');
+  const { toast } = useAlert();
 
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartEntry[]>([]);
@@ -94,7 +96,7 @@ export default function StaffSales() {
       setReceiptVisible(true);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.message || 'Sale failed');
+      toast({ type: 'error', message: error.response?.data?.message || 'Sale failed' });
     },
   });
 
@@ -104,7 +106,7 @@ export default function StaffSales() {
   const addToCart = (product: Product) => {
     if (product.productType === 'configurable') {
       if (!product.variants?.length) {
-        Alert.alert('No Variants', `${product.name} has no variants configured yet`);
+        toast({ type: 'warning', message: `${product.name} has no variants configured yet` });
         return;
       }
       setSelectedProduct(product);
@@ -115,7 +117,7 @@ export default function StaffSales() {
     // server be authoritative on whether there's enough component stock.
     const tracksOwnStock = product.trackInventory && product.productType !== 'bundle';
     if (tracksOwnStock && product.quantity <= 0) {
-      Alert.alert('Out of Stock', `${product.name} is out of stock`);
+      toast({ type: 'warning', message: `${product.name} is out of stock` });
       return;
     }
     setSelectedProduct(product);
@@ -184,16 +186,16 @@ export default function StaffSales() {
 
   const handleCheckout = () => {
     if (cart.length === 0) {
-      Alert.alert('Empty Cart', 'Add at least one product before checking out.');
+      toast({ type: 'warning', message: 'Add at least one product before checking out.' });
       return;
     }
     if (paymentMethod === 'mpesa') {
       if (!mpesaEnabled) {
-        Alert.alert('M-Pesa Not Configured', 'The shop owner has not connected an M-Pesa Business account yet.');
+        toast({ type: 'warning', message: 'The shop owner has not connected an M-Pesa Business account yet.' });
         return;
       }
       if (!isValidKenyanPhone(customerPhone)) {
-        Alert.alert('Invalid Phone', 'Enter a valid Kenyan number (e.g. +254712345678).');
+        toast({ type: 'error', message: 'Enter a valid Kenyan number (e.g. +254712345678).' });
         return;
       }
       setMpesaModalVisible(true);

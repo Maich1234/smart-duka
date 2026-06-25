@@ -6,7 +6,6 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -51,6 +52,7 @@ export default function StaffDetailsScreen() {
   const queryClient = useQueryClient();
   const tabBarHeight = useBottomTabBarHeight();
   const [resetModalVisible, setResetModalVisible] = useState(false);
+  const { alert, toast } = useAlert();
 
   const { data, isLoading } = useQuery({
     queryKey: ['staff', id],
@@ -68,20 +70,30 @@ export default function StaffDetailsScreen() {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
       router.back();
     },
-    onError: (error: any) => Alert.alert('Error', error.response?.data?.message || 'Failed to delete staff'),
+    onError: (error: any) =>
+      toast({ type: 'error', message: error.response?.data?.message || 'Failed to delete staff' }),
   });
 
   const resetPasswordMutation = useMutation({
     mutationFn: (newPassword: string) => resetStaffPassword(id, newPassword),
-    onSuccess: () => { setResetModalVisible(false); Alert.alert('Success', 'Password reset'); },
-    onError: (error: any) => Alert.alert('Error', error.response?.data?.message || 'Failed to reset password'),
+    onSuccess: () => {
+      setResetModalVisible(false);
+      toast({ type: 'success', message: 'Password reset successfully' });
+    },
+    onError: (error: any) =>
+      toast({ type: 'error', message: error.response?.data?.message || 'Failed to reset password' }),
   });
 
   const handleDelete = () => {
-    Alert.alert('Remove Staff Member', `Are you sure you want to remove ${data?.data.name}? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate() },
-    ]);
+    alert({
+      type: 'confirm',
+      title: 'Remove Staff Member',
+      message: `Are you sure you want to remove ${data?.data.name}? This cannot be undone.`,
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
+        { label: 'Remove', variant: 'danger', onPress: () => deleteMutation.mutate() },
+      ],
+    });
   };
 
   if (isLoading || !data) {

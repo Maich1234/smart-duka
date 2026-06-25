@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -45,6 +46,7 @@ function SectionLabel({ title, icon }: { title: string; icon: keyof typeof Ionic
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
+  const { toast } = useAlert();
   const {
     control,
     handleSubmit,
@@ -69,13 +71,13 @@ export default function RegisterScreen() {
       if (res.success) {
         router.replace({ pathname: '/(auth)/verify-email', params: { email: data.email } });
       } else {
-        Alert.alert('Registration Failed', res.message || 'Please try again');
+        toast({ type: 'error', message: res.message || 'Registration failed. Please try again.' });
       }
     } catch (error: any) {
-      Alert.alert(
-        'Registration Failed',
-        error.response?.data?.message || 'Something went wrong. Please try again.'
-      );
+      toast({
+        type: 'error',
+        message: error.response?.data?.message || 'Something went wrong. Please try again.',
+      });
     } finally {
       setLoading(false);
     }

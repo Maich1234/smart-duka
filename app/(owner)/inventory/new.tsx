@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { getProducts, createProduct, type CreateProductData } from '@/services/products';
@@ -17,6 +17,7 @@ const EMPTY_FORM: ProductFormData = {
 export default function NewProductScreen() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<ProductFormData>(EMPTY_FORM);
+  const { toast } = useAlert();
 
   const { data } = useQuery({
     queryKey: ['products', ''],
@@ -34,20 +35,21 @@ export default function NewProductScreen() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       router.back();
     },
-    onError: (error: any) => Alert.alert('Error', error.response?.data?.message || 'Creation failed'),
+    onError: (error: any) =>
+      toast({ type: 'error', message: error.response?.data?.message || 'Creation failed' }),
   });
 
   const handleSave = () => {
     if (!form.name || !form.category || !form.sellingPrice || !form.costPrice) {
-      Alert.alert('Error', 'Please fill all required fields');
+      toast({ type: 'error', message: 'Please fill all required fields' });
       return;
     }
     if (form.productType === 'bundle' && form.bundleItems.length === 0) {
-      Alert.alert('Error', 'Add at least one item to the bundle');
+      toast({ type: 'error', message: 'Add at least one item to the bundle' });
       return;
     }
     if (form.productType === 'configurable' && form.variants.length === 0) {
-      Alert.alert('Error', 'Add at least one variant');
+      toast({ type: 'error', message: 'Add at least one variant' });
       return;
     }
 

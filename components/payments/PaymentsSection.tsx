@@ -195,6 +195,12 @@ export const PaymentsSection: React.FC = () => {
           onSave={handleSaveConfig}
           loading={saving}
           onCancel={() => setView(config?.consumerKeySet ? 'configured' : 'no_config')}
+          initialValues={config ? {
+            environment: config.environment,
+            businessName: config.businessName,
+            shortcode: config.shortcode,
+          } : undefined}
+          isEditing={!!config?.consumerKeySet}
         />
       </Animated.View>
     );
@@ -222,9 +228,21 @@ export const PaymentsSection: React.FC = () => {
       {/* Masked credentials */}
       <View style={styles.credentialGroup}>
         <Text style={styles.credGroupLabel}>API CREDENTIALS</Text>
-        <CredentialRow label="Consumer Key" isSet={config?.consumerKeySet ?? false} />
-        <CredentialRow label="Consumer Secret" isSet={config?.consumerSecretSet ?? false} />
-        <CredentialRow label="Passkey" isSet={config?.passkeySet ?? false} />
+        <CredentialRow
+          label="Consumer Key"
+          isSet={config?.consumerKeySet ?? false}
+          maskedValue={config?.consumerKeyMasked ?? null}
+        />
+        <CredentialRow
+          label="Consumer Secret"
+          isSet={config?.consumerSecretSet ?? false}
+          maskedValue={config?.consumerSecretMasked ?? null}
+        />
+        <CredentialRow
+          label="Passkey"
+          isSet={config?.passkeySet ?? false}
+          maskedValue={config?.passkeyMasked ?? null}
+        />
       </View>
 
       {config?.configuredAt && (
@@ -267,25 +285,50 @@ const InfoRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; label: string; v
   </View>
 );
 
-const CredentialRow: React.FC<{ label: string; isSet: boolean }> = ({ label, isSet }) => (
-  <View style={styles.credRow}>
-    <Ionicons name="key-outline" size={13} color={Colors.textTertiary} />
-    <Text style={styles.credLabel}>{label}</Text>
-    <View style={styles.credValueWrap}>
-      {isSet ? (
-        <>
-          <Text style={styles.credMasked}>••••••••••••••••</Text>
+const CredentialRow: React.FC<{ label: string; isSet: boolean; maskedValue: string | null }> = ({
+  label,
+  isSet,
+  maskedValue,
+}) => {
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <View style={styles.credRow}>
+      <View style={styles.credRowTop}>
+        <View style={styles.credRowLeft}>
+          <Ionicons name="key-outline" size={13} color={Colors.textTertiary} />
+          <Text style={styles.credLabel}>{label}</Text>
+        </View>
+        {isSet ? (
           <View style={styles.credSetBadge}>
             <Ionicons name="checkmark" size={10} color={Colors.success} />
             <Text style={styles.credSetText}>Set</Text>
           </View>
-        </>
-      ) : (
-        <Text style={styles.credNotSet}>Not set</Text>
+        ) : (
+          <Text style={styles.credNotSet}>Not set</Text>
+        )}
+      </View>
+      {isSet && (
+        <View style={styles.credValueRow}>
+          <Text style={styles.credMasked} selectable>
+            {revealed ? (maskedValue ?? '••••••••••••••••') : '••••••••••••••••'}
+          </Text>
+          <TouchableOpacity
+            style={styles.revealBtn}
+            onPress={() => setRevealed((v) => !v)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={revealed ? 'eye-off-outline' : 'eye-outline'}
+              size={14}
+              color={Colors.textTertiary}
+            />
+          </TouchableOpacity>
+        </View>
       )}
     </View>
-  </View>
-);
+  );
+};
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -468,27 +511,43 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   credRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
     backgroundColor: Colors.surface,
+    gap: 6,
+  },
+  credRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  credRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   credLabel: {
-    flex: 1,
     fontSize: 12,
     color: Colors.textSecondary,
     fontFamily: Typography.fontFamily,
   },
-  credValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  credValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 19,
+  },
   credMasked: {
-    fontSize: 10,
-    color: Colors.textTertiary,
+    flex: 1,
+    fontSize: 12,
+    color: Colors.textPrimary,
     fontFamily: 'Courier New',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
+  },
+  revealBtn: {
+    padding: 2,
   },
   credSetBadge: {
     flexDirection: 'row',

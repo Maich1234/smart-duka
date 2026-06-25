@@ -13,18 +13,32 @@ interface Props {
     environment: 'sandbox' | 'production';
     businessName: string;
     shortcode: string;
-    consumerKey: string;
-    consumerSecret: string;
-    passkey: string;
+    consumerKey?: string;
+    consumerSecret?: string;
+    passkey?: string;
   }) => Promise<void>;
   loading?: boolean;
   onCancel?: () => void;
+  initialValues?: {
+    environment: 'sandbox' | 'production';
+    businessName: string;
+    shortcode: string;
+  };
+  isEditing?: boolean;
 }
 
-export const MpesaConfigForm: React.FC<Props> = ({ onSave, loading = false, onCancel }) => {
-  const [environment, setEnvironment] = useState<'sandbox' | 'production'>('sandbox');
-  const [businessName, setBusinessName] = useState('');
-  const [shortcode, setShortcode] = useState('');
+export const MpesaConfigForm: React.FC<Props> = ({
+  onSave,
+  loading = false,
+  onCancel,
+  initialValues,
+  isEditing = false,
+}) => {
+  const [environment, setEnvironment] = useState<'sandbox' | 'production'>(
+    initialValues?.environment ?? 'sandbox'
+  );
+  const [businessName, setBusinessName] = useState(initialValues?.businessName ?? '');
+  const [shortcode, setShortcode] = useState(initialValues?.shortcode ?? '');
   const [consumerKey, setConsumerKey] = useState('');
   const [consumerSecret, setConsumerSecret] = useState('');
   const [passkey, setPasskey] = useState('');
@@ -34,16 +48,30 @@ export const MpesaConfigForm: React.FC<Props> = ({ onSave, loading = false, onCa
     const e: Record<string, string> = {};
     if (!businessName.trim()) e.businessName = 'Business name is required';
     if (!shortcode.trim() || !/^\d{5,7}$/.test(shortcode.trim())) e.shortcode = 'Shortcode must be 5–7 digits';
-    if (!consumerKey.trim() || consumerKey.trim().length < 10) e.consumerKey = 'Consumer key is required';
-    if (!consumerSecret.trim() || consumerSecret.trim().length < 10) e.consumerSecret = 'Consumer secret is required';
-    if (!passkey.trim() || passkey.trim().length < 10) e.passkey = 'Passkey is required';
+    if (!isEditing) {
+      if (!consumerKey.trim() || consumerKey.trim().length < 10) e.consumerKey = 'Consumer key is required';
+      if (!consumerSecret.trim() || consumerSecret.trim().length < 10) e.consumerSecret = 'Consumer secret is required';
+      if (!passkey.trim() || passkey.trim().length < 10) e.passkey = 'Passkey is required';
+    } else {
+      if (consumerKey.trim() && consumerKey.trim().length < 10) e.consumerKey = 'Consumer key must be at least 10 characters';
+      if (consumerSecret.trim() && consumerSecret.trim().length < 10) e.consumerSecret = 'Consumer secret must be at least 10 characters';
+      if (passkey.trim() && passkey.trim().length < 10) e.passkey = 'Passkey must be at least 10 characters';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSave = async () => {
     if (!validate()) return;
-    await onSave({ environment, businessName: businessName.trim(), shortcode: shortcode.trim(), consumerKey: consumerKey.trim(), consumerSecret: consumerSecret.trim(), passkey: passkey.trim() });
+    const payload: Parameters<typeof onSave>[0] = {
+      environment,
+      businessName: businessName.trim(),
+      shortcode: shortcode.trim(),
+    };
+    if (consumerKey.trim()) payload.consumerKey = consumerKey.trim();
+    if (consumerSecret.trim()) payload.consumerSecret = consumerSecret.trim();
+    if (passkey.trim()) payload.passkey = passkey.trim();
+    await onSave(payload);
   };
 
   return (
@@ -125,13 +153,21 @@ export const MpesaConfigForm: React.FC<Props> = ({ onSave, loading = false, onCa
         These are encrypted with AES-256 before storage. Get them from the{' '}
         <Text style={styles.credentialLink}>Safaricom Developer Portal</Text>.
       </Text>
+      {isEditing && (
+        <View style={styles.keepExistingNote}>
+          <Ionicons name="information-circle-outline" size={13} color={Colors.info} />
+          <Text style={styles.keepExistingText}>
+            Leave credential fields blank to keep your existing keys.
+          </Text>
+        </View>
+      )}
 
       <Input
         label="Consumer Key"
         value={consumerKey}
         onChangeText={(t) => { setConsumerKey(t); setErrors((p) => ({ ...p, consumerKey: '' })); }}
         leftIcon="key-outline"
-        placeholder="Your app's consumer key"
+        placeholder={isEditing ? '••••  Leave blank to keep existing' : 'Your app\'s consumer key'}
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
@@ -142,7 +178,7 @@ export const MpesaConfigForm: React.FC<Props> = ({ onSave, loading = false, onCa
         value={consumerSecret}
         onChangeText={(t) => { setConsumerSecret(t); setErrors((p) => ({ ...p, consumerSecret: '' })); }}
         leftIcon="lock-closed-outline"
-        placeholder="Your app's consumer secret"
+        placeholder={isEditing ? '••••  Leave blank to keep existing' : 'Your app\'s consumer secret'}
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
@@ -153,7 +189,7 @@ export const MpesaConfigForm: React.FC<Props> = ({ onSave, loading = false, onCa
         value={passkey}
         onChangeText={(t) => { setPasskey(t); setErrors((p) => ({ ...p, passkey: '' })); }}
         leftIcon="shield-outline"
-        placeholder="Your Lipa Na M-Pesa passkey"
+        placeholder={isEditing ? '••••  Leave blank to keep existing' : 'Your Lipa Na M-Pesa passkey'}
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
@@ -249,6 +285,22 @@ const styles = StyleSheet.create({
   credentialLink: {
     color: Colors.primary,
     fontFamily: Typography.fontFamilySemiBold,
+  },
+  keepExistingNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    marginBottom: 12,
+  },
+  keepExistingText: {
+    flex: 1,
+    fontSize: 11,
+    color: Colors.info,
+    fontFamily: Typography.fontFamily,
+    lineHeight: 15,
   },
   actionRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   cancelBtn: { flex: 1 },

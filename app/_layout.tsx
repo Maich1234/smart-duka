@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { Alert } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -12,13 +11,12 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider } from '@/context/AuthContext';
+import { AlertProvider, useAlert } from '@/context/AlertContext';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { onForegroundMessage, onTokenRefresh } from '@/services/notifications';
 
 SplashScreen.preventAutoHideAsync();
-// Cross-fade the native splash into the first screen instead of a hard cut,
-// so the static OS splash hands off cleanly to our animated splash.tsx.
 SplashScreen.setOptions({ duration: 300, fade: true });
 
 const queryClient = new QueryClient({
@@ -36,6 +34,39 @@ const asyncStoragePersister = createAsyncStoragePersister({
   throttleTime: 2000,
 });
 
+// Handles FCM foreground messages using the custom alert system.
+// Must live inside AlertProvider so useAlert is available.
+function NotificationListener() {
+  const { alert } = useAlert();
+
+  useEffect(() => {
+    const unsubscribe = onForegroundMessage(({ notification, data }) => {
+      if (!notification?.title) return;
+      alert({
+        type: 'info',
+        title: notification.title ?? '',
+        message: notification.body ?? undefined,
+        buttons: [
+          { label: 'Dismiss', variant: 'ghost' },
+          {
+            label: 'View',
+            variant: 'primary',
+            onPress: () =>
+              router.push(
+                data?.type === 'depletion_alert'
+                  ? '/(owner)/inventory'
+                  : '/(owner)/reports'
+              ),
+          },
+        ],
+      });
+    });
+    return unsubscribe;
+  }, [alert]);
+
+  return null;
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -47,30 +78,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded && !isAuthLoading) {
-      // Defer one frame so the router has already committed its redirect
-      // (see app/index.tsx) before the native splash fades out — otherwise
-      // the blank index route can flash for a frame in between.
       requestAnimationFrame(() => SplashScreen.hideAsync());
     }
   }, [fontsLoaded, isAuthLoading]);
 
-  useEffect(() => {
-    const unsubscribe = onForegroundMessage(({ notification, data }) => {
-      if (!notification?.title) return;
-      Alert.alert(notification.title, notification.body, [
-        { text: 'Dismiss', style: 'cancel' },
-        {
-          text: 'View',
-          onPress: () => router.push(data?.type === 'depletion_alert' ? '/(owner)/inventory' : '/(owner)/reports'),
-        },
-      ]);
-    });
-    return unsubscribe;
-  }, []);
-
-  // Keeps the backend's copy of the FCM token in sync whenever Firebase
-  // rotates it — without this, a rotated token silently breaks push
-  // notifications for the device until the next manual re-login.
   useEffect(() => {
     const unsubscribe = onTokenRefresh();
     return unsubscribe;
@@ -86,20 +97,20 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <KeyboardProvider>
           <SafeAreaProvider>
-            <AuthProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="splash" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(owner)" />
-                <Stack.Screen name="(staff)" />
-                <Stack.Screen name="(public)" />
-                {/* app/help/*.web.tsx has the real Help Center content;
-                    app/help/*.tsx is a native fallback that immediately
-                    redirects to the hosted web page (see openHelp()). */}
-                <Stack.Screen name="help" />
-              </Stack>
-              <OfflineIndicator />
-            </AuthProvider>
+            <AlertProvider>
+              <AuthProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="splash" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(owner)" />
+                  <Stack.Screen name="(staff)" />
+                  <Stack.Screen name="(public)" />
+                  <Stack.Screen name="help" />
+                </Stack>
+                <OfflineIndicator />
+                <NotificationListener />
+              </AuthProvider>
+            </AlertProvider>
           </SafeAreaProvider>
         </KeyboardProvider>
       </GestureHandlerRootView>

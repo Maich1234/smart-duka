@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/context/AuthContext';
@@ -15,14 +16,15 @@ export default function StaffProfile() {
   const { user, logout } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
   const [updatingPassword, setUpdatingPassword] = useState(false);
+  const { toast } = useAlert();
 
   const handlePasswordChange = async (current: string, newPwd: string) => {
     setUpdatingPassword(true);
     try {
       await changePassword(current, newPwd);
-      Alert.alert('Success', 'Password changed successfully');
+      toast({ type: 'success', message: 'Password changed successfully' });
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Password change failed');
+      toast({ type: 'error', message: error.response?.data?.message || 'Password change failed' });
     } finally {
       setUpdatingPassword(false);
     }

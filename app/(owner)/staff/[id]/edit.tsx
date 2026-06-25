@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Switch } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ export default function EditStaffScreen() {
   const { permissions, setPermissions, reset } = useStaffDraftStore();
   const [form, setForm] = useState({ name: '', email: '', phone: '', isActive: true });
   const [seeded, setSeeded] = useState(false);
+  const { toast } = useAlert();
 
   const { data, isLoading } = useQuery({
     queryKey: ['staff', id],
@@ -52,12 +54,14 @@ export default function EditStaffScreen() {
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to update staff');
+      toast({ type: 'error', message: error.response?.data?.message || 'Failed to update staff' });
     },
   });
 
   const handleSave = () => {
-    if (!form.name || !form.email) return Alert.alert('Error', 'Name and email are required');
+    if (!form.name || !form.email) {
+      return toast({ type: 'error', message: 'Name and email are required' });
+    }
     saveMutation.mutate();
   };
 
