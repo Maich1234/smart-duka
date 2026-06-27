@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +12,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getStaff } from '@/services/staff';
 import { StaffCard } from '@/components/staff/StaffCard';
-import { SearchBar } from '@/components/ui/SearchBar';
+import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
+import { useSearch } from '@/hooks/useSearch';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -21,18 +22,27 @@ import { Motion } from '@/constants/Motion';
 export default function OwnerStaffList() {
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
-  const [search, setSearch] = useState('');
+
+  const {
+    value: searchValue,
+    query: searchQuery,
+    onChange: onSearchChange,
+    onSubmit: onSearchSubmit,
+    selectRecent,
+    recentSearches,
+    clearRecent,
+  } = useSearch('staff');
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['staff', search],
-    queryFn: () => getStaff({ search }),
+    queryKey: ['staff', searchQuery],
+    queryFn: () => getStaff({ search: searchQuery }),
   });
 
   const staffList = data?.data || [];
   const activeCount = staffList.filter((s) => s.isActive).length;
   const inactiveCount = staffList.filter((s) => !s.isActive).length;
 
-  if (isLoading && staffList.length === 0) {
+  if (isLoading && staffList.length === 0 && !searchQuery) {
     return <LoadingState />;
   }
 
@@ -128,10 +138,15 @@ export default function OwnerStaffList() {
         </TouchableOpacity>
       </View>
 
-      <SearchBar
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search staff by name or email..."
+      <ContextualSearchBar
+        value={searchValue}
+        onChangeText={onSearchChange}
+        onSubmit={onSearchSubmit}
+        recentSearches={recentSearches}
+        onSelectRecent={selectRecent}
+        onClearRecent={clearRecent}
+        placeholder="Search staff by name or email…"
+        style={styles.searchBar}
       />
 
       <FlatList
@@ -156,6 +171,7 @@ export default function OwnerStaffList() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  searchBar: { marginHorizontal: Spacing.lg, marginBottom: Spacing.xs },
 
   // ── Header
   header: {

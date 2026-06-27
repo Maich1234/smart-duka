@@ -1,13 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  interpolateColor,
-} from 'react-native-reanimated';
+import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -17,6 +12,10 @@ interface InventoryHeaderProps {
   onAddPress: () => void;
   searchValue: string;
   onSearchChange: (text: string) => void;
+  onSearchSubmit?: () => void;
+  recentSearches?: string[];
+  onSelectRecent?: (term: string) => void;
+  onClearRecent?: () => void;
   title?: string;
   showAddButton?: boolean;
   productCount?: number;
@@ -27,35 +26,20 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
   onAddPress,
   searchValue,
   onSearchChange,
+  onSearchSubmit,
+  recentSearches,
+  onSelectRecent,
+  onClearRecent,
   title = 'Inventory',
   showAddButton = true,
   productCount,
   alertCount = 0,
 }) => {
   const insets = useSafeAreaInsets();
-  const inputRef = useRef<TextInput>(null);
-  const [isFocused, setIsFocused] = useState(false);
-  const focusAnim = useSharedValue(0);
-
-  const handleFocus = () => {
-    setIsFocused(true);
-    focusAnim.value = withTiming(1, { duration: 180 });
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    focusAnim.value = withTiming(0, { duration: 180 });
-  };
-
-  const searchContainerAnim = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(focusAnim.value, [0, 1], [Colors.border, Colors.primary]),
-  }));
-
-  const searchIconAnim = useAnimatedStyle(() => ({
-    opacity: 0.5 + focusAnim.value * 0.5,
-  }));
 
   return (
+    // zIndex: 100 so the ContextualSearchBar dropdown floats above the filter
+    // chips and FlatList rendered below this component in the parent screen.
     <View style={[styles.container, { paddingTop: insets.top + Spacing.sm }]}>
       {/* Title row */}
       <View style={styles.titleRow}>
@@ -95,38 +79,15 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
         </View>
       </View>
 
-      {/* Search bar */}
-      <Animated.View style={[styles.searchContainer, searchContainerAnim]}>
-        <Animated.View style={searchIconAnim}>
-          <Ionicons
-            name="search-outline"
-            size={18}
-            color={isFocused ? Colors.primary : Colors.textTertiary}
-          />
-        </Animated.View>
-        <TextInput
-          ref={inputRef}
-          style={styles.searchInput}
-          value={searchValue}
-          onChangeText={onSearchChange}
-          placeholder="Search products, SKU, category…"
-          placeholderTextColor={Colors.textTertiary}
-          returnKeyType="search"
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {searchValue.length > 0 && (
-          <TouchableOpacity
-            onPress={() => onSearchChange('')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Clear search"
-          >
-            <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
-          </TouchableOpacity>
-        )}
-      </Animated.View>
+      <ContextualSearchBar
+        value={searchValue}
+        onChangeText={onSearchChange}
+        onSubmit={onSearchSubmit}
+        recentSearches={recentSearches}
+        onSelectRecent={onSelectRecent}
+        onClearRecent={onClearRecent}
+        placeholder="Search products, SKU, category…"
+      />
     </View>
   );
 };
@@ -143,6 +104,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
+    // Must sit above filter bar (elevation 0) so the search dropdown overlays it
+    zIndex: 100,
   },
   titleRow: {
     flexDirection: 'row',
@@ -218,23 +181,5 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.white,
     letterSpacing: 0.2,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.background,
-    borderWidth: 1.5,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 11,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: Typography.size.body,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textPrimary,
-    padding: 0,
-    margin: 0,
   },
 });

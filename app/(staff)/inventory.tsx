@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -7,21 +7,42 @@ import { useQuery } from '@tanstack/react-query';
 import { getProducts } from '@/services/products';
 import { InventoryHeader } from '@/components/inventory/InventoryHeader';
 import { ProductCard } from '@/components/inventory/ProductCard';
+import { useSearch, localFilter } from '@/hooks/useSearch';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { usePermission } from '@/utils/permissions';
+import { useMemo } from 'react';
 
 export default function StaffInventory() {
   const tabBarHeight = useBottomTabBarHeight();
-  const [search, setSearch] = useState('');
   const canViewProducts = usePermission('view_products');
+
+  const {
+    value: searchValue,
+    query: searchQuery,
+    onChange: onSearchChange,
+    onSubmit: onSearchSubmit,
+    selectRecent,
+    recentSearches,
+    clearRecent,
+  } = useSearch('staff_inventory');
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['products', search],
-    queryFn: () => getProducts({ search }),
+    queryKey: ['products', searchQuery],
+    queryFn: () => getProducts({ search: searchQuery }),
     enabled: canViewProducts,
   });
 
-  const products = data?.data || [];
+  const allProducts = useMemo(() => data?.data || [], [data]);
+
+  const products = useMemo(() => {
+    if (!searchQuery) return allProducts;
+    return localFilter(allProducts, searchQuery, (p) => [
+      p.name,
+      p.category,
+      ...(p.variants?.map((v) => v.sku).filter(Boolean) ?? []),
+    ]);
+  }, [allProducts, searchQuery]);
 
   if (!canViewProducts) {
     return (
@@ -31,13 +52,24 @@ export default function StaffInventory() {
     );
   }
 
-  if (isLoading && products.length === 0) {
+  if (isLoading && allProducts.length === 0) {
     return <LoadingState />;
   }
 
   return (
     <View style={styles.container}>
-      <InventoryHeader onAddPress={() => {}} searchValue={search} onSearchChange={setSearch} title="Products" showAddButton={false} />
+      <InventoryHeader
+        onAddPress={() => {}}
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        onSearchSubmit={onSearchSubmit}
+        recentSearches={recentSearches}
+        onSelectRecent={selectRecent}
+        onClearRecent={clearRecent}
+        title="Products"
+        showAddButton={false}
+        productCount={allProducts.length}
+      />
       <FlatList
         showsVerticalScrollIndicator={false}
         data={products}

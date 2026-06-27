@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -13,10 +12,11 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { getSales, getSalesStats, type Sale, type SalesResponse } from '@/services/sales';
-import { getStaff } from '@/services/staff';
 import { getShopConfig } from '@/services/shop';
 import { SalesList } from '@/components/sales/SalesList';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
+import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
+import { useSearch } from '@/hooks/useSearch';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -44,8 +44,18 @@ export default function OwnerSales() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [staffId, setStaffId] = useState('');
-  const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+
+  const {
+    value: searchValue,
+    query: searchQuery,
+    onChange: onSearchChange,
+    onSubmit: onSearchSubmit,
+    selectRecent,
+    recentSearches,
+    clearRecent,
+    clear: clearSearch,
+  } = useSearch('sales');
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -89,8 +99,20 @@ export default function OwnerSales() {
   const shopLogoUrl = shopConfigData?.data.logoUrl;
   const shopMotto = shopConfigData?.data.motto;
 
-  const sales = salesData?.pages.flatMap((p) => p.data) ?? [];
+  const allSales = salesData?.pages.flatMap((p) => p.data) ?? [];
   const totalCount = salesData?.pages[0]?.pagination.total ?? 0;
+
+  // Client-side filter: sales API doesn't support full-text search, so we
+  // filter the already-fetched pages by invoice number and cashier name.
+  const sales = useMemo(() => {
+    if (!searchQuery) return allSales;
+    const q = searchQuery.toLowerCase();
+    return allSales.filter(
+      (s) =>
+        s.invoiceNumber.toLowerCase().includes(q) ||
+        s.staff?.name?.toLowerCase().includes(q),
+    );
+  }, [allSales, searchQuery]);
 
   const stats = statsData?.data;
   const totalSales = stats?.totalSales ?? 0;
@@ -212,23 +234,16 @@ export default function OwnerSales() {
       </Animated.View>
 
       {/* ── Search bar ────────────────────────────────────────────── */}
-      <Animated.View entering={FadeInDown.duration(430).delay(180)} style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={18} color={Colors.textTertiary} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search invoice, name or phone..."
-          placeholderTextColor={Colors.textTertiary}
-          value={search}
-          onChangeText={setSearch}
+      <Animated.View entering={FadeInDown.duration(430).delay(180)} style={styles.searchWrapper}>
+        <ContextualSearchBar
+          value={searchValue}
+          onChangeText={onSearchChange}
+          onSubmit={onSearchSubmit}
+          recentSearches={recentSearches}
+          onSelectRecent={selectRecent}
+          onClearRecent={clearRecent}
+          placeholder="Search invoice or cashier name…"
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.sortBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="swap-vertical-outline" size={18} color={Colors.textSecondary} />
-        </TouchableOpacity>
       </Animated.View>
 
       {/* ── Filter pill tabs ──────────────────────────────────────── */}
@@ -268,7 +283,7 @@ export default function OwnerSales() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [totalSales, txCount, pctChange, cashTotal, mpesaTotal, cardTotal, avgSale,
       cashPct, mpesaPct, cardPct, cashCount, mpesaCount, cardCount, totalCount,
-      paymentFilter, search, startDate, endDate, currency]);
+      paymentFilter, searchValue, searchQuery, recentSearches, startDate, endDate, currency]);
 
   return (
     <View style={styles.container}>
@@ -583,32 +598,9 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
   },
 
-  // ── Search bar
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+  // ── Search wrapper (ContextualSearchBar manages its own internal styles)
+  searchWrapper: {
     marginBottom: Spacing.sm,
-  },
-  searchIcon: {},
-  searchInput: {
-    flex: 1,
-    fontSize: Typography.size.small,
-    color: Colors.textPrimary,
-    fontFamily: Typography.fontFamily,
-    paddingVertical: 2,
-  },
-  sortBtn: {
-    paddingLeft: 4,
-    borderLeftWidth: 1,
-    borderLeftColor: Colors.border,
-    paddingVertical: 2,
   },
 
   // ── Filter pill tabs

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, FlatList, RefreshControl, Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListRow } from '@/components/ui/ListRow';
 import { Button } from '@/components/ui/Button';
+import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ import {
 import { ExpenseFormSheet } from '@/components/expenses/ExpenseFormSheet';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
+import { useSearch, localFilter } from '@/hooks/useSearch';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -47,6 +49,18 @@ export const ExpensesScreen: React.FC = () => {
   const [formVisible, setFormVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const queryClient = useQueryClient();
+
+  const {
+    value: searchValue,
+    query: searchQuery,
+    onChange: onSearchChange,
+    onSubmit: onSearchSubmit,
+    selectRecent,
+    recentSearches,
+    clearRecent,
+    clear: clearSearch,
+    isSearching,
+  } = useSearch('expenses');
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['expenses'],
@@ -98,6 +112,17 @@ export const ExpensesScreen: React.FC = () => {
     setFormVisible(true);
   };
 
+  const allExpenses = useMemo(() => data?.data || [], [data]);
+
+  const expenses = useMemo(() => {
+    if (!searchQuery) return allExpenses;
+    return localFilter(allExpenses, searchQuery, (e) => [
+      e.category,
+      e.description,
+      formatDate(e.date),
+    ]);
+  }, [allExpenses, searchQuery]);
+
   if (!canManageExpenses) {
     return (
       <View style={styles.center}>
@@ -110,7 +135,6 @@ export const ExpensesScreen: React.FC = () => {
     return <LoadingState />;
   }
 
-  const expenses = data?.data || [];
   const summary = summaryData?.data;
 
   return (
@@ -120,10 +144,33 @@ export const ExpensesScreen: React.FC = () => {
         <Button title="Add Expense" onPress={openAdd} size="sm" />
       </View>
 
-      <View style={styles.summary}>
-        <Text style={styles.summaryLabel}>Total Recorded</Text>
-        <Text style={styles.summaryValue}>{formatCurrency(summary?.total || 0, currency)}</Text>
-      </View>
+      {/* Summary always visible — not affected by search */}
+      {!isSearching && (
+        <View style={styles.summary}>
+          <Text style={styles.summaryLabel}>Total Recorded</Text>
+          <Text style={styles.summaryValue}>{formatCurrency(summary?.total || 0, currency)}</Text>
+        </View>
+      )}
+
+      {/* Compact summary shown while searching so context is preserved */}
+      {isSearching && (
+        <View style={styles.summaryCompact}>
+          <Text style={styles.summaryCompactLabel}>
+            Total: <Text style={styles.summaryCompactValue}>{formatCurrency(summary?.total || 0, currency)}</Text>
+          </Text>
+        </View>
+      )}
+
+      <ContextualSearchBar
+        value={searchValue}
+        onChangeText={onSearchChange}
+        onSubmit={onSearchSubmit}
+        recentSearches={recentSearches}
+        onSelectRecent={selectRecent}
+        onClearRecent={clearRecent}
+        placeholder="Search by category or description…"
+        style={styles.searchBar}
+      />
 
       <FlatList
         showsVerticalScrollIndicator={false}
@@ -149,7 +196,20 @@ export const ExpensesScreen: React.FC = () => {
         contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
         ListEmptyComponent={
-          <EmptyState title="No expenses recorded" subtitle="Add your first expense to start tracking spending." />
+          isSearching ? (
+            <View style={styles.emptySearch}>
+              <Ionicons name="search-outline" size={36} color={Colors.textTertiary} />
+              <Text style={styles.emptySearchTitle}>No expenses found</Text>
+              <Text style={styles.emptySearchSub}>
+                No results for "{searchValue}". Try a different term or{' '}
+              </Text>
+              <TouchableOpacity onPress={clearSearch}>
+                <Text style={styles.emptySearchLink}>clear search</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <EmptyState title="No expenses recorded" subtitle="Add your first expense to start tracking spending." />
+          )
         }
       />
 
@@ -169,13 +229,71 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg },
   empty: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center' },
 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
   title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
 
-  summary: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg },
+  summary: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm },
   summaryLabel: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  summaryValue: { fontSize: Typography.size.display, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, marginTop: 2 },
+  summaryValue: {
+    fontSize: Typography.size.display,
+    fontFamily: Typography.fontFamilyBold,
+    color: Colors.textPrimary,
+    marginTop: 2,
+  },
+
+  // Condensed summary row shown while actively searching
+  summaryCompact: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  summaryCompactLabel: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    fontFamily: Typography.fontFamily,
+  },
+  summaryCompactValue: {
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+
+  searchBar: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm },
 
   expenseRight: { alignItems: 'flex-end', gap: Spacing.xs },
-  expenseAmount: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  expenseAmount: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+
+  // Search empty state
+  emptySearch: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xxl,
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.xs,
+  },
+  emptySearchTitle: {
+    fontSize: Typography.size.h3,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+    marginTop: Spacing.sm,
+  },
+  emptySearchSub: {
+    fontSize: Typography.size.small,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptySearchLink: {
+    fontSize: Typography.size.small,
+    color: Colors.primary,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
 });

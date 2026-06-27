@@ -10,7 +10,8 @@ import { createSale, getMySales, type Sale } from '@/services/sales';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { ProductCard } from '@/components/inventory/ProductCard';
-import { SearchBar } from '@/components/ui/SearchBar';
+import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
+import { useSearch } from '@/hooks/useSearch';
 import { CartItem } from '@/components/sales/CartItem';
 import { CartSummary, isValidKenyanPhone } from '@/components/sales/CartSummary';
 import { QuantityModal } from '@/components/sales/QuantityModal';
@@ -43,7 +44,15 @@ export default function StaffSales() {
   const canViewSales = usePermission('view_sales');
   const { toast } = useAlert();
 
-  const [search, setSearch] = useState('');
+  const {
+    value: search,
+    query: searchQuery,
+    onChange: setSearch,
+    onSubmit: onSearchSubmit,
+    selectRecent: selectProductRecent,
+    recentSearches: productRecentSearches,
+    clearRecent: clearProductRecentSearches,
+  } = useSearch('pos_products');
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa'>('cash');
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
@@ -60,8 +69,8 @@ export default function StaffSales() {
   const queryClient = useQueryClient();
 
   const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useQuery({
-    queryKey: ['products', search],
-    queryFn: () => getProducts({ search }),
+    queryKey: ['products', searchQuery],
+    queryFn: () => getProducts({ search: searchQuery }),
     enabled: canRecordSale,
   });
 
@@ -259,7 +268,16 @@ export default function StaffSales() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Record Sale</Text>
-      <SearchBar value={search} onChangeText={setSearch} placeholder="Search products" />
+      <ContextualSearchBar
+        value={search}
+        onChangeText={setSearch}
+        onSubmit={onSearchSubmit}
+        recentSearches={productRecentSearches}
+        onSelectRecent={selectProductRecent}
+        onClearRecent={clearProductRecentSearches}
+        placeholder="Search products…"
+        style={styles.searchBar}
+      />
 
       <FlatList
         showsVerticalScrollIndicator={false}
@@ -403,6 +421,7 @@ export default function StaffSales() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  searchBar: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
   restrictedText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: Typography.size.body, textAlign: 'center' },
   title: {

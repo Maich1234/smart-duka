@@ -15,7 +15,8 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { SearchBar } from '@/components/ui/SearchBar';
+import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
+import { useSearch } from '@/hooks/useSearch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getMpesaTransactions, type MpesaTransaction, type MpesaTransactionStatus } from '@/services/mpesa';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
@@ -38,9 +39,18 @@ const STATUS_COLORS: Record<MpesaTransactionStatus, { bg: string; text: string; 
 
 export default function PaymentsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<MpesaTransactionStatus | 'all'>('all');
   const [selectedTx, setSelectedTx] = useState<MpesaTransaction | null>(null);
+
+  const {
+    value: searchValue,
+    query: searchQuery,
+    onChange: onSearchChange,
+    onSubmit: onSearchSubmit,
+    selectRecent,
+    recentSearches,
+    clearRecent,
+  } = useSearch('payments');
 
   const {
     data,
@@ -50,12 +60,12 @@ export default function PaymentsScreen() {
     hasNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['mpesaTransactions', search, statusFilter],
+    queryKey: ['mpesaTransactions', searchQuery, statusFilter],
     queryFn: ({ pageParam = 1 }) =>
       getMpesaTransactions({
         page: pageParam as number,
         limit: 20,
-        ...(search ? { search } : {}),
+        ...(searchQuery ? { search: searchQuery } : {}),
         ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
       }),
     getNextPageParam: (last) =>
@@ -112,7 +122,16 @@ export default function PaymentsScreen() {
 
             {/* Search + filters */}
             <View style={styles.filtersWrap}>
-              <SearchBar value={search} onChangeText={setSearch} placeholder="Search by phone or reference..." />
+              <ContextualSearchBar
+                value={searchValue}
+                onChangeText={onSearchChange}
+                onSubmit={onSearchSubmit}
+                recentSearches={recentSearches}
+                onSelectRecent={selectRecent}
+                onClearRecent={clearRecent}
+                placeholder="Search by phone or reference…"
+                style={styles.searchBar}
+              />
               <FlatList
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -329,6 +348,7 @@ const styles = StyleSheet.create({
   },
   // Filters
   filtersWrap: { paddingHorizontal: Spacing.lg, marginBottom: 4 },
+  searchBar: { marginBottom: 4 },
   statusFilters: { gap: 8, paddingVertical: 8 },
   filterChip: {
     paddingHorizontal: 14,

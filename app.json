@@ -26,7 +26,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.wabunifu.smartduka",
-      "googleServicesFile": "./google-services.json",
+      "googleServicesFile": "$GOOGLE_SERVICES_JSON",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -37,7 +37,10 @@
               "host": "smart-duka--fqsxcq2wom.expo.app"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "VIEW",
@@ -48,7 +51,10 @@
               "host": "smart-duka.expo.app"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -88,14 +94,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "35fd7583-1715-4d40-bf73-9a052a020622"
+        "projectId": "5c0dd2e5-470b-4d6a-b4f7-54ef552e75f8"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/35fd7583-1715-4d40-bf73-9a052a020622"
-    }
+      "url": "https://u.expo.dev/5c0dd2e5-470b-4d6a-b4f7-54ef552e75f8"
+    },
+    "owner": "muchael123"
   }
 }

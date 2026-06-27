@@ -22,6 +22,7 @@ import { InventoryHeader } from '@/components/inventory/InventoryHeader';
 import { ProductCard } from '@/components/inventory/ProductCard';
 import { InventoryStatsRow } from '@/components/inventory/InventoryStatsRow';
 import { StockUpdateModal } from '@/components/inventory/StockUpdateModal';
+import { useSearch, localFilter } from '@/hooks/useSearch';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -66,7 +67,17 @@ const FILTER_OPTIONS: FilterOption[] = [
 
 export default function OwnerInventory() {
   const tabBarHeight = useBottomTabBarHeight();
-  const [search, setSearch] = useState('');
+  const {
+    value: searchValue,
+    query: searchQuery,
+    onChange: onSearchChange,
+    onSubmit: onSearchSubmit,
+    selectRecent,
+    recentSearches,
+    clearRecent,
+    clear: clearSearch,
+    isSearching,
+  } = useSearch('inventory');
   const [stockModalVisible, setStockModalVisible] = useState(false);
   const [selectedProductForStock, setSelectedProductForStock] = useState<Product | null>(null);
   const [velocityFilter, setVelocityFilter] = useState<VelocityFilter>('all');
@@ -80,8 +91,8 @@ export default function OwnerInventory() {
   const depletion = depletionData?.data;
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['products', search],
-    queryFn: () => getProducts({ search }),
+    queryKey: ['products', searchQuery],
+    queryFn: () => getProducts({ search: searchQuery }),
   });
 
   const deleteMutation = useMutation({
@@ -126,7 +137,20 @@ export default function OwnerInventory() {
     }
   };
 
-  const products = useMemo(() => data?.data || [], [data]);
+  const allProducts = useMemo(() => data?.data || [], [data]);
+
+  // Apply local search on top of server results so matches are instant while
+  // the debounced API call is still in-flight (covers SKU, name, category).
+  const products = useMemo(() => {
+    if (!searchQuery) return allProducts;
+    return localFilter(allProducts, searchQuery, (p) => [
+      p.name,
+      p.category,
+      p.description,
+      // Search variant SKUs so "SKU-123" still finds the right product
+      ...(p.variants?.map((v) => v.sku).filter(Boolean) ?? []),
+    ]);
+  }, [allProducts, searchQuery]);
 
   const fastIds = useMemo(
     () => new Set(depletion?.fastMovers.map((i) => i.productId) || []),
@@ -148,32 +172,32 @@ export default function OwnerInventory() {
     return products;
   }, [products, velocityFilter, fastIds, slowIds, stockoutIds]);
 
-  const stats = useMemo(() => {
-    const lowStockCount = products.filter(
-      (p) => p.trackInventory !== false && p.quantity > 0 && p.quantity <= p.lowStockAlert,
-    ).length;
-    const totalValue = products.reduce(
-      (sum, p) => sum + (p.costPrice ?? 0) * p.quantity,
-      0,
-    );
-    return {
-      totalProducts: products.length,
-      lowStockCount,
-      stockoutSoonCount: stockoutIds.size,
-      totalValue,
-    };
-  }, [products, stockoutIds]);
-
-  const alertCount = stats.lowStockCount + stats.stockoutSoonCount;
-
   const filterCounts: Record<VelocityFilter, number> = {
-    all: products.length,
+    all: allProducts.length,
     fast: fastIds.size,
     slow: slowIds.size,
     stockout: stockoutIds.size,
   };
 
-  if (isLoading && products.length === 0) {
+  const stats = useMemo(() => {
+    const lowStockCount = allProducts.filter(
+      (p) => p.trackInventory !== false && p.quantity > 0 && p.quantity <= p.lowStockAlert,
+    ).length;
+    const totalValue = allProducts.reduce(
+      (sum, p) => sum + (p.costPrice ?? 0) * p.quantity,
+      0,
+    );
+    return {
+      totalProducts: allProducts.length,
+      lowStockCount,
+      stockoutSoonCount: stockoutIds.size,
+      totalValue,
+    };
+  }, [allProducts, stockoutIds]);
+
+  const alertCount = stats.lowStockCount + stats.stockoutSoonCount;
+
+  if (isLoading && allProducts.length === 0) {
     return <LoadingState />;
   }
 
@@ -182,9 +206,13 @@ export default function OwnerInventory() {
       {/* ── Fixed header: title + search ─────────────────────────────────── */}
       <InventoryHeader
         onAddPress={() => router.push('/(owner)/inventory/new')}
-        searchValue={search}
-        onSearchChange={setSearch}
-        productCount={products.length}
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        onSearchSubmit={onSearchSubmit}
+        recentSearches={recentSearches}
+        onSelectRecent={selectRecent}
+        onClearRecent={clearRecent}
+        productCount={allProducts.length}
         alertCount={alertCount}
       />
 
@@ -300,9 +328,9 @@ export default function OwnerInventory() {
         }
         ListEmptyComponent={
           <EmptyInventoryState
-            hasSearch={search.length > 0}
+            hasSearch={isSearching}
             onAddProduct={() => router.push('/(owner)/inventory/new')}
-            onClearSearch={() => setSearch('')}
+            onClearSearch={clearSearch}
           />
         }
       />
