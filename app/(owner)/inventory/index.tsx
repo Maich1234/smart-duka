@@ -13,7 +13,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getProducts, deleteProduct, updateStock, type Product } from '@/services/products';
@@ -90,9 +90,19 @@ export default function OwnerInventory() {
   });
   const depletion = depletionData?.data;
 
-  const { data, isLoading, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['products', searchQuery],
-    queryFn: () => getProducts({ search: searchQuery }),
+    queryFn: ({ pageParam = 1 }) => getProducts({ search: searchQuery, page: pageParam, limit: 30 }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
+    initialPageParam: 1,
   });
 
   const deleteMutation = useMutation({
@@ -137,7 +147,7 @@ export default function OwnerInventory() {
     }
   };
 
-  const allProducts = useMemo(() => data?.data || [], [data]);
+  const allProducts = useMemo(() => data?.pages.flatMap((p) => p.data) || [], [data]);
 
   // Apply local search on top of server results so matches are instant while
   // the debounced API call is still in-flight (covers SKU, name, category).
@@ -305,6 +315,8 @@ export default function OwnerInventory() {
           { paddingBottom: tabBarHeight + Spacing.lg },
         ]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <Animated.View entering={FadeInDown.duration(400).delay(100)}>
             <InventoryStatsRow stats={stats} />

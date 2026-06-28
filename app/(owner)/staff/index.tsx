@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getStaff } from '@/services/staff';
@@ -33,12 +33,22 @@ export default function OwnerStaffList() {
     clearRecent,
   } = useSearch('staff');
 
-  const { data, isLoading, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['staff', searchQuery],
-    queryFn: () => getStaff({ search: searchQuery }),
+    queryFn: ({ pageParam = 1 }) => getStaff({ search: searchQuery, page: pageParam, limit: 20 }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
+    initialPageParam: 1,
   });
 
-  const staffList = data?.data || [];
+  const staffList = data?.pages.flatMap((p) => p.data) || [];
   const activeCount = staffList.filter((s) => s.isActive).length;
   const inactiveCount = staffList.filter((s) => !s.isActive).length;
 
@@ -164,6 +174,8 @@ export default function OwnerStaffList() {
         contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
         ListEmptyComponent={<EmptyState title="No staff found" subtitle="Add a team member to get started." />}
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.4}
       />
     </Animated.View>
   );

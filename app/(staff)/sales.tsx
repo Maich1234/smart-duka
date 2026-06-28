@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Text } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
@@ -68,15 +68,33 @@ export default function StaffSales() {
 
   const queryClient = useQueryClient();
 
-  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useQuery({
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    refetch: refetchProducts,
+    fetchNextPage: fetchNextProducts,
+    hasNextPage: hasNextProducts,
+    isFetchingNextPage: isFetchingNextProducts,
+  } = useInfiniteQuery({
     queryKey: ['products', searchQuery],
-    queryFn: () => getProducts({ search: searchQuery }),
+    queryFn: ({ pageParam = 1 }) => getProducts({ search: searchQuery, page: pageParam, limit: 30 }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
+    initialPageParam: 1,
     enabled: canRecordSale,
   });
 
-  const { data: mySalesData } = useQuery({
+  const {
+    data: mySalesData,
+    fetchNextPage: fetchNextSales,
+    hasNextPage: hasNextSales,
+    isFetchingNextPage: isFetchingNextSales,
+  } = useInfiniteQuery({
     queryKey: ['mySales'],
-    queryFn: () => getMySales({ limit: 50 }),
+    queryFn: ({ pageParam = 1 }) => getMySales({ page: pageParam, limit: 20 }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
+    initialPageParam: 1,
     enabled: canViewSales,
   });
 
@@ -109,8 +127,8 @@ export default function StaffSales() {
     },
   });
 
-  const products = productsData?.data || [];
-  const mySales = mySalesData?.data || [];
+  const products = productsData?.pages.flatMap((p) => p.data) || [];
+  const mySales = mySalesData?.pages.flatMap((p) => p.data) || [];
 
   const addToCart = (product: Product) => {
     if (product.productType === 'configurable') {
@@ -249,6 +267,8 @@ export default function StaffSales() {
           )}
           contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
           ListEmptyComponent={<EmptyState title="No sales yet" />}
+          onEndReached={() => { if (hasNextSales && !isFetchingNextSales) fetchNextSales(); }}
+          onEndReachedThreshold={0.4}
         />
         <SaleDetailsModal
           visible={detailsModalVisible}
@@ -294,6 +314,8 @@ export default function StaffSales() {
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={productsLoading} onRefresh={refetchProducts} />}
+        onEndReached={() => { if (hasNextProducts && !isFetchingNextProducts) fetchNextProducts(); }}
+        onEndReachedThreshold={0.4}
         ListHeaderComponent={
           cart.length > 0 ? (
             <View style={styles.cartSection}>

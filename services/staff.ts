@@ -15,6 +15,7 @@ export interface Staff {
 export interface StaffResponse {
   success: boolean;
   data: Staff[];
+  pagination: { page: number; limit: number; total: number; pages: number };
   message?: string;
 }
 
@@ -65,7 +66,7 @@ export interface Permission {
 /**
  * Get all staff members for current shop (Owner only)
  */
-export const getStaff = async (params?: { search?: string }): Promise<StaffResponse> => {
+export const getStaff = async (params?: { search?: string; page?: number; limit?: number }): Promise<StaffResponse> => {
   const response = await api.get('/staff', { params });
   return response.data;
 };
