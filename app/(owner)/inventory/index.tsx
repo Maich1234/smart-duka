@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getProducts, deleteProduct, updateStock, type Product } from '@/services/products';
@@ -90,19 +90,14 @@ export default function OwnerInventory() {
   });
   const depletion = depletionData?.data;
 
-  const {
-    data,
-    isLoading,
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['products', searchQuery],
-    queryFn: ({ pageParam = 1 }) => getProducts({ search: searchQuery, page: pageParam, limit: 30 }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
-    initialPageParam: 1,
+  const [page, setPage] = useState(1);
+
+  // Reset to page 1 when search changes
+  useEffect(() => { setPage(1); }, [searchQuery]);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['products', searchQuery, page],
+    queryFn: () => getProducts({ search: searchQuery, page, limit: 10 }),
   });
 
   const deleteMutation = useMutation({
@@ -147,7 +142,8 @@ export default function OwnerInventory() {
     }
   };
 
-  const allProducts = useMemo(() => data?.pages.flatMap((p) => p.data) || [], [data]);
+  const allProducts = useMemo(() => data?.data || [], [data]);
+  const totalPages = data?.pagination?.pages ?? 1;
 
   // Apply local search on top of server results so matches are instant while
   // the debounced API call is still in-flight (covers SKU, name, category).
@@ -315,8 +311,19 @@ export default function OwnerInventory() {
           { paddingBottom: tabBarHeight + Spacing.lg },
         ]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
-        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
-        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          totalPages > 1 ? (
+            <View style={styles.paginationBar}>
+              <TouchableOpacity onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}>
+                <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
+              </TouchableOpacity>
+              <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
+              <TouchableOpacity onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}>
+                <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
         ListHeaderComponent={
           <Animated.View entering={FadeInDown.duration(400).delay(100)}>
             <InventoryStatsRow stats={stats} />
@@ -635,6 +642,30 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     paddingTop: Spacing.md,
+  },
+  paginationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    paddingVertical: Spacing.lg,
+  },
+  pageBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageBtnDisabled: {
+    borderColor: Colors.border,
+  },
+  pageLabel: {
+    fontSize: 13,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
   },
   listSectionLabel: {
     flexDirection: 'row',

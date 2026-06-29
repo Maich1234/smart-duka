@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getStaff } from '@/services/staff';
@@ -33,22 +33,25 @@ export default function OwnerStaffList() {
     clearRecent,
   } = useSearch('staff');
 
-  const {
-    data,
-    isLoading,
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['staff', searchQuery],
-    queryFn: ({ pageParam = 1 }) => getStaff({ search: searchQuery, page: pageParam, limit: 20 }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
-    initialPageParam: 1,
+  const [page, setPage] = useState(1);
+  const [showAll, setShowAll] = useState(false);
+
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+  useEffect(() => { setPage(1); }, [searchQuery, showAll]);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['staff', searchQuery, page, showAll],
+    queryFn: () => getStaff({
+      search: searchQuery,
+      page,
+      limit: 10,
+      ...(!showAll ? { startDate: twoDaysAgo } : {}),
+    }),
   });
 
-  const staffList = data?.pages.flatMap((p) => p.data) || [];
+  const staffList = data?.data || [];
+  const totalPages = data?.pagination?.pages ?? 1;
   const activeCount = staffList.filter((s) => s.isActive).length;
   const inactiveCount = staffList.filter((s) => !s.isActive).length;
 
@@ -116,18 +119,46 @@ export default function OwnerStaffList() {
     </>
   );
 
-  const ListFooter = staffList.length > 0 ? (
-    <TouchableOpacity style={styles.promoBanner} activeOpacity={0.8}>
-      <View style={styles.promoIcon}>
-        <Ionicons name="shield-checkmark-outline" size={22} color={Colors.primary} />
+  const ListFooter = (
+    <>
+      {/* Date filter indicator */}
+      <View style={styles.filterIndicator}>
+        <View style={styles.filterBadge}>
+          <Ionicons name="time-outline" size={13} color={Colors.primary} />
+          <Text style={styles.filterBadgeText}>{showAll ? 'All time' : 'Past 2 days'}</Text>
+        </View>
+        <TouchableOpacity onPress={() => setShowAll((v) => !v)}>
+          <Text style={styles.filterToggle}>{showAll ? 'Show recent only' : 'Show all'}</Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.promoText}>
-        <Text style={styles.promoTitle}>Secure & Controlled Access</Text>
-        <Text style={styles.promoSubtitle}>Control what each staff member can see and do.</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
-    </TouchableOpacity>
-  ) : null;
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <View style={styles.paginationBar}>
+          <TouchableOpacity onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}>
+            <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
+          <TouchableOpacity onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}>
+            <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {staffList.length > 0 && (
+        <TouchableOpacity style={styles.promoBanner} activeOpacity={0.8}>
+          <View style={styles.promoIcon}>
+            <Ionicons name="shield-checkmark-outline" size={22} color={Colors.primary} />
+          </View>
+          <View style={styles.promoText}>
+            <Text style={styles.promoTitle}>Secure & Controlled Access</Text>
+            <Text style={styles.promoSubtitle}>Control what each staff member can see and do.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+        </TouchableOpacity>
+      )}
+    </>
+  );
 
   return (
     <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.container}>
@@ -174,8 +205,6 @@ export default function OwnerStaffList() {
         contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
         ListEmptyComponent={<EmptyState title="No staff found" subtitle="Add a team member to get started." />}
-        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
-        onEndReachedThreshold={0.4}
       />
     </Animated.View>
   );
@@ -377,5 +406,56 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.caption,
     color: Colors.textSecondary,
     lineHeight: 16,
+  },
+  filterIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  filterBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.primarySubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  filterBadgeText: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
+  },
+  filterToggle: {
+    fontSize: 12,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
+    textDecorationLine: 'underline',
+  },
+  paginationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    paddingVertical: Spacing.lg,
+  },
+  pageBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageBtnDisabled: {
+    borderColor: Colors.border,
+  },
+  pageLabel: {
+    fontSize: 13,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
   },
 });

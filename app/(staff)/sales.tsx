@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Text } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Text, TouchableOpacity } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
@@ -68,33 +68,18 @@ export default function StaffSales() {
 
   const queryClient = useQueryClient();
 
-  const {
-    data: productsData,
-    isLoading: productsLoading,
-    refetch: refetchProducts,
-    fetchNextPage: fetchNextProducts,
-    hasNextPage: hasNextProducts,
-    isFetchingNextPage: isFetchingNextProducts,
-  } = useInfiniteQuery({
-    queryKey: ['products', searchQuery],
-    queryFn: ({ pageParam = 1 }) => getProducts({ search: searchQuery, page: pageParam, limit: 30 }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
-    initialPageParam: 1,
+  const [productsPage, setProductsPage] = useState(1);
+  const [salesPage, setSalesPage] = useState(1);
+
+  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useQuery({
+    queryKey: ['products', searchQuery, productsPage],
+    queryFn: () => getProducts({ search: searchQuery, page: productsPage, limit: 10 }),
     enabled: canRecordSale,
   });
 
-  const {
-    data: mySalesData,
-    fetchNextPage: fetchNextSales,
-    hasNextPage: hasNextSales,
-    isFetchingNextPage: isFetchingNextSales,
-  } = useInfiniteQuery({
-    queryKey: ['mySales'],
-    queryFn: ({ pageParam = 1 }) => getMySales({ page: pageParam, limit: 20 }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination.page < lastPage.pagination.pages ? lastPage.pagination.page + 1 : undefined,
-    initialPageParam: 1,
+  const { data: mySalesData } = useQuery({
+    queryKey: ['mySales', salesPage],
+    queryFn: () => getMySales({ page: salesPage, limit: 10 }),
     enabled: canViewSales,
   });
 
@@ -127,8 +112,10 @@ export default function StaffSales() {
     },
   });
 
-  const products = productsData?.pages.flatMap((p) => p.data) || [];
-  const mySales = mySalesData?.pages.flatMap((p) => p.data) || [];
+  const products = productsData?.data || [];
+  const mySales = mySalesData?.data || [];
+  const productsTotalPages = productsData?.pagination?.pages ?? 1;
+  const salesTotalPages = mySalesData?.pagination?.pages ?? 1;
 
   const addToCart = (product: Product) => {
     if (product.productType === 'configurable') {
@@ -267,8 +254,19 @@ export default function StaffSales() {
           )}
           contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
           ListEmptyComponent={<EmptyState title="No sales yet" />}
-          onEndReached={() => { if (hasNextSales && !isFetchingNextSales) fetchNextSales(); }}
-          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            salesTotalPages > 1 ? (
+              <View style={salesPaginationStyle}>
+                <TouchableOpacity onPress={() => setSalesPage((p) => Math.max(1, p - 1))} disabled={salesPage <= 1} style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}>
+                  <Ionicons name="chevron-back" size={16} color={salesPage <= 1 ? '#94A3B8' : '#0F766E'} />
+                </TouchableOpacity>
+                <Text style={pageLabelStyle}>Page {salesPage} of {salesTotalPages}</Text>
+                <TouchableOpacity onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))} disabled={salesPage >= salesTotalPages} style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}>
+                  <Ionicons name="chevron-forward" size={16} color={salesPage >= salesTotalPages ? '#94A3B8' : '#0F766E'} />
+                </TouchableOpacity>
+              </View>
+            ) : null
+          }
         />
         <SaleDetailsModal
           visible={detailsModalVisible}
@@ -314,8 +312,6 @@ export default function StaffSales() {
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={productsLoading} onRefresh={refetchProducts} />}
-        onEndReached={() => { if (hasNextProducts && !isFetchingNextProducts) fetchNextProducts(); }}
-        onEndReachedThreshold={0.4}
         ListHeaderComponent={
           cart.length > 0 ? (
             <View style={styles.cartSection}>
@@ -351,23 +347,49 @@ export default function StaffSales() {
           ) : null
         }
         ListFooterComponent={
-          canViewSales ? (
-          <View style={styles.historySection}>
-            <Text style={styles.sectionTitle}>My Sales History</Text>
-            {mySales.length === 0 ? (
-              <EmptyState title="No sales yet" />
-            ) : (
-              mySales.map((sale, i) => (
-                <SaleCard
-                  key={sale._id}
-                  sale={sale}
-                  showStaff={false}
-                  onPress={() => { setSelectedSale(sale); setDetailsModalVisible(true); }}
-                />
-              ))
+          <View>
+            {/* Products pagination */}
+            {productsTotalPages > 1 && (
+              <View style={salesPaginationStyle}>
+                <TouchableOpacity onPress={() => setProductsPage((p) => Math.max(1, p - 1))} disabled={productsPage <= 1} style={[pageBtn, productsPage <= 1 && pageBtnDisabled]}>
+                  <Ionicons name="chevron-back" size={16} color={productsPage <= 1 ? '#94A3B8' : '#0F766E'} />
+                </TouchableOpacity>
+                <Text style={pageLabelStyle}>Page {productsPage} of {productsTotalPages}</Text>
+                <TouchableOpacity onPress={() => setProductsPage((p) => Math.min(productsTotalPages, p + 1))} disabled={productsPage >= productsTotalPages} style={[pageBtn, productsPage >= productsTotalPages && pageBtnDisabled]}>
+                  <Ionicons name="chevron-forward" size={16} color={productsPage >= productsTotalPages ? '#94A3B8' : '#0F766E'} />
+                </TouchableOpacity>
+              </View>
+            )}
+            {/* Sales history */}
+            {canViewSales && (
+              <View style={styles.historySection}>
+                <Text style={styles.sectionTitle}>My Sales History</Text>
+                {mySales.length === 0 ? (
+                  <EmptyState title="No sales yet" />
+                ) : (
+                  mySales.map((sale) => (
+                    <SaleCard
+                      key={sale._id}
+                      sale={sale}
+                      showStaff={false}
+                      onPress={() => { setSelectedSale(sale); setDetailsModalVisible(true); }}
+                    />
+                  ))
+                )}
+                {salesTotalPages > 1 && (
+                  <View style={salesPaginationStyle}>
+                    <TouchableOpacity onPress={() => setSalesPage((p) => Math.max(1, p - 1))} disabled={salesPage <= 1} style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}>
+                      <Ionicons name="chevron-back" size={16} color={salesPage <= 1 ? '#94A3B8' : '#0F766E'} />
+                    </TouchableOpacity>
+                    <Text style={pageLabelStyle}>Page {salesPage} of {salesTotalPages}</Text>
+                    <TouchableOpacity onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))} disabled={salesPage >= salesTotalPages} style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}>
+                      <Ionicons name="chevron-forward" size={16} color={salesPage >= salesTotalPages ? '#94A3B8' : '#0F766E'} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             )}
           </View>
-          ) : null
         }
       />
 
@@ -440,6 +462,11 @@ export default function StaffSales() {
     </View>
   );
 }
+
+const salesPaginationStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 20, paddingVertical: 16 };
+const pageBtn = { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: '#0F766E', alignItems: 'center' as const, justifyContent: 'center' as const };
+const pageBtnDisabled = { borderColor: '#E2E8F0' };
+const pageLabelStyle = { fontSize: 13, fontWeight: '600' as const, color: '#64748B' };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
