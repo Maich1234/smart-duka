@@ -44,8 +44,10 @@ export interface CreateSaleData {
     variantId?: string;
   }>;
   paymentMethod: 'cash' | 'mpesa' | 'card';
-  /** For M-Pesa sales: links the confirmed STK Push transaction */
+  /** Normal M-Pesa flow: links the confirmed STK Push transaction */
   mpesaTransactionId?: string;
+  /** Offline fallback: M-Pesa receipt code entered manually from customer's SMS */
+  mpesaReceiptNumber?: string;
 }
 
 export interface SalesStats {

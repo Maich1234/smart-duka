@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, FlatList, RefreshControl, Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -28,6 +29,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Motion } from '@/constants/Motion';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { isOfflineQueued } from '@/utils/errors';
 
 const CATEGORY_ICONS: Record<ExpenseCategory, keyof typeof Ionicons.glyphMap> = {
   rent: 'home-outline',
@@ -49,6 +51,7 @@ export const ExpensesScreen: React.FC = () => {
   const [formVisible, setFormVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const queryClient = useQueryClient();
+  const { alert, toast } = useAlert();
 
   const {
     value: searchValue,
@@ -83,7 +86,15 @@ export const ExpensesScreen: React.FC = () => {
       setFormVisible(false);
       setEditingExpense(null);
     },
-    onError: (error: any) => Alert.alert('Error', error.response?.data?.message || 'Could not save expense'),
+    onError: (error: any) => {
+      if (isOfflineQueued(error)) {
+        setFormVisible(false);
+        setEditingExpense(null);
+        toast({ type: 'info', message: 'Expense saved offline — will sync when connected.' });
+        return;
+      }
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not save expense' });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -92,14 +103,25 @@ export const ExpensesScreen: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expenseSummary'] });
     },
-    onError: (error: any) => Alert.alert('Error', error.response?.data?.message || 'Deletion failed'),
+    onError: (error: any) => {
+      if (isOfflineQueued(error)) {
+        toast({ type: 'info', message: 'Deletion will sync when connected.' });
+        return;
+      }
+      toast({ type: 'error', message: error.response?.data?.message || 'Deletion failed' });
+    },
   });
 
   const handleDelete = (expense: Expense) => {
-    Alert.alert('Confirm', 'Delete this expense?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(expense._id) },
-    ]);
+    alert({
+      type: 'confirm',
+      title: 'Delete Expense',
+      message: 'Delete this expense? This cannot be undone.',
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
+        { label: 'Delete', variant: 'danger', onPress: () => deleteMutation.mutate(expense._id) },
+      ],
+    });
   };
 
   const openEdit = (expense: Expense) => {

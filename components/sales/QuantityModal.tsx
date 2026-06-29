@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
@@ -41,6 +42,7 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
   const isDecimal = unitOfMeasure !== 'unit';
   const [quantity, setQuantity] = useState('1');
   const [price, setPrice] = useState(defaultPrice != null ? String(defaultPrice) : '');
+  const { toast } = useAlert();
 
   React.useEffect(() => {
     if (visible) {
@@ -53,7 +55,7 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
   const handleConfirm = () => {
     const qty = isDecimal ? parseFloat(quantity) : parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0 || qty > maxStock) {
-      Alert.alert('Invalid Quantity', `Quantity must be greater than 0${maxStock < Infinity ? ` and at most ${maxStock}` : ''}`);
+      toast({ type: 'error', message: `Quantity must be greater than 0${maxStock < Infinity ? ` and at most ${maxStock}` : ''}` });
       return;
     }
 
@@ -61,15 +63,15 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
     if (priceEditable) {
       unitPrice = parseFloat(price);
       if (isNaN(unitPrice) || unitPrice <= 0) {
-        Alert.alert('Invalid Price', 'Enter a valid price greater than 0');
+        toast({ type: 'error', message: 'Enter a valid price greater than 0' });
         return;
       }
       if (minPrice != null && unitPrice < minPrice) {
-        Alert.alert('Invalid Price', `Price cannot be below ${minPrice}`);
+        toast({ type: 'error', message: `Price cannot be below ${minPrice}` });
         return;
       }
       if (maxPrice != null && unitPrice > maxPrice) {
-        Alert.alert('Invalid Price', `Price cannot exceed ${maxPrice}`);
+        toast({ type: 'error', message: `Price cannot exceed ${maxPrice}` });
         return;
       }
     }

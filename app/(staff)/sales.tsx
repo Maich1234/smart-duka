@@ -21,6 +21,7 @@ import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
 import { ReceiptModal } from '@/components/sales/ReceiptModal';
 import { MpesaPaymentModal } from '@/components/payments/MpesaPaymentModal';
 import { applyBestPromotion } from '@/utils/promotions';
+import { isOfflineQueued } from '@/utils/errors';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -108,6 +109,11 @@ export default function StaffSales() {
       setReceiptVisible(true);
     },
     onError: (error: any) => {
+      if (isOfflineQueued(error)) {
+        setCart([]);
+        toast({ type: 'info', message: 'Sale saved offline — will sync when connected.' });
+        return;
+      }
       toast({ type: 'error', message: error.response?.data?.message || 'Sale failed' });
     },
   });
@@ -218,14 +224,18 @@ export default function StaffSales() {
     createSaleMutation.mutate({ items: buildSaleItems(), paymentMethod });
   };
 
-  const handleMpesaSuccess = (transactionId: string) => {
+  const handleMpesaSuccess = (transactionId: string | null, receiptNumber: string | null) => {
     setMpesaModalVisible(false);
-    setPendingMpesaTransactionId(transactionId);
+    if (transactionId) setPendingMpesaTransactionId(transactionId);
     createSaleMutation.mutate({
       items: buildSaleItems(),
       paymentMethod: 'mpesa',
-      mpesaTransactionId: transactionId,
-    } as any);
+      // Normal flow: link confirmed STK push transaction
+      // Offline flow: no transactionId — pass receipt number for the backend to record
+      ...(transactionId
+        ? { mpesaTransactionId: transactionId }
+        : { mpesaReceiptNumber: receiptNumber ?? undefined }),
+    });
   };
 
   if (!canRecordSale && !canViewSales) {

@@ -5,10 +5,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -35,7 +35,7 @@ interface Props {
   phoneNumber: string;
   amount: number;
   accountReference?: string;
-  onSuccess: (transactionId: string, mpesaReceiptNumber: string) => void;
+  onSuccess: (transactionId: string | null, mpesaReceiptNumber: string | null) => void;
   onCancel: () => void;
   currency?: string;
 }
@@ -65,10 +65,12 @@ export const MpesaPaymentModal: React.FC<Props> = ({
   onCancel,
   currency = 'KES',
 }) => {
+  const { toast } = useAlert();
   const [status, setStatus] = useState<ModalStatus>('initiating');
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isOfflineEntry, setIsOfflineEntry] = useState(false);
 
   // Verify-by-receipt-code UI state
   const [showVerifyInput, setShowVerifyInput] = useState(false);
@@ -151,6 +153,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
     setTransactionId(null);
     setReceiptNumber(null);
     setErrorMessage(null);
+    setIsOfflineEntry(false);
     setShowVerifyInput(false);
     setVerifyCode('');
 
@@ -215,7 +218,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
   const handleVerifyReceipt = async () => {
     const code = verifyCode.trim().toUpperCase();
     if (code.length < 6) {
-      Alert.alert('Invalid Code', 'Enter the full M-Pesa transaction code from the customer\'s SMS.');
+      toast({ type: 'error', message: 'Enter the full M-Pesa transaction code from the customer\'s SMS.' });
       return;
     }
     setVerifying(true);
@@ -224,23 +227,33 @@ export const MpesaPaymentModal: React.FC<Props> = ({
       if (res.data.status === 'success') {
         setReceiptNumber(res.data.mpesaReceiptNumber);
         setTransactionId(res.data.transactionId);
+        setIsOfflineEntry(false);
         setStatus('success');
       } else {
-        Alert.alert(
-          'Payment Not Confirmed',
-          `Transaction found but status is "${res.data.status}". ${res.message}`
-        );
+        toast({
+          type: 'warning',
+          message: `Transaction found but status is "${res.data.status}". ${res.message}`,
+        });
       }
     } catch (err: any) {
+      // Offline — trust the code the staff entered from the customer's SMS.
+      // The sale will be queued and synced when connectivity returns.
+      if (err?.offlineRealtime || err?.offlineQueued) {
+        setReceiptNumber(code);
+        setTransactionId(null);
+        setIsOfflineEntry(true);
+        setStatus('success');
+        return;
+      }
       const msg = err.response?.data?.message || 'Receipt code not found. Double-check the code and try again.';
-      Alert.alert('Verification Failed', msg);
+      toast({ type: 'error', message: msg });
     } finally {
       setVerifying(false);
     }
   };
 
   const handleSuccess = () => {
-    onSuccess(transactionId!, receiptNumber!);
+    onSuccess(transactionId, receiptNumber);
   };
 
   if (!visible) return null;
@@ -311,21 +324,38 @@ export const MpesaPaymentModal: React.FC<Props> = ({
           {/* Success */}
           {status === 'success' && (
             <Animated.View entering={FadeInDown.duration(340)} style={styles.body}>
-              <LinearGradient colors={['#15803D', '#16A34A']} style={styles.successIcon}>
-                <Ionicons name="checkmark" size={36} color="#fff" />
+              <LinearGradient
+                colors={isOfflineEntry ? ['#0F766E', '#14B8A6'] : ['#15803D', '#16A34A']}
+                style={styles.successIcon}
+              >
+                <Ionicons name={isOfflineEntry ? 'cloud-upload-outline' : 'checkmark'} size={36} color="#fff" />
               </LinearGradient>
-              <View style={[styles.statusBadge, styles.successBadge]}>
-                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
-                <Text style={[styles.statusBadgeText, { color: Colors.success }]}>Payment Confirmed</Text>
+              <View style={[styles.statusBadge, isOfflineEntry ? styles.pendingBadge : styles.successBadge]}>
+                <Ionicons
+                  name={isOfflineEntry ? 'time-outline' : 'checkmark-circle'}
+                  size={12}
+                  color={isOfflineEntry ? '#92400E' : Colors.success}
+                />
+                <Text style={[styles.statusBadgeText, { color: isOfflineEntry ? '#92400E' : Colors.success }]}>
+                  {isOfflineEntry ? 'Saved — will sync when online' : 'Payment Confirmed'}
+                </Text>
               </View>
-              <Text style={styles.statusTitle}>Payment Successful</Text>
+              <Text style={styles.statusTitle}>
+                {isOfflineEntry ? 'Sale Recorded Offline' : 'Payment Successful'}
+              </Text>
               <Text style={styles.statusSub}>
-                {formatCurrency(amount, currency)} received from {maskedPhone}
+                {isOfflineEntry
+                  ? `${formatCurrency(amount, currency)} from ${maskedPhone} — receipt code saved. Sale will sync automatically when connected.`
+                  : `${formatCurrency(amount, currency)} received from ${maskedPhone}`}
               </Text>
               {receiptNumber && (
-                <View style={styles.receiptCard}>
-                  <Text style={styles.receiptLabel}>M-Pesa Reference</Text>
-                  <Text style={styles.receiptNumber}>{receiptNumber}</Text>
+                <View style={[styles.receiptCard, isOfflineEntry && styles.receiptCardOffline]}>
+                  <Text style={[styles.receiptLabel, isOfflineEntry && styles.receiptLabelOffline]}>
+                    M-Pesa Reference
+                  </Text>
+                  <Text style={[styles.receiptNumber, isOfflineEntry && styles.receiptNumberOffline]}>
+                    {receiptNumber}
+                  </Text>
                 </View>
               )}
               <Button
@@ -703,4 +733,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   verifyBtn: { minWidth: 72 },
+
+  // Offline receipt entry variants
+  receiptCardOffline: {
+    backgroundColor: Colors.warningSubtle,
+    borderColor: `${Colors.warning}30`,
+  },
+  receiptLabelOffline: { color: Colors.warning },
+  receiptNumberOffline: { color: '#92400E' },
 });

@@ -6,6 +6,7 @@ import { getProducts, createProduct, type CreateProductData } from '@/services/p
 import { getShopConfig } from '@/services/shop';
 import { Screen } from '@/components/ui/Screen';
 import { ProductForm, type ProductFormData } from '@/components/inventory/ProductForm';
+import { isOfflineQueued } from '@/utils/errors';
 
 const EMPTY_FORM: ProductFormData = {
   name: '', category: '', sellingPrice: '', costPrice: '', quantity: '', lowStockAlert: '5',
@@ -35,8 +36,14 @@ export default function NewProductScreen() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       router.back();
     },
-    onError: (error: any) =>
-      toast({ type: 'error', message: error.response?.data?.message || 'Creation failed' }),
+    onError: (error: any) => {
+      if (isOfflineQueued(error)) {
+        router.back();
+        toast({ type: 'info', message: 'Product saved offline — will sync when connected.' });
+        return;
+      }
+      toast({ type: 'error', message: error.response?.data?.message || 'Creation failed' });
+    },
   });
 
   const handleSave = () => {

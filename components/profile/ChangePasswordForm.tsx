@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -115,6 +116,7 @@ export const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const { toast } = useAlert();
 
   const strength = getPasswordStrength(newPassword);
   const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
@@ -122,11 +124,11 @@ export const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({
 
   const handleSubmit = () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill all fields');
+      toast({ type: 'error', message: 'Please fill all fields' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      toast({ type: 'error', message: 'New passwords do not match' });
       return;
     }
     onChangePassword(currentPassword, newPassword);

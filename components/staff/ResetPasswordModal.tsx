@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
@@ -24,14 +25,15 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 }) => {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const { toast } = useAlert();
 
   const handleConfirm = () => {
     if (!password || !confirm) {
-      Alert.alert('Missing Fields', 'Please fill both fields');
+      toast({ type: 'error', message: 'Please fill both fields' });
       return;
     }
     if (password !== confirm) {
-      Alert.alert('Error', 'Passwords do not match');
+      toast({ type: 'error', message: 'Passwords do not match' });
       return;
     }
     onConfirm(password);

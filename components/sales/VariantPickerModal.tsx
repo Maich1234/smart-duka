@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
@@ -29,6 +30,7 @@ export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('1');
+  const { toast } = useAlert();
 
   useEffect(() => {
     if (visible) {
@@ -42,12 +44,12 @@ export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
 
   const handleConfirm = () => {
     if (!selected) {
-      Alert.alert('Select an option', 'Please choose a variant');
+      toast({ type: 'warning', message: 'Please choose a variant before adding to cart' });
       return;
     }
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0 || qty > selected.quantity) {
-      Alert.alert('Invalid Quantity', `Quantity must be between 1 and ${selected.quantity}`);
+      toast({ type: 'error', message: `Quantity must be between 1 and ${selected.quantity}` });
       return;
     }
     onConfirm(selected, qty);

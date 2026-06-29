@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,6 +41,7 @@ export const PaymentsSection: React.FC = () => {
   const [verificationVisible, setVerificationVisible] = useState(false);
   const [config, setConfig] = useState<MpesaConfigDetails | null>(null);
   const [saving, setSaving] = useState(false);
+  const { alert, toast } = useAlert();
 
   // Check if we already have a valid verification session
   useEffect(() => {
@@ -76,24 +78,25 @@ export const PaymentsSection: React.FC = () => {
     setSaving(true);
     try {
       await saveMpesaConfig(data, token);
-      Alert.alert('M-Pesa Connected', 'Your M-Pesa Business account has been connected successfully.');
+      toast({ type: 'success', message: 'M-Pesa Business account connected successfully.' });
       await loadConfig(token);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to save configuration');
+      toast({ type: 'error', message: err.response?.data?.message || 'Failed to save configuration' });
     } finally {
       setSaving(false);
     }
   };
 
   const handleDisconnect = () => {
-    Alert.alert(
-      'Disconnect M-Pesa',
-      'This will remove your M-Pesa integration. Existing transaction records are preserved. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    alert({
+      type: 'confirm',
+      title: 'Disconnect M-Pesa',
+      message: 'This will remove your M-Pesa integration. Existing transaction records are preserved. Continue?',
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
         {
-          text: 'Disconnect',
-          style: 'destructive',
+          label: 'Disconnect',
+          variant: 'danger',
           onPress: async () => {
             const token = getStoredVerificationToken();
             if (!token) { setView('locked'); return; }
@@ -102,12 +105,12 @@ export const PaymentsSection: React.FC = () => {
               setConfig(null);
               setView('no_config');
             } catch (err: any) {
-              Alert.alert('Error', err.response?.data?.message || 'Failed to disconnect');
+              toast({ type: 'error', message: err.response?.data?.message || 'Failed to disconnect' });
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   // ─── Locked state ─────────────────────────────────────────────────────────

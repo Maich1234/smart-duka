@@ -15,6 +15,34 @@ import { AlertProvider, useAlert } from '@/context/AlertContext';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { onForegroundMessage, onTokenRefresh } from '@/services/notifications';
+import { initOfflineDb } from '@/utils/offlineDb';
+import { setupOfflineListener } from '@/utils/offlineManager';
+import { enqueueOperation } from '@/utils/offlineQueue';
+
+// Initialise SQLite queue DB synchronously before any React render
+initOfflineDb();
+// Wire up NetInfo → React Query online state + queue flush on reconnect
+setupOfflineListener();
+
+/** One-time migration of any requests queued by the old AsyncStorage method. */
+async function migrateAsyncStorageQueue() {
+  try {
+    const raw = await AsyncStorage.getItem('offline_mutations');
+    if (!raw) return;
+    const items: Array<{ method?: string; url?: string; data?: Record<string, unknown> }> =
+      JSON.parse(raw);
+    for (const item of items) {
+      enqueueOperation(
+        { method: item.method ?? 'POST', url: item.url ?? '', body: item.data ?? null },
+        `migrate:${crypto.randomUUID()}`
+      );
+    }
+    await AsyncStorage.removeItem('offline_mutations');
+  } catch {
+    // Malformed data — just clear it
+    await AsyncStorage.removeItem('offline_mutations').catch(() => {});
+  }
+}
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 300, fade: true });
@@ -85,6 +113,10 @@ export default function RootLayout() {
   useEffect(() => {
     const unsubscribe = onTokenRefresh();
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    migrateAsyncStorageQueue();
   }, []);
 
   if (!fontsLoaded) return null;
