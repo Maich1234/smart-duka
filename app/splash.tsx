@@ -21,7 +21,7 @@ import { useAuthStore, type AuthState } from '@/store/authStore';
 const { height } = Dimensions.get('window');
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-const TITLE = 'Smart-Duka';
+const TITLE = 'Smart Duka';
 const FOOTER = 'Powered by Wabunifu Labs';
 
 // Cinematic dark-teal palette, kept within the brand's teal family but deepened for a premium feel.

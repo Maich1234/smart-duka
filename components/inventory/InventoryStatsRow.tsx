@@ -11,6 +11,8 @@ export interface InventoryStats {
   lowStockCount: number;
   stockoutSoonCount: number;
   totalValue: number;
+  /** True when the catalogue has more than one page — low stock / value counts are per-page only. */
+  isPageScope?: boolean;
 }
 
 interface InventoryStatsRowProps {
@@ -52,6 +54,10 @@ export const InventoryStatsRow: React.FC<InventoryStatsRowProps> = ({ stats }) =
   const stockoutAnim = useCountUp(stats.stockoutSoonCount);
   const valueAnim = useCountUp(Math.round(stats.totalValue));
 
+  // When there are multiple pages, low-stock count and value reflect this page only.
+  const pageScopeNote = stats.isPageScope ? 'this page' : 'need restock';
+  const valueScopeNote = stats.isPageScope ? 'this page' : 'total worth';
+
   const cards = [
     {
       icon: 'cube' as const,
@@ -66,7 +72,7 @@ export const InventoryStatsRow: React.FC<InventoryStatsRowProps> = ({ stats }) =
       icon: 'warning' as const,
       label: 'Low Stock',
       value: String(lowStockAnim),
-      sublabel: 'need restock',
+      sublabel: pageScopeNote,
       colors: (stats.lowStockCount > 0
         ? ['#78350F', '#D97706']
         : ['#1C1917', '#44403C']) as readonly [string, string],
@@ -88,7 +94,7 @@ export const InventoryStatsRow: React.FC<InventoryStatsRowProps> = ({ stats }) =
       icon: 'wallet' as const,
       label: 'Stock Value',
       value: `KES ${formatCompactValue(valueAnim)}`,
-      sublabel: 'total worth',
+      sublabel: valueScopeNote,
       colors: ['#14532D', '#15803D'] as readonly [string, string],
       accent: '#86EFAC',
       delay: 240,

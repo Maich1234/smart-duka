@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Motion } from '@/constants/Motion';
+import { QueryError } from '@/components/ui/QueryError';
 
 export default function OwnerStaffList() {
   const tabBarHeight = useBottomTabBarHeight();
@@ -34,20 +35,12 @@ export default function OwnerStaffList() {
   } = useSearch('staff');
 
   const [page, setPage] = useState(1);
-  const [showAll, setShowAll] = useState(false);
 
-  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  useEffect(() => { setPage(1); }, [searchQuery]);
 
-  useEffect(() => { setPage(1); }, [searchQuery, showAll]);
-
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['staff', searchQuery, page, showAll],
-    queryFn: () => getStaff({
-      search: searchQuery,
-      page,
-      limit: 10,
-      ...(!showAll ? { startDate: twoDaysAgo } : {}),
-    }),
+  const { data, isLoading, isRefetching, isError, refetch } = useQuery({
+    queryKey: ['staff', searchQuery, page],
+    queryFn: () => getStaff({ search: searchQuery, page, limit: 10 }),
   });
 
   const staffList = data?.data || [];
@@ -56,7 +49,11 @@ export default function OwnerStaffList() {
   const inactiveCount = staffList.filter((s) => !s.isActive).length;
 
   if (isLoading && staffList.length === 0 && !searchQuery) {
-    return <LoadingState />;
+    return <ListSkeleton rows={5} heroHeight={160} showSearch />;
+  }
+
+  if (isError && staffList.length === 0) {
+    return <QueryError onRetry={refetch} />;
   }
 
   const ListHeader = (
@@ -121,17 +118,6 @@ export default function OwnerStaffList() {
 
   const ListFooter = (
     <>
-      {/* Date filter indicator */}
-      <View style={styles.filterIndicator}>
-        <View style={styles.filterBadge}>
-          <Ionicons name="time-outline" size={13} color={Colors.primary} />
-          <Text style={styles.filterBadgeText}>{showAll ? 'All time' : 'Past 2 days'}</Text>
-        </View>
-        <TouchableOpacity onPress={() => setShowAll((v) => !v)}>
-          <Text style={styles.filterToggle}>{showAll ? 'Show recent only' : 'Show all'}</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Pagination */}
       {totalPages > 1 && (
         <View style={styles.paginationBar}>
@@ -146,16 +132,15 @@ export default function OwnerStaffList() {
       )}
 
       {staffList.length > 0 && (
-        <TouchableOpacity style={styles.promoBanner} activeOpacity={0.8}>
+        <View style={styles.promoBanner}>
           <View style={styles.promoIcon}>
             <Ionicons name="shield-checkmark-outline" size={22} color={Colors.primary} />
           </View>
           <View style={styles.promoText}>
             <Text style={styles.promoTitle}>Secure & Controlled Access</Text>
-            <Text style={styles.promoSubtitle}>Control what each staff member can see and do.</Text>
+            <Text style={styles.promoSubtitle}>Tap a staff member to manage their permissions.</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
-        </TouchableOpacity>
+        </View>
       )}
     </>
   );
@@ -203,7 +188,7 @@ export default function OwnerStaffList() {
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
         ListEmptyComponent={<EmptyState title="No staff found" subtitle="Add a team member to get started." />}
       />
     </Animated.View>
@@ -406,33 +391,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.caption,
     color: Colors.textSecondary,
     lineHeight: 16,
-  },
-  filterIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xs,
-  },
-  filterBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primarySubtle,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  filterBadgeText: {
-    fontSize: 11,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.primary,
-  },
-  filterToggle: {
-    fontSize: 12,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.primary,
-    textDecorationLine: 'underline',
   },
   paginationBar: {
     flexDirection: 'row',

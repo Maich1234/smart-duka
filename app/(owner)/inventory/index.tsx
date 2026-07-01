@@ -11,7 +11,7 @@ import {
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -28,6 +28,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { Motion } from '@/constants/Motion';
+import { QueryError } from '@/components/ui/QueryError';
 
 type VelocityFilter = 'all' | 'fast' | 'slow' | 'stockout';
 
@@ -95,7 +96,7 @@ export default function OwnerInventory() {
   // Reset to page 1 when search changes
   useEffect(() => { setPage(1); }, [searchQuery]);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['products', searchQuery, page],
     queryFn: () => getProducts({ search: searchQuery, page, limit: 10 }),
   });
@@ -179,7 +180,8 @@ export default function OwnerInventory() {
   }, [products, velocityFilter, fastIds, slowIds, stockoutIds]);
 
   const filterCounts: Record<VelocityFilter, number> = {
-    all: allProducts.length,
+    // Use server total so "All" shows full catalogue count, not the 10-item page slice
+    all: data?.pagination?.total ?? allProducts.length,
     fast: fastIds.size,
     slow: slowIds.size,
     stockout: stockoutIds.size,
@@ -194,17 +196,24 @@ export default function OwnerInventory() {
       0,
     );
     return {
-      totalProducts: allProducts.length,
+      // Use server pagination total so the stats card reflects the full catalogue
+      totalProducts: data?.pagination?.total ?? allProducts.length,
       lowStockCount,
       stockoutSoonCount: stockoutIds.size,
       totalValue,
+      // Flag that value/lowStock counts come from this page only (not whole catalogue)
+      isPageScope: (data?.pagination?.pages ?? 1) > 1,
     };
-  }, [allProducts, stockoutIds]);
+  }, [allProducts, stockoutIds, data?.pagination?.total, data?.pagination?.pages]);
 
   const alertCount = stats.lowStockCount + stats.stockoutSoonCount;
 
   if (isLoading && allProducts.length === 0) {
-    return <LoadingState />;
+    return <ListSkeleton rows={6} heroHeight={120} showSearch />;
+  }
+
+  if (isError && allProducts.length === 0) {
+    return <QueryError onRetry={refetch} />;
   }
 
   return (
@@ -218,7 +227,7 @@ export default function OwnerInventory() {
         recentSearches={recentSearches}
         onSelectRecent={selectRecent}
         onClearRecent={clearRecent}
-        productCount={allProducts.length}
+        productCount={data?.pagination?.total ?? allProducts.length}
         alertCount={alertCount}
       />
 
@@ -241,6 +250,7 @@ export default function OwnerInventory() {
                 activeOpacity={0.75}
                 style={[styles.filterChip, isActive && styles.filterChipActive]}
                 accessibilityRole="button"
+                accessibilityLabel={opt.label}
                 accessibilityState={{ selected: isActive }}
               >
                 {isActive && (
@@ -310,15 +320,29 @@ export default function OwnerInventory() {
           styles.listContent,
           { paddingBottom: tabBarHeight + Spacing.lg },
         ]}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
         ListFooterComponent={
           totalPages > 1 ? (
             <View style={styles.paginationBar}>
-              <TouchableOpacity onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}>
+              <TouchableOpacity
+                onPress={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel={`Previous page, page ${page - 1}`}
+                accessibilityState={{ disabled: page <= 1 }}
+              >
                 <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
               </TouchableOpacity>
               <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-              <TouchableOpacity onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}>
+              <TouchableOpacity
+                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel={`Next page, page ${page + 1}`}
+                accessibilityState={{ disabled: page >= totalPages }}
+              >
                 <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
               </TouchableOpacity>
             </View>
@@ -337,6 +361,15 @@ export default function OwnerInventory() {
                   onViewStockout={() => setVelocityFilter('stockout')}
                 />
               )}
+            {velocityFilter !== 'all' && totalPages > 1 && (
+              <View style={styles.filterScopeNote}>
+                <Ionicons name="information-circle-outline" size={13} color={Colors.textTertiary} />
+                <Text style={styles.filterScopeText}>
+                  Showing matches on this page. Browse pages to see all{' '}
+                  {filterCounts[velocityFilter]} items.
+                </Text>
+              </View>
+            )}
             <View style={styles.listSectionLabel}>
               <Text style={styles.sectionLabelText}>
                 {velocityFilter === 'all' ? 'ALL PRODUCTS' : FILTER_OPTIONS.find((o) => o.value === velocityFilter)?.label.toUpperCase()}
@@ -665,6 +698,24 @@ const styles = StyleSheet.create({
   pageLabel: {
     fontSize: 13,
     fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
+  },
+  filterScopeNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    padding: 8,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  filterScopeText: {
+    flex: 1,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
   },
   listSectionLabel: {

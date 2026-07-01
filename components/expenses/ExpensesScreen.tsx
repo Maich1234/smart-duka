@@ -30,6 +30,7 @@ import { Spacing } from '@/constants/Spacing';
 import { Motion } from '@/constants/Motion';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { isOfflineQueued } from '@/utils/errors';
+import { QueryError } from '@/components/ui/QueryError';
 
 const CATEGORY_ICONS: Record<ExpenseCategory, keyof typeof Ionicons.glyphMap> = {
   rent: 'home-outline',
@@ -50,6 +51,7 @@ export const ExpensesScreen: React.FC = () => {
   const canManageExpenses = usePermission('manage_expenses');
   const [formVisible, setFormVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { alert, toast } = useAlert();
 
@@ -65,9 +67,9 @@ export const ExpensesScreen: React.FC = () => {
     isSearching,
   } = useSearch('expenses');
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['expenses'],
-    queryFn: () => getExpenses({ limit: 50 }),
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
+    queryKey: ['expenses', page],
+    queryFn: () => getExpenses({ page, limit: 10 }),
     enabled: canManageExpenses,
   });
 
@@ -83,6 +85,7 @@ export const ExpensesScreen: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expenseSummary'] });
+      setPage(1);
       setFormVisible(false);
       setEditingExpense(null);
     },
@@ -102,6 +105,7 @@ export const ExpensesScreen: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expenseSummary'] });
+      setPage(1);
     },
     onError: (error: any) => {
       if (isOfflineQueued(error)) {
@@ -135,6 +139,7 @@ export const ExpensesScreen: React.FC = () => {
   };
 
   const allExpenses = useMemo(() => data?.data || [], [data]);
+  const totalPages = data?.pagination?.pages ?? 1;
 
   const expenses = useMemo(() => {
     if (!searchQuery) return allExpenses;
@@ -155,6 +160,10 @@ export const ExpensesScreen: React.FC = () => {
 
   if (isLoading) {
     return <LoadingState />;
+  }
+
+  if (isError && allExpenses.length === 0) {
+    return <QueryError onRetry={refetch} />;
   }
 
   const summary = summaryData?.data;
@@ -233,6 +242,27 @@ export const ExpensesScreen: React.FC = () => {
             <EmptyState title="No expenses recorded" subtitle="Add your first expense to start tracking spending." />
           )
         }
+        ListFooterComponent={
+          totalPages > 1 ? (
+            <View style={styles.paginationBar}>
+              <TouchableOpacity
+                onPress={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+              >
+                <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
+              </TouchableOpacity>
+              <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
+              <TouchableOpacity
+                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+              >
+                <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
       />
 
       <ExpenseFormSheet
@@ -292,6 +322,30 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
+  },
+
+  // Pagination
+  paginationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    paddingVertical: Spacing.lg,
+  },
+  pageBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageBtnDisabled: { borderColor: Colors.border },
+  pageLabel: {
+    fontSize: 13,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
   },
 
   // Search empty state

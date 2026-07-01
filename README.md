@@ -50,6 +50,13 @@ You can start developing by editing the files inside the **app** directory. This
 
 The API base URL, `PUBLIC_WEB_URL` (used to build receipt QR codes), and other app-wide settings live in [constants/config.ts](constants/config.ts).
 
+### Firebase Admin SDK (server-side only)
+
+The Firebase Admin SDK service account key must **never** be placed in this mobile project. It grants full admin-level Firebase access and must only live in backend environment variables (e.g. Vercel).
+
+If a service account key is accidentally committed or exposed, rotate it immediately:
+**Firebase Console → Project Settings → Service Accounts → Generate new private key**
+
 ### Push notifications (FCM) setup
 
 Push uses the native `@react-native-firebase/messaging` client (the backend sends pushes via the Firebase Admin SDK — see the backend README), which requires a rebuilt native app — it will **not** work in Expo Go or a stale dev-client build:

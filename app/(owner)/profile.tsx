@@ -16,7 +16,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/AuthContext';
@@ -164,7 +164,7 @@ interface HelpItem {
 }
 
 const HELP_ITEMS: HelpItem[] = [
-  { icon: 'book-outline', label: 'Tutorials', sub: 'Learn features', slug: undefined },
+  { icon: 'book-outline', label: 'Tutorials', sub: 'Learn features', slug: 'getting-started' },
   { icon: 'help-circle-outline', label: 'FAQ', sub: 'Common questions', slug: 'faq' },
   { icon: 'chatbubble-ellipses-outline', label: 'Support', sub: 'Contact us', slug: 'support' },
 ];
@@ -174,64 +174,59 @@ const HELP_ITEMS: HelpItem[] = [
 export default function OwnerProfile() {
   const { user, logout } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
-  const { toast } = useAlert();
+  const { toast, alert } = useAlert();
+  const queryClient = useQueryClient();
 
-  const [shop, setShop] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    taxRate: 0,
-    country: 'KE',
-    currency: 'KES',
-    receiptThankYouNote: '',
-    logoUrl: '',
-    motto: '',
-  });
-  const [loadingShop, setLoadingShop] = useState(true);
+  const handleLogout = () => {
+    alert({
+      type: 'confirm',
+      title: 'Sign out?',
+      message: 'You\'ll need to sign back in to access your Smart Duka account.',
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
+        { label: 'Sign out', variant: 'danger', onPress: logout },
+      ],
+    });
+  };
+
+  const [shopEdits, setShopEdits] = useState<Record<string, string | number>>({});
   const [updatingShop, setUpdatingShop] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  const { data: dashData, refetch: refetchDash } = useQuery({
+  const { data: shopConfigData, isLoading: loadingShop } = useQuery({
+    queryKey: ['shopConfig'],
+    queryFn: getShopConfig,
+  });
+
+  const { data: dashData, isRefetching: isDashRefetching, refetch: refetchDash } = useQuery({
     queryKey: ['ownerDashboard'],
     queryFn: getOwnerDashboard,
   });
 
-  const { data: staffData, refetch: refetchStaff } = useQuery({
+  const { data: staffData, isRefetching: isStaffRefetching, refetch: refetchStaff } = useQuery({
     queryKey: ['staff'],
     queryFn: () => getStaff(),
   });
 
   useEffect(() => {
-    loadShop();
     getNotificationsPreference().then(setNotificationsEnabled);
   }, []);
 
-  const loadShop = async () => {
-    try {
-      const res = await getShopConfig();
-      if (res.success) {
-        setShop({
-          name: res.data.name ?? '',
-          address: res.data.address ?? '',
-          phone: res.data.phone ?? '',
-          email: res.data.email ?? '',
-          taxRate: res.data.taxRate ?? 0,
-          country: (res.data as any).country ?? 'KE',
-          currency: res.data.currency ?? 'KES',
-          receiptThankYouNote: res.data.receiptThankYouNote ?? '',
-          logoUrl: (res.data as any).logoUrl ?? '',
-          motto: (res.data as any).motto ?? '',
-        });
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoadingShop(false);
-    }
+  const shop = {
+    name: shopConfigData?.data.name ?? '',
+    address: shopConfigData?.data.address ?? '',
+    phone: shopConfigData?.data.phone ?? '',
+    email: shopConfigData?.data.email ?? '',
+    taxRate: shopConfigData?.data.taxRate ?? 0,
+    country: (shopConfigData?.data as any)?.country ?? 'KE',
+    currency: shopConfigData?.data.currency ?? 'KES',
+    receiptThankYouNote: shopConfigData?.data.receiptThankYouNote ?? '',
+    logoUrl: (shopConfigData?.data as any)?.logoUrl ?? '',
+    motto: (shopConfigData?.data as any)?.motto ?? '',
   };
+  const displayShop = { ...shop, ...shopEdits };
 
   const handleToggleNotifications = async (enabled: boolean) => {
     setNotificationsEnabled(enabled);
@@ -243,9 +238,11 @@ export default function OwnerProfile() {
   const handleShopUpdate = async () => {
     setUpdatingShop(true);
     try {
-      const { name, address, phone, email, taxRate, country, currency, receiptThankYouNote, logoUrl, motto } = shop;
+      const { name, address, phone, email, taxRate, country, currency, receiptThankYouNote, logoUrl, motto } = displayShop;
       await updateShopConfig({ name, address, phone, email, taxRate, country, currency, receiptThankYouNote, logoUrl, motto } as any);
       toast({ type: 'success', message: 'Shop information updated' });
+      setShopEdits({});
+      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
     } catch (error: any) {
       toast({ type: 'error', message: error.response?.data?.message || 'Update failed' });
     } finally {
@@ -270,7 +267,8 @@ export default function OwnerProfile() {
     setUploadingLogo(true);
     try {
       const { logoUrl } = await uploadShopLogo(asset.uri, asset.mimeType ?? 'image/jpeg');
-      setShop((prev) => ({ ...prev, logoUrl }));
+      setShopEdits((prev) => ({ ...prev, logoUrl }));
+      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
     } catch (error: any) {
       toast({ type: 'error', message: error.response?.data?.message || 'Could not upload logo' });
     } finally {
@@ -314,7 +312,7 @@ export default function OwnerProfile() {
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl }}
         refreshControl={
           <RefreshControl
-            refreshing={false}
+            refreshing={isDashRefetching || isStaffRefetching}
             onRefresh={handleRefresh}
             tintColor={Colors.primary}
             colors={[Colors.primary]}
@@ -436,8 +434,8 @@ export default function OwnerProfile() {
         <SectionLabel label="BUSINESS SETTINGS" />
         <Animated.View entering={FadeInUp.duration(360).delay(100)} style={styles.sectionWrap}>
           <ShopSettingsForm
-            shop={shop}
-            onChange={(field, value) => setShop((prev) => ({ ...prev, [field]: value }))}
+            shop={displayShop}
+            onChange={(field, value) => setShopEdits((prev) => ({ ...prev, [field]: value }))}
             onSave={handleShopUpdate}
             onPickLogo={handlePickLogo}
             uploadingLogo={uploadingLogo}
@@ -497,7 +495,7 @@ export default function OwnerProfile() {
 
         {/* ── SIGN OUT ──────────────────────────────────────────────────── */}
         <Animated.View entering={FadeIn.duration(300).delay(180)} style={styles.signOutWrap}>
-          <TouchableOpacity style={styles.signOutBtn} onPress={logout} activeOpacity={0.78}>
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleLogout} activeOpacity={0.78}>
             <View style={styles.signOutLeft}>
               <View style={styles.signOutIconWrap}>
                 <Ionicons name="log-out-outline" size={17} color={Colors.danger} />

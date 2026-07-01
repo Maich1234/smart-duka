@@ -26,8 +26,10 @@ const emailSchema = z.object({
 
 const resetSchema = z
   .object({
-    newPassword: z.string().min(6, 'Password must be at least 6 characters'),
-    confirmPassword: z.string().min(6),
+    newPassword: z.string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[0-9]/, 'Must contain at least one number'),
+    confirmPassword: z.string().min(8),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
     message: "Passwords don't match",
@@ -53,6 +55,14 @@ export default function ForgotPasswordScreen() {
   const [otpError, setOtpError] = useState('');
   const [formError, setFormError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifyAttempts, setVerifyAttempts] = useState(0);
+  const [verifyCooldown, setVerifyCooldown] = useState(0);
+
+  useEffect(() => {
+    if (verifyCooldown <= 0) return;
+    const timer = setInterval(() => setVerifyCooldown((prev) => prev - 1), 1000);
+    return () => clearInterval(timer);
+  }, [verifyCooldown]);
 
   const emailForm = useForm<EmailForm>({
     resolver: zodResolver(emailSchema),
@@ -112,7 +122,11 @@ export default function ForgotPasswordScreen() {
       await api.post('/auth/verify-otp', { email, otp });
       setStep('reset');
     } catch (error: any) {
-      setOtpError(error.response?.data?.message || 'Invalid or expired code. Try again.');
+      const attempts = verifyAttempts + 1;
+      setVerifyAttempts(attempts);
+      if (attempts >= 5) setVerifyCooldown(30);
+      else if (attempts >= 3) setVerifyCooldown(10);
+      setOtpError(error.response?.data?.message || 'Invalid code.');
     } finally {
       setLoading(false);
     }
@@ -197,13 +211,18 @@ export default function ForgotPasswordScreen() {
               error={otpError}
             />
             {formError ? <InlineError message={formError} /> : null}
+            {verifyCooldown > 0 && (
+              <Text style={styles.cooldownText}>
+                Too many attempts — try again in {verifyCooldown}s
+              </Text>
+            )}
             <Button
               title="Verify Code"
               onPress={handleVerifyOtp}
               loading={loading}
               style={styles.button}
               size="lg"
-              disabled={otp.length < 6}
+              disabled={otp.length < 6 || verifyCooldown > 0}
             />
             <TouchableOpacity
               onPress={() => {
@@ -227,7 +246,7 @@ export default function ForgotPasswordScreen() {
               render={({ field: { onChange, value }, fieldState: { error } }) => (
                 <Input
                   label="New password"
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters with a number"
                   value={value}
                   onChangeText={onChange}
                   error={error?.message}
@@ -333,6 +352,13 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
+  },
+  cooldownText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.danger,
+    textAlign: 'center',
+    marginBottom: Spacing.xs,
   },
   successContainer: {
     alignItems: 'center',

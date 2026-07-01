@@ -19,6 +19,8 @@ interface ButtonProps {
   textStyle?: TextStyle;
   haptic?: boolean;
   leftIcon?: keyof typeof Ionicons.glyphMap;
+  accessibilityLabel?: string;
+  accessibilityState?: object;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -32,6 +34,8 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   haptic = true,
   leftIcon,
+  accessibilityLabel,
+  accessibilityState,
 }) => {
   const handlePress = () => {
     if (haptic && !disabled && !loading) {
@@ -87,6 +91,9 @@ export const Button: React.FC<ButtonProps> = ({
     <AnimatedPressable
       onPress={handlePress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityState={{ disabled: disabled || loading, ...accessibilityState }}
       style={[
         styles.button,
         {

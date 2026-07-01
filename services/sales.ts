@@ -120,10 +120,14 @@ export const getSaleById = async (id: string): Promise<SaleResponse> => {
 };
 
 /**
- * Get aggregated sales stats for the current month (for the sales page hero card)
+ * Get aggregated sales stats, optionally scoped to a date range.
+ * When no dates are passed the backend returns the current-month totals.
  */
-export const getSalesStats = async (): Promise<SalesStatsResponse> => {
-  const response = await api.get('/sales/stats');
+export const getSalesStats = async (params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<SalesStatsResponse> => {
+  const response = await api.get('/sales/stats', { params });
   return response.data;
 };
 

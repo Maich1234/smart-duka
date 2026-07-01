@@ -103,7 +103,7 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
       </View>
 
       {/* Full-screen modal picker */}
-      <Modal visible={open} animationType="slide" transparent presentationStyle="overFullScreen">
+      <Modal visible={open} animationType="slide" transparent presentationStyle="overFullScreen" accessibilityViewIsModal>
         <View style={styles.overlay}>
           <SafeAreaView style={styles.sheet}>
             {/* Header */}

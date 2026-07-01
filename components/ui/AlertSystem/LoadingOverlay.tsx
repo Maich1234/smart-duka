@@ -115,6 +115,7 @@ export function LoadingOverlay({ visible, message }: LoadingOverlayProps) {
       transparent
       animationType="none"
       statusBarTranslucent
+      accessibilityViewIsModal
     >
       <Animated.View style={[styles.overlay, overlayAnim]}>
         <Animated.View style={[styles.card, overlayAnim]}>

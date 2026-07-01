@@ -19,8 +19,9 @@ interface StrengthInfo {
 
 function getStrength(password: string): StrengthInfo {
   if (!password) return { level: 0, label: '', color: Colors.border };
-  let score = 0;
-  if (password.length >= 8) score++;
+  // Passwords under the minimum length are always Weak, regardless of complexity.
+  if (password.length < 8) return { level: 1, label: 'Weak', color: Colors.danger };
+  let score = 1; // length >= 8 already satisfies one criterion
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;

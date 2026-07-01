@@ -47,6 +47,7 @@ export const OTPInput: React.FC<OTPInputProps> = ({
         onBlur={() => setIsFocused(false)}
         caretHidden
         textContentType="oneTimeCode"
+        accessibilityLabel={`Enter ${length}-digit verification code. ${value.length} of ${length} digits entered.`}
       />
 
       {/* Visual digit boxes */}

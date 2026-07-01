@@ -51,7 +51,7 @@ export default function LoginScreen() {
     const result = await login(data.email, data.password);
     setLoading(false);
     if (result.success) {
-      if (verified === '1') {
+      if (verified === '1' && result.role === 'owner') {
         router.replace('/(auth)/onboarding');
       } else {
         router.replace(

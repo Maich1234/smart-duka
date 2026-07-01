@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Spacing } from '@/constants/Spacing';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { useAuthStore } from '@/store/authStore';
+import { getProducts } from '@/services/products';
 
 const { width } = Dimensions.get('window');
 
@@ -53,6 +54,16 @@ export default function OnboardingScreen() {
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList<Slide>>(null);
   const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    getProducts({ page: 1, limit: 1 })
+      .then((res) => {
+        if ((res.pagination?.total ?? 0) > 0) {
+          router.replace('/(owner)/dashboard');
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const finish = () => {
     router.replace(user?.role === 'owner' ? '/(owner)/dashboard' : '/(staff)/dashboard');

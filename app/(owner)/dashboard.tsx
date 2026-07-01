@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { SalesSummaryCard } from '@/components/dashboard/SalesSummaryCard';
 import { StatsRow } from '@/components/dashboard/StatsRow';
 import { LowStockList } from '@/components/dashboard/LowStockList';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
+import { Shimmer } from '@/components/ui/Shimmer';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
@@ -95,13 +96,14 @@ const QUICK_ACTIONS: QuickAction[] = [
 const DashboardSkeleton = () => (
   <View style={styles.skeletonContainer}>
     <View style={styles.skeletonHeader}>
-      <View style={styles.skeletonLine} />
-      <View style={[styles.skeletonLine, { width: '60%' }]} />
+      <Shimmer height={14} borderRadius={7} style={{ width: '50%' }} />
+      <Shimmer height={22} borderRadius={6} style={{ width: '70%', marginTop: 6 }} />
+      <Shimmer height={12} borderRadius={6} style={{ width: '35%', marginTop: 6 }} />
     </View>
-    <View style={styles.skeletonCard} />
+    <Shimmer height={180} borderRadius={24} style={styles.skeletonCard} />
     <View style={styles.skeletonGrid}>
       {[0, 1, 2, 3].map((i) => (
-        <View key={i} style={styles.skeletonAction} />
+        <Shimmer key={i} height={110} borderRadius={20} style={styles.skeletonAction} />
       ))}
     </View>
   </View>
@@ -111,13 +113,22 @@ export default function OwnerDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['ownerDashboard'],
     queryFn: getOwnerDashboard,
   });
 
-  const greeting = useMemo(() => getGreeting(), []);
-  const formattedDate = useMemo(() => getFormattedDate(), []);
+  const [timeContext, setTimeContext] = useState({
+    greeting: getGreeting(),
+    formattedDate: getFormattedDate(),
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTimeContext({ greeting: getGreeting(), formattedDate: getFormattedDate() });
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const shopInitials = useMemo(
     () => getShopInitials(user?.shop?.name ?? 'Smart Duka'),
     [user?.shop?.name],
@@ -127,6 +138,20 @@ export default function OwnerDashboard() {
     return (
       <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
         <DashboardSkeleton />
+      </Animated.View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Animated.View entering={FadeIn.duration(300)} style={[styles.container, styles.errorCenter]}>
+        <Ionicons name="cloud-offline-outline" size={48} color="#94A3B8" />
+        <Text style={styles.errorTitle}>Could not load dashboard</Text>
+        <Text style={styles.errorSub}>Check your connection and try again.</Text>
+        <TouchableOpacity onPress={() => refetch()} style={styles.retryBtn} activeOpacity={0.8}>
+          <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
+          <Text style={styles.retryBtnText}>Retry</Text>
+        </TouchableOpacity>
       </Animated.View>
     );
   }
@@ -143,7 +168,7 @@ export default function OwnerDashboard() {
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl }}
         refreshControl={
           <RefreshControl
-            refreshing={false}
+            refreshing={isRefetching}
             onRefresh={refetch}
             tintColor="#0F766E"
             colors={['#0F766E']}
@@ -159,20 +184,22 @@ export default function OwnerDashboard() {
           >
             <View style={styles.headerContent}>
             <View style={styles.headerLeft}>
-              <Text style={styles.greeting}>{greeting},</Text>
+              <Text style={styles.greeting}>{timeContext.greeting},</Text>
               <Text style={styles.shopName} numberOfLines={1}>
                 {user?.shop?.name ?? 'Smart Duka'}
               </Text>
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={12} color="#94A3B8" />
-                <Text style={styles.dateText}>{formattedDate}</Text>
+                <Text style={styles.dateText}>{timeContext.formattedDate}</Text>
               </View>
             </View>
             <View style={styles.headerRight}>
               <TouchableOpacity
                 style={styles.notifButton}
                 activeOpacity={0.75}
-                onPress={() => {}}
+                onPress={() => router.push('/(owner)/inventory')}
+                accessibilityRole="button"
+                accessibilityLabel="View low stock alerts in inventory"
               >
                 <Ionicons name="notifications-outline" size={20} color="#64748B" />
                 {(dashboard?.lowStockItems?.length ?? 0) > 0 && (
@@ -183,6 +210,8 @@ export default function OwnerDashboard() {
                 style={styles.avatarButton}
                 activeOpacity={0.8}
                 onPress={() => router.push('/(owner)/profile')}
+                accessibilityRole="button"
+                accessibilityLabel="Open profile"
               >
                 <LinearGradient
                   colors={['#0F766E', '#0D3B2E']}
@@ -218,6 +247,8 @@ export default function OwnerDashboard() {
                 activeOpacity={0.82}
                 onPress={() => router.push(action.route as Parameters<typeof router.push>[0])}
                 style={styles.actionCard}
+                accessibilityRole="button"
+                accessibilityLabel={`${action.title}: ${action.subtitle}`}
               >
                 <LinearGradient
                   colors={action.colors}
@@ -423,24 +454,53 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
+  // ── Error state ─────────────────────────────────────────────────────────
+  errorCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+    gap: 10,
+  },
+  errorTitle: {
+    fontSize: Typography.size.h3,
+    fontFamily: Typography.fontFamilyBold,
+    color: '#0F172A',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  errorSub: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0F766E',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  retryBtnText: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: '#FFFFFF',
+  },
+
   // ── Skeleton ─────────────────────────────────────────────────────────
   skeletonContainer: {
     padding: Spacing.lg,
     gap: Spacing.lg,
   },
   skeletonHeader: {
-    gap: 8,
-  },
-  skeletonLine: {
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#E2E8F0',
-    width: '80%',
+    gap: 4,
   },
   skeletonCard: {
-    height: 180,
-    borderRadius: 24,
-    backgroundColor: '#E2E8F0',
+    marginTop: 4,
   },
   skeletonGrid: {
     flexDirection: 'row',
@@ -449,8 +509,5 @@ const styles = StyleSheet.create({
   },
   skeletonAction: {
     width: ACTION_CARD_WIDTH,
-    height: 110,
-    borderRadius: 20,
-    backgroundColor: '#E2E8F0',
   },
 });

@@ -16,6 +16,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import Svg, { Rect, Text as SvgText, Line as SvgLine } from 'react-native-svg';
 import type { ReportSummary, TopProduct, StaffPerformance, ReportPeriod, ReportBucket } from '@/services/reports';
 import type { RatingsSummary } from '@/services/ratings';
 import type { DepletionAnalytics } from '@/services/analytics';
@@ -1160,5 +1161,386 @@ const sv = StyleSheet.create({
     fontSize: 14,
     color: Colors.textTertiary,
     fontFamily: Typography.fontFamily,
+  },
+});
+
+// ─── RevenueBreakdownCard ─────────────────────────────────────────────────────
+
+interface RevenueBreakdownProps {
+  summary: ReportSummary;
+  currency?: string;
+}
+
+export function RevenueBreakdownCard({ summary, currency }: RevenueBreakdownProps) {
+  if (summary.totalRevenue <= 0) return null;
+
+  const expensePct = Math.min((summary.expenseTotal / summary.totalRevenue) * 100, 100);
+  const profitPct = Math.max((summary.netProfit / summary.totalRevenue) * 100, 0);
+  const profitNegative = summary.netProfit < 0;
+
+  return (
+    <Animated.View entering={FadeInDown.duration(360).delay(100)}>
+      <View style={[rb.card, Shadows.sm]}>
+        {/* stacked bar */}
+        <View style={rb.barWrap}>
+          {/* revenue full bar (background) */}
+          <View style={rb.barBg} />
+          {/* expenses portion — overlaid from left */}
+          {summary.expenseTotal > 0 && (
+            <View style={[rb.barExpense, { width: `${expensePct}%` }]} />
+          )}
+          {/* profit portion — fill from right */}
+          {!profitNegative && profitPct > 0 && (
+            <View style={[rb.barProfit, { width: `${profitPct}%` }]} />
+          )}
+          {/* midpoint divider if both exist */}
+          {summary.expenseTotal > 0 && !profitNegative && (
+            <View style={[rb.barDivider, { left: `${expensePct}%` }]} />
+          )}
+        </View>
+
+        {/* metric columns */}
+        <View style={rb.metricRow}>
+          <View style={rb.metric}>
+            <View style={[rb.dot, { backgroundColor: Colors.primary }]} />
+            <Text style={rb.metricLabel}>Revenue</Text>
+            <Text style={rb.metricValue}>{formatCurrency(summary.totalRevenue, currency)}</Text>
+          </View>
+
+          {summary.expenseTotal > 0 && (
+            <>
+              <View style={rb.vDivider} />
+              <View style={rb.metric}>
+                <View style={[rb.dot, { backgroundColor: '#F97316' }]} />
+                <Text style={rb.metricLabel}>Expenses</Text>
+                <Text style={[rb.metricValue, { color: '#F97316' }]}>
+                  -{formatCurrency(summary.expenseTotal, currency)}
+                </Text>
+                <Text style={rb.metricSub}>{expensePct.toFixed(0)}% of rev.</Text>
+              </View>
+            </>
+          )}
+
+          <View style={rb.vDivider} />
+          <View style={rb.metric}>
+            <View style={[rb.dot, { backgroundColor: profitNegative ? Colors.danger : Colors.success }]} />
+            <Text style={rb.metricLabel}>Net Profit</Text>
+            <Text style={[rb.metricValue, { color: profitNegative ? Colors.danger : Colors.success }]}>
+              {profitNegative ? '-' : ''}{formatCurrency(Math.abs(summary.netProfit), currency)}
+            </Text>
+            {!profitNegative && (
+              <Text style={rb.metricSub}>{profitPct.toFixed(0)}% margin</Text>
+            )}
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+const rb = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    paddingBottom: Spacing.md,
+  },
+  barWrap: {
+    height: 6,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: 3,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  barBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.primarySubtle,
+    borderRadius: 3,
+  },
+  barExpense: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#F97316',
+    borderRadius: 3,
+  },
+  barProfit: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: Colors.success,
+    borderRadius: 3,
+  },
+  barDivider: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: Colors.surface,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+  },
+  metric: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginBottom: 2,
+  },
+  metricLabel: {
+    fontSize: 9,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  metricValue: {
+    fontSize: 13,
+    fontFamily: Typography.fontFamilyBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  metricSub: {
+    fontSize: 10,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+  },
+  vDivider: {
+    width: 1,
+    backgroundColor: Colors.divider,
+    alignSelf: 'stretch',
+    marginHorizontal: 2,
+  },
+});
+
+// ─── PeakActivitySection ──────────────────────────────────────────────────────
+
+const BAR_COL = 40;
+const BAR_W = 28;
+const BAR_CHART_H = 110;
+const BAR_TOP_PAD = 18;
+
+interface PeakActivityProps {
+  series: ReportBucket[];
+  currency?: string;
+  period: ReportPeriod;
+}
+
+export function PeakActivitySection({ series, currency, period }: PeakActivityProps) {
+  const hasData = series.some((b) => b.total > 0);
+  if (!hasData) return null;
+
+  const maxTotal = Math.max(...series.map((b) => b.total), 1);
+  const peakIndex = series.reduce(
+    (best, b, i) => (b.total > series[best].total ? i : best),
+    0,
+  );
+  const totalTxns = series.reduce((s, b) => s + b.transactionCount, 0);
+  const peakBucket = series[peakIndex];
+  const periodUnit = period === 'daily' ? 'hour' : 'day';
+  const chartWidth = series.length * BAR_COL;
+
+  return (
+    <Animated.View entering={FadeInDown.duration(380).delay(230)}>
+      <SectionHeader
+        icon="bar-chart-outline"
+        title="Activity Breakdown"
+        subtitle={`Sales by ${periodUnit} · ${totalTxns} transactions total`}
+        delay={210}
+      />
+      <View style={[pa.card, Shadows.sm]}>
+        {/* peak callout strip */}
+        {peakBucket && peakBucket.total > 0 && (
+          <View style={pa.peakStrip}>
+            <View style={pa.peakIconWrap}>
+              <Ionicons name="flame" size={13} color={Colors.accent} />
+            </View>
+            <Text style={pa.peakText}>
+              Peak: <Text style={pa.peakHighlight}>{peakBucket.label}</Text>
+            </Text>
+            <View style={pa.peakRight}>
+              <Text style={pa.peakAmount}>{formatCurrency(peakBucket.total, currency)}</Text>
+              <Text style={pa.peakTxns}>{peakBucket.transactionCount} sales</Text>
+            </View>
+          </View>
+        )}
+
+        {/* divider */}
+        <View style={pa.stripDivider} />
+
+        {/* bar chart */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={pa.scrollContent}
+        >
+          <View style={{ width: chartWidth }}>
+            <Svg width={chartWidth} height={BAR_TOP_PAD + BAR_CHART_H + 2}>
+              {/* grid lines at 50% and 100% */}
+              {[0, 0.5].map((f) => (
+                <SvgLine
+                  key={f}
+                  x1={0}
+                  x2={chartWidth}
+                  y1={BAR_TOP_PAD + BAR_CHART_H * f}
+                  y2={BAR_TOP_PAD + BAR_CHART_H * f}
+                  stroke={Colors.divider}
+                  strokeWidth={1}
+                />
+              ))}
+
+              {series.map((bucket, i) => {
+                const barH = Math.max(
+                  bucket.total > 0 ? (bucket.total / maxTotal) * BAR_CHART_H : 0,
+                  bucket.total > 0 ? 4 : 0,
+                );
+                const x = i * BAR_COL + (BAR_COL - BAR_W) / 2;
+                const y = BAR_TOP_PAD + BAR_CHART_H - barH;
+                const isPeak = i === peakIndex;
+                const intensity = 0.35 + (bucket.total / maxTotal) * 0.65;
+
+                return (
+                  <React.Fragment key={bucket.date + i}>
+                    <Rect
+                      x={x}
+                      y={y}
+                      width={BAR_W}
+                      height={barH}
+                      rx={5}
+                      ry={5}
+                      fill={isPeak ? Colors.accent : Colors.primary}
+                      fillOpacity={isPeak ? 1 : intensity}
+                    />
+                    {isPeak && barH > 0 && (
+                      <SvgText
+                        x={x + BAR_W / 2}
+                        y={y - 5}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fill={Colors.accentDark}
+                        fontWeight="bold"
+                      >
+                        ★
+                      </SvgText>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </Svg>
+
+            {/* labels row */}
+            <View style={pa.labelRow}>
+              {series.map((bucket, i) => (
+                <View key={bucket.date + i} style={{ width: BAR_COL, alignItems: 'center' }}>
+                  <Text
+                    style={[pa.label, i === peakIndex && pa.labelPeak]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    {bucket.label}
+                  </Text>
+                  {bucket.transactionCount > 0 && (
+                    <Text style={pa.txnCount}>{bucket.transactionCount}</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </Animated.View>
+  );
+}
+
+const pa = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  peakStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 11,
+    gap: 8,
+  },
+  peakIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.accentSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  peakText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+  },
+  peakHighlight: {
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  peakRight: {
+    alignItems: 'flex-end',
+    gap: 1,
+  },
+  peakAmount: {
+    fontSize: 13,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.2,
+  },
+  peakTxns: {
+    fontSize: 10,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+  },
+  stripDivider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: 2,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  label: {
+    fontSize: 10,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+    textAlign: 'center',
+  },
+  labelPeak: {
+    color: Colors.accentDark,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  txnCount: {
+    fontSize: 9,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+    marginTop: 1,
   },
 });

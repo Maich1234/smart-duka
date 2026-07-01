@@ -290,6 +290,7 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
       transparent
       animationType="none"
       statusBarTranslucent
+      accessibilityViewIsModal
       onRequestClose={canDismissOnOverlay ? handleDismiss : undefined}
     >
       {/* Overlay */}

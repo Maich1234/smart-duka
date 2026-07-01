@@ -127,6 +127,14 @@ export const ChangePasswordForm: React.FC<ChangePasswordFormProps> = ({
       toast({ type: 'error', message: 'Please fill all fields' });
       return;
     }
+    if (newPassword.length < 8) {
+      toast({ type: 'error', message: 'Password must be at least 8 characters' });
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      toast({ type: 'error', message: 'Password must contain at least one number' });
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast({ type: 'error', message: 'New passwords do not match' });
       return;

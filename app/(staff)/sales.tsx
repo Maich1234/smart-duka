@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, Text, TouchableOpacity, BackHandler } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAlert } from '@/context/AlertContext';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -27,23 +28,14 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { usePermission } from '@/utils/permissions';
 import { Ionicons } from '@expo/vector-icons';
-
-interface CartEntry extends Product {
-  cartQuantity: number;
-  /** Override for variable/service/configurable lines — undefined means use sellingPrice */
-  cartUnitPrice?: number;
-  cartVariantId?: string;
-  cartVariantName?: string;
-}
-
-const cartKey = (item: CartEntry) => `${item._id}:${item.cartVariantId ?? ''}`;
+import { useCartStore, cartKey, type CartEntry } from '@/store/staffCartStore';
 
 export default function StaffSales() {
   const user = useAuthStore((s: AuthState) => s.user);
   const tabBarHeight = useBottomTabBarHeight();
   const canRecordSale = usePermission('record_sale');
   const canViewSales = usePermission('view_sales');
-  const { toast } = useAlert();
+  const { toast, alert } = useAlert();
 
   const {
     value: search,
@@ -54,7 +46,8 @@ export default function StaffSales() {
     recentSearches: productRecentSearches,
     clearRecent: clearProductRecentSearches,
   } = useSearch('pos_products');
-  const [cart, setCart] = useState<CartEntry[]>([]);
+
+  const { cart, addItem, removeItem, clearCart, updateItem } = useCartStore();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa'>('cash');
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [variantModalVisible, setVariantModalVisible] = useState(false);
@@ -65,12 +58,79 @@ export default function StaffSales() {
   const [receiptVisible, setReceiptVisible] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [mpesaModalVisible, setMpesaModalVisible] = useState(false);
-  const [pendingMpesaTransactionId, setPendingMpesaTransactionId] = useState<string | null>(null);
+  const [mpesaMode, setMpesaMode] = useState<'stk' | 'manual'>('stk');
+  const [manualReceiptCode, setManualReceiptCode] = useState('');
 
   const queryClient = useQueryClient();
+  const navigation = useNavigation();
 
   const [productsPage, setProductsPage] = useState(1);
   const [salesPage, setSalesPage] = useState(1);
+
+  // Reset to page 1 whenever the search query changes so stale page numbers
+  // don't produce empty results when the new query has fewer pages.
+  useEffect(() => {
+    setProductsPage(1);
+  }, [searchQuery]);
+
+  // Block tab navigation mid-sale — confirm before discarding the cart.
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
+      if (cart.length === 0) return;
+      e.preventDefault();
+      const targetAction = e.data?.action;
+      alert({
+        type: 'confirm',
+        title: 'Leave Sale?',
+        message: 'You have items in your cart. Leaving this screen will clear your current sale.',
+        buttons: [
+          { label: 'Stay', variant: 'ghost' },
+          {
+            label: 'Leave',
+            variant: 'danger',
+            onPress: () => {
+              clearCart();
+              setCustomerPhone('');
+              setMpesaMode('stk');
+              setManualReceiptCode('');
+              if (targetAction) (navigation as any).dispatch(targetAction);
+            },
+          },
+        ],
+      });
+    });
+    return unsubscribe;
+  }, [navigation, cart.length, alert, clearCart]);
+
+  // Intercept Android back button when mid-sale to prevent silent cart loss.
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (cart.length === 0) return false;
+        alert({
+          type: 'confirm',
+          title: 'Discard Sale?',
+          message: 'You have items in your cart. Going back will clear your current sale.',
+          buttons: [
+            { label: 'Stay', variant: 'ghost' },
+            {
+              label: 'Discard',
+              variant: 'danger',
+              onPress: () => {
+                clearCart();
+                setCustomerPhone('');
+                setMpesaMode('stk');
+                setManualReceiptCode('');
+              },
+            },
+          ],
+        });
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
+    }, [cart.length, alert, clearCart])
+  );
 
   const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['products', searchQuery, productsPage],
@@ -104,13 +164,17 @@ export default function StaffSales() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['mySales'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      setCart([]);
+      clearCart();
+      setManualReceiptCode('');
+      setMpesaMode('stk');
       setCompletedSale(data.data);
       setReceiptVisible(true);
     },
     onError: (error: any) => {
       if (isOfflineQueued(error)) {
-        setCart([]);
+        clearCart();
+        setManualReceiptCode('');
+        setMpesaMode('stk');
         toast({ type: 'info', message: 'Sale saved offline — will sync when connected.' });
         return;
       }
@@ -146,47 +210,41 @@ export default function StaffSales() {
 
   const confirmAdd = (quantity: number, unitPrice?: number) => {
     if (!selectedProduct) return;
-    setCart((prev) => {
-      const existing = prev.find((item) => item._id === selectedProduct._id && !item.cartVariantId);
-      if (existing) {
-        return prev.map((item) =>
-          item === existing
-            ? { ...item, cartQuantity: item.cartQuantity + quantity, cartUnitPrice: unitPrice ?? item.cartUnitPrice }
-            : item
-        );
-      }
-      return [...prev, { ...selectedProduct, cartQuantity: quantity, cartUnitPrice: unitPrice }];
-    });
+    const existing = cart.find((item) => item._id === selectedProduct._id && !item.cartVariantId);
+    if (existing) {
+      updateItem(cartKey(existing), {
+        cartQuantity: existing.cartQuantity + quantity,
+        cartUnitPrice: unitPrice ?? existing.cartUnitPrice,
+      });
+    } else {
+      addItem({ ...selectedProduct, cartQuantity: quantity, cartUnitPrice: unitPrice });
+    }
     setQuantityModalVisible(false);
     setSelectedProduct(null);
   };
 
   const confirmVariantAdd = (variant: ProductVariant, quantity: number) => {
     if (!selectedProduct) return;
-    setCart((prev) => {
-      const existing = prev.find((item) => item._id === selectedProduct._id && item.cartVariantId === variant._id);
-      if (existing) {
-        return prev.map((item) =>
-          item === existing ? { ...item, cartQuantity: item.cartQuantity + quantity } : item
-        );
-      }
-      return [
-        ...prev,
-        {
-          ...selectedProduct,
-          cartQuantity: quantity,
-          cartUnitPrice: variant.sellingPrice,
-          cartVariantId: variant._id,
-          cartVariantName: variant.name,
-        },
-      ];
-    });
+    const existing = cart.find(
+      (item) => item._id === selectedProduct._id && item.cartVariantId === variant._id
+    );
+    if (existing) {
+      updateItem(cartKey(existing), { cartQuantity: existing.cartQuantity + quantity });
+    } else {
+      addItem({
+        ...selectedProduct,
+        cartQuantity: quantity,
+        cartUnitPrice: variant.sellingPrice,
+        cartVariantId: variant._id,
+        cartVariantName: variant.name,
+      });
+    }
     setVariantModalVisible(false);
     setSelectedProduct(null);
   };
 
   const removeFromCart = (key: string) => {
-    setCart((prev) => prev.filter((item) => cartKey(item) !== key));
+    removeItem(key);
   };
 
   const cartPromoResults = cart.map((item) =>
@@ -210,6 +268,21 @@ export default function StaffSales() {
       return;
     }
     if (paymentMethod === 'mpesa') {
+      if (mpesaMode === 'manual') {
+        // Customer already paid — skip STK push, record receipt directly.
+        const code = manualReceiptCode.trim();
+        if (code.length < 6) {
+          toast({ type: 'error', message: 'Enter a valid M-Pesa receipt code.' });
+          return;
+        }
+        createSaleMutation.mutate({
+          items: buildSaleItems(),
+          paymentMethod: 'mpesa',
+          mpesaReceiptNumber: code,
+        });
+        return;
+      }
+      // STK push flow
       if (!mpesaEnabled) {
         toast({ type: 'warning', message: 'The shop owner has not connected an M-Pesa Business account yet.' });
         return;
@@ -226,7 +299,6 @@ export default function StaffSales() {
 
   const handleMpesaSuccess = (transactionId: string | null, receiptNumber: string | null) => {
     setMpesaModalVisible(false);
-    if (transactionId) setPendingMpesaTransactionId(transactionId);
     createSaleMutation.mutate({
       items: buildSaleItems(),
       paymentMethod: 'mpesa',
@@ -323,54 +395,84 @@ export default function StaffSales() {
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={productsLoading} onRefresh={refetchProducts} />}
         ListHeaderComponent={
-          cart.length > 0 ? (
-            <View style={styles.cartSection}>
-              <Text style={styles.sectionTitle}>Current Sale</Text>
-              {cart.map((item) => (
-                <CartItem
-                  key={cartKey(item)}
-                  item={{
-                    ...item,
-                    quantity: item.cartQuantity,
-                    variantName: item.cartVariantName,
-                    bundleComponentNames: item.bundleItems?.map(
-                      (b) => products.find((p) => p._id === b.product)?.name || 'item'
-                    ),
-                  }}
-                  unitPrice={item.cartUnitPrice}
-                  onRemove={() => removeFromCart(cartKey(item))}
-                />
-              ))}
-              <CartSummary
-                total={totalAmount}
-                totalSavings={totalSavings}
-                paymentMethod={paymentMethod}
-                onPaymentMethodChange={(m) => { setPaymentMethod(m); if (m === 'cash') setCustomerPhone(''); }}
-                onCheckout={handleCheckout}
-                loading={createSaleMutation.isPending}
-                mpesaEnabled={mpesaEnabled}
-                customerPhone={customerPhone}
-                onCustomerPhoneChange={setCustomerPhone}
-                currency={user?.shop?.currency}
-              />
-            </View>
-          ) : null
-        }
-        ListFooterComponent={
           <View>
-            {/* Products pagination */}
+            {cart.length > 0 && (
+              <View style={styles.cartSection}>
+                <Text style={styles.sectionTitle}>Current Sale</Text>
+                {cart.map((item) => (
+                  <CartItem
+                    key={cartKey(item)}
+                    item={{
+                      ...item,
+                      quantity: item.cartQuantity,
+                      variantName: item.cartVariantName,
+                      bundleComponentNames: item.bundleItems?.map(
+                        (b) => products.find((p) => p._id === b.product)?.name || 'item'
+                      ),
+                    }}
+                    unitPrice={item.cartUnitPrice}
+                    onRemove={() => removeFromCart(cartKey(item))}
+                  />
+                ))}
+                <CartSummary
+                  total={totalAmount}
+                  totalSavings={totalSavings}
+                  paymentMethod={paymentMethod}
+                  onPaymentMethodChange={(m) => {
+                    setPaymentMethod(m);
+                    if (m === 'cash') {
+                      setCustomerPhone('');
+                      setMpesaMode('stk');
+                      setManualReceiptCode('');
+                    }
+                  }}
+                  onCheckout={handleCheckout}
+                  loading={createSaleMutation.isPending}
+                  mpesaEnabled={mpesaEnabled}
+                  customerPhone={customerPhone}
+                  onCustomerPhoneChange={setCustomerPhone}
+                  currency={user?.shop?.currency}
+                  mpesaMode={mpesaMode}
+                  onMpesaModeChange={setMpesaMode}
+                  manualReceiptCode={manualReceiptCode}
+                  onManualReceiptCodeChange={setManualReceiptCode}
+                />
+              </View>
+            )}
+            {/* Product pagination sits above the product list so staff never
+                need to scroll past products to change pages. */}
             {productsTotalPages > 1 && (
-              <View style={salesPaginationStyle}>
-                <TouchableOpacity onPress={() => setProductsPage((p) => Math.max(1, p - 1))} disabled={productsPage <= 1} style={[pageBtn, productsPage <= 1 && pageBtnDisabled]}>
-                  <Ionicons name="chevron-back" size={16} color={productsPage <= 1 ? '#94A3B8' : '#0F766E'} />
+              <View style={[styles.paginationRow, styles.productsPaginationHeader]}>
+                <TouchableOpacity
+                  onPress={() => setProductsPage((p) => Math.max(1, p - 1))}
+                  disabled={productsPage <= 1}
+                  style={[styles.paginationBtn, productsPage <= 1 && styles.paginationBtnDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Previous page, page ${productsPage - 1}`}
+                  accessibilityState={{ disabled: productsPage <= 1 }}
+                >
+                  <Ionicons name="chevron-back" size={16} color={productsPage <= 1 ? Colors.textSecondary : Colors.primary} />
                 </TouchableOpacity>
-                <Text style={pageLabelStyle}>Page {productsPage} of {productsTotalPages}</Text>
-                <TouchableOpacity onPress={() => setProductsPage((p) => Math.min(productsTotalPages, p + 1))} disabled={productsPage >= productsTotalPages} style={[pageBtn, productsPage >= productsTotalPages && pageBtnDisabled]}>
-                  <Ionicons name="chevron-forward" size={16} color={productsPage >= productsTotalPages ? '#94A3B8' : '#0F766E'} />
+                <Text style={styles.paginationLabel}>Page {productsPage} of {productsTotalPages}</Text>
+                <TouchableOpacity
+                  onPress={() => setProductsPage((p) => Math.min(productsTotalPages, p + 1))}
+                  disabled={productsPage >= productsTotalPages}
+                  style={[styles.paginationBtn, productsPage >= productsTotalPages && styles.paginationBtnDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Next page, page ${productsPage + 1}`}
+                  accessibilityState={{ disabled: productsPage >= productsTotalPages }}
+                >
+                  <Ionicons name="chevron-forward" size={16} color={productsPage >= productsTotalPages ? Colors.textSecondary : Colors.primary} />
                 </TouchableOpacity>
               </View>
             )}
-            {/* Sales history */}
+          </View>
+        }
+        ListFooterComponent={
+          <View>
+            {/* Sales history — map() inside a FlatList footer loses virtualisation,
+                acceptable here because the server pages to ≤10 items. If the page
+                limit is ever removed, move this section to a separate screen/tab. */}
             {canViewSales && (
               <View style={styles.historySection}>
                 <Text style={styles.sectionTitle}>My Sales History</Text>
@@ -387,13 +489,27 @@ export default function StaffSales() {
                   ))
                 )}
                 {salesTotalPages > 1 && (
-                  <View style={salesPaginationStyle}>
-                    <TouchableOpacity onPress={() => setSalesPage((p) => Math.max(1, p - 1))} disabled={salesPage <= 1} style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}>
-                      <Ionicons name="chevron-back" size={16} color={salesPage <= 1 ? '#94A3B8' : '#0F766E'} />
+                  <View style={styles.paginationRow}>
+                    <TouchableOpacity
+                      onPress={() => setSalesPage((p) => Math.max(1, p - 1))}
+                      disabled={salesPage <= 1}
+                      style={[styles.paginationBtn, salesPage <= 1 && styles.paginationBtnDisabled]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Previous page, page ${salesPage - 1}`}
+                      accessibilityState={{ disabled: salesPage <= 1 }}
+                    >
+                      <Ionicons name="chevron-back" size={16} color={salesPage <= 1 ? Colors.textSecondary : Colors.primary} />
                     </TouchableOpacity>
-                    <Text style={pageLabelStyle}>Page {salesPage} of {salesTotalPages}</Text>
-                    <TouchableOpacity onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))} disabled={salesPage >= salesTotalPages} style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}>
-                      <Ionicons name="chevron-forward" size={16} color={salesPage >= salesTotalPages ? '#94A3B8' : '#0F766E'} />
+                    <Text style={styles.paginationLabel}>Page {salesPage} of {salesTotalPages}</Text>
+                    <TouchableOpacity
+                      onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
+                      disabled={salesPage >= salesTotalPages}
+                      style={[styles.paginationBtn, salesPage >= salesTotalPages && styles.paginationBtnDisabled]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Next page, page ${salesPage + 1}`}
+                      accessibilityState={{ disabled: salesPage >= salesTotalPages }}
+                    >
+                      <Ionicons name="chevron-forward" size={16} color={salesPage >= salesTotalPages ? Colors.textSecondary : Colors.primary} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -473,10 +589,6 @@ export default function StaffSales() {
   );
 }
 
-const salesPaginationStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 20, paddingVertical: 16 };
-const pageBtn = { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: '#0F766E', alignItems: 'center' as const, justifyContent: 'center' as const };
-const pageBtnDisabled = { borderColor: '#E2E8F0' };
-const pageLabelStyle = { fontSize: 13, fontWeight: '600' as const, color: '#64748B' };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
@@ -505,4 +617,42 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   historySection: { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg, marginBottom: Spacing.xl },
+  paginationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    paddingVertical: Spacing.md,
+  },
+  productsPaginationHeader: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+  },
+  paginationBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paginationBtnDisabled: {
+    borderColor: Colors.border,
+  },
+  paginationLabel: {
+    fontSize: 13,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
+  },
 });
+
+// Inline styles used only in the read-only sales history branch
+const salesPaginationStyle = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 20, paddingVertical: Spacing.md };
+const pageBtn = { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: '#0F766E', alignItems: 'center' as const, justifyContent: 'center' as const };
+const pageBtnDisabled = { borderColor: '#CBD5E1' };
+const pageLabelStyle = { fontSize: 13, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary };

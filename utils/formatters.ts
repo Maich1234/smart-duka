@@ -36,7 +36,7 @@ export const formatDateTime = (dateString: string | Date): string => {
 };
 
 /**
- * Format phone number (e.g., 254712345678 -> 0712 345 678)
+ * Format phone number in local notation (e.g., 254712345678 → 0712 345 678)
  */
 export const formatPhoneNumber = (phone: string): string => {
   const cleaned = phone.replace(/\D/g, '');
@@ -45,6 +45,23 @@ export const formatPhoneNumber = (phone: string): string => {
   }
   if (cleaned.length === 10 && cleaned.startsWith('07')) {
     return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7)}`;
+  }
+  return phone;
+};
+
+/**
+ * Format a Kenyan phone number for display in E.164 style with spaces.
+ * Handles +254XXXXXXXXX, 254XXXXXXXXX and 07XXXXXXXX inputs.
+ * Falls back to the raw value if the number doesn't match.
+ * Used by M-Pesa payment flows to show the customer's number clearly.
+ */
+export const formatKenyanPhone = (phone: string): string => {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('254') && digits.length === 12) {
+    return `+254 ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+  }
+  if (digits.startsWith('0') && digits.length === 10) {
+    return `+254 ${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
   }
   return phone;
 };

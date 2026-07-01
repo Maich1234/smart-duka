@@ -19,6 +19,7 @@ import Animated, {
   withSequence,
   withTiming,
   withSpring,
+  cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ import { Spacing } from '@/constants/Spacing';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/utils/formatters';
 import { initiateSTKPush, getTransactionStatus, verifyByReceiptNumber, type MpesaTransactionStatus } from '@/services/mpesa';
+import { formatKenyanPhone } from '@/utils/formatters';
 
 interface Props {
   visible: boolean;
@@ -43,7 +45,8 @@ interface Props {
 type ModalStatus = 'initiating' | 'pending' | 'success' | 'failed' | 'cancelled' | 'timeout';
 
 const POLL_INTERVAL_MS = 3000;
-const MAX_POLL_DURATION_MS = 90000; // 90 seconds
+const MAX_POLL_DURATION_MS = 120000; // 120 seconds
+const MAX_CONSECUTIVE_ERRORS = 5;
 
 /** UUID v4 generator — uses crypto.randomUUID when available (Hermes/modern), falls back gracefully. */
 function generateIdempotencyKey(): string {
@@ -71,6 +74,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isOfflineEntry, setIsOfflineEntry] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   // Verify-by-receipt-code UI state
   const [showVerifyInput, setShowVerifyInput] = useState(false);
@@ -78,7 +82,9 @@ export const MpesaPaymentModal: React.FC<Props> = ({
   const [verifying, setVerifying] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
+  const consecutiveErrorsRef = useRef(0);
 
   /**
    * Idempotency key: generated ONCE when the modal opens for this payment intent.
@@ -114,10 +120,29 @@ export const MpesaPaymentModal: React.FC<Props> = ({
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
   }, []);
 
   const beginPolling = useCallback((txId: string) => {
     stopPolling();
+    consecutiveErrorsRef.current = 0;
+
+    // Live countdown so staff know how long is left.
+    const totalSeconds = Math.round(MAX_POLL_DURATION_MS / 1000);
+    setCountdown(totalSeconds);
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
     pollRef.current = setInterval(async () => {
       const elapsed = Date.now() - startTimeRef.current;
       if (elapsed > MAX_POLL_DURATION_MS) {
@@ -127,6 +152,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
       }
       try {
         const res = await getTransactionStatus(txId);
+        consecutiveErrorsRef.current = 0;
         const s = res.data.status as MpesaTransactionStatus;
         if (s !== 'pending') {
           stopPolling();
@@ -142,8 +168,20 @@ export const MpesaPaymentModal: React.FC<Props> = ({
             setStatus('failed');
           }
         }
-      } catch {
-        // Network hiccup during polling — keep trying
+      } catch (err: any) {
+        // Distinguish transient network jitter from persistent server errors.
+        // After MAX_CONSECUTIVE_ERRORS back-to-back failures we surface an error
+        // rather than leaving staff waiting for the full 120s countdown.
+        const isNetworkError = !err?.response;
+        if (!isNetworkError) {
+          consecutiveErrorsRef.current += 1;
+          if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+            stopPolling();
+            setErrorMessage(err.response?.data?.message ?? 'Unable to reach payment server. Check your connection.');
+            setStatus('failed');
+          }
+        }
+        // Pure network jitter — keep polling silently.
       }
     }, POLL_INTERVAL_MS);
   }, [stopPolling]);
@@ -156,6 +194,8 @@ export const MpesaPaymentModal: React.FC<Props> = ({
     setIsOfflineEntry(false);
     setShowVerifyInput(false);
     setVerifyCode('');
+    setCountdown(0);
+    consecutiveErrorsRef.current = 0;
 
     try {
       const res = await initiateSTKPush(phoneNumber, amount, accountReference, key);
@@ -193,6 +233,17 @@ export const MpesaPaymentModal: React.FC<Props> = ({
       stopPolling();
       return;
     }
+    // Reset all state synchronously so there is no flash of a previous payment's
+    // terminal status (failed/timeout) before sendSTKPush begins.
+    setStatus('initiating');
+    setTransactionId(null);
+    setReceiptNumber(null);
+    setErrorMessage(null);
+    setIsOfflineEntry(false);
+    setShowVerifyInput(false);
+    setVerifyCode('');
+    setCountdown(0);
+    consecutiveErrorsRef.current = 0;
     // New payment intent → new idempotency key
     idempotencyKeyRef.current = generateIdempotencyKey();
     sendSTKPush(idempotencyKeyRef.current);
@@ -258,7 +309,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
 
   if (!visible) return null;
 
-  const maskedPhone = formatPhone(phoneNumber);
+  const maskedPhone = formatKenyanPhone(phoneNumber);
   const isTerminal = status === 'failed' || status === 'cancelled' || status === 'timeout';
 
   return (
@@ -315,6 +366,11 @@ export const MpesaPaymentModal: React.FC<Props> = ({
               <View style={styles.waitingDots}>
                 <WaitingDots />
               </View>
+              {countdown > 0 && (
+                <Text style={styles.countdownText}>
+                  Waiting {countdown}s…
+                </Text>
+              )}
               <TouchableOpacity onPress={onCancel} style={styles.cancelLink}>
                 <Text style={styles.cancelLinkText}>Cancel transaction</Text>
               </TouchableOpacity>
@@ -476,8 +532,13 @@ const WaitingDot: React.FC<{ delay: number }> = ({ delay }) => {
         false
       );
     }, delay);
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      clearTimeout(timer);
+      // Cancel any in-flight animation so we don't update state on
+      // an unmounted component when the modal closes during the delay window.
+      cancelAnimation(opacity);
+    };
+  }, [delay, opacity]);
 
   const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return <Animated.View style={[styles.dot, animStyle]} />;
@@ -490,17 +551,6 @@ const WaitingDots: React.FC = () => (
     <WaitingDot delay={320} />
   </View>
 );
-
-function formatPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('254') && digits.length === 12) {
-    return `+254 ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
-  }
-  if (digits.startsWith('0') && digits.length === 10) {
-    return `0${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-  }
-  return phone;
-}
 
 const styles = StyleSheet.create({
   backdrop: {
@@ -637,7 +687,13 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     letterSpacing: -0.3,
   },
-  waitingDots: { marginBottom: 16 },
+  waitingDots: { marginBottom: 6 },
+  countdownText: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+    fontFamily: Typography.fontFamily,
+    marginBottom: 12,
+  },
   dot: {
     width: 8,
     height: 8,

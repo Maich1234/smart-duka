@@ -228,7 +228,8 @@ export default function OwnerLayout() {
       <Tabs.Screen
         name="sales"
         options={{
-          title: 'New Sale',
+          title: 'Sales',
+          headerShown: false,
         }}
       />
       <Tabs.Screen

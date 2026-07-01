@@ -45,6 +45,7 @@ export default function OwnerSales() {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [staffId, setStaffId] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const {
     value: searchValue,
@@ -61,9 +62,14 @@ export default function OwnerSales() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  const isDateFiltered = !!(startDate || endDate);
+
   const { data: statsData } = useQuery({
-    queryKey: ['salesStats'],
-    queryFn: getSalesStats,
+    queryKey: ['salesStats', startDate?.toISOString(), endDate?.toISOString()],
+    queryFn: () => getSalesStats({
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+    }),
   });
 
   const {
@@ -105,14 +111,18 @@ export default function OwnerSales() {
   // Client-side filter: sales API doesn't support full-text search, so we
   // filter the already-fetched pages by invoice number and cashier name.
   const sales = useMemo(() => {
-    if (!searchQuery) return allSales;
-    const q = searchQuery.toLowerCase();
-    return allSales.filter(
-      (s) =>
-        s.invoiceNumber.toLowerCase().includes(q) ||
-        s.staff?.name?.toLowerCase().includes(q),
-    );
-  }, [allSales, searchQuery]);
+    const base = !searchQuery
+      ? allSales
+      : (() => {
+          const q = searchQuery.toLowerCase();
+          return allSales.filter(
+            (s) =>
+              s.invoiceNumber.toLowerCase().includes(q) ||
+              s.staff?.name?.toLowerCase().includes(q),
+          );
+        })();
+    return sortOrder === 'asc' ? [...base].reverse() : base;
+  }, [allSales, searchQuery, sortOrder]);
 
   const stats = statsData?.data;
   const totalSales = stats?.totalSales ?? 0;
@@ -121,20 +131,24 @@ export default function OwnerSales() {
   const cashTotal = stats?.cashTotal ?? 0;
   const mpesaTotal = stats?.mpesaTotal ?? 0;
   const cardTotal = stats?.cardTotal ?? 0;
-  const cashCount = stats?.cashCount ?? 0;
-  const mpesaCount = stats?.mpesaCount ?? 0;
-  const cardCount = stats?.cardCount ?? 0;
+  const cashCount = stats?.cashCount;
+  const mpesaCount = stats?.mpesaCount;
+  const cardCount = stats?.cardCount;
   const avgSale = stats?.avgSale ?? 0;
 
   const cashPct = totalSales > 0 ? Math.round((cashTotal / totalSales) * 100) : 0;
   const mpesaPct = totalSales > 0 ? Math.round((mpesaTotal / totalSales) * 100) : 0;
   const cardPct = totalSales > 0 ? Math.round((cardTotal / totalSales) * 100) : 0;
 
-  const FILTER_TABS: { key: PaymentFilter; label: string; count: number }[] = [
-    { key: 'all',   label: 'All Sales',  count: totalCount },
-    { key: 'mpesa', label: 'M-Pesa',     count: mpesaCount },
-    { key: 'cash',  label: 'Cash',       count: cashCount },
-    { key: 'card',  label: 'Card',       count: cardCount },
+  // When a date range is active, payment-method counts come from the same
+  // filtered stats request. If the backend ignores the params it will return
+  // this-month totals — in that case we only show the "All" count from the
+  // paginated list, which is always correctly filtered server-side.
+  const FILTER_TABS: { key: PaymentFilter; label: string; count: number | null }[] = [
+    { key: 'all',   label: 'All Sales', count: totalCount },
+    { key: 'mpesa', label: 'M-Pesa',   count: mpesaCount ?? null },
+    { key: 'cash',  label: 'Cash',     count: cashCount  ?? null },
+    { key: 'card',  label: 'Card',     count: cardCount  ?? null },
   ];
 
   const listHeader = useMemo(() => (
@@ -153,20 +167,24 @@ export default function OwnerSales() {
           <View style={styles.heroTop}>
             <View style={styles.heroLeft}>
               <View style={styles.heroLabelRow}>
-                <Text style={styles.heroLabel}>Total Sales (This Month)</Text>
+                <Text style={styles.heroLabel}>
+                {isDateFiltered ? 'Total Sales (Selected Period)' : 'Total Sales (This Month)'}
+              </Text>
                 <Ionicons name="eye-outline" size={16} color="rgba(255,255,255,0.5)" style={{ marginLeft: 6 }} />
               </View>
               <Text style={styles.heroAmount}>{formatCurrency(totalSales, currency)}</Text>
-              <View style={[styles.changeBadge, { backgroundColor: pctChange >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(239,68,68,0.18)' }]}>
-                <Ionicons
-                  name={pctChange >= 0 ? 'arrow-up' : 'arrow-down'}
-                  size={11}
-                  color={pctChange >= 0 ? '#4ADE80' : '#F87171'}
-                />
-                <Text style={[styles.changeText, { color: pctChange >= 0 ? '#4ADE80' : '#F87171' }]}>
-                  {Math.abs(pctChange)}% vs last month
-                </Text>
-              </View>
+              {!isDateFiltered && (
+                <View style={[styles.changeBadge, { backgroundColor: pctChange >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(239,68,68,0.18)' }]}>
+                  <Ionicons
+                    name={pctChange >= 0 ? 'arrow-up' : 'arrow-down'}
+                    size={11}
+                    color={pctChange >= 0 ? '#4ADE80' : '#F87171'}
+                  />
+                  <Text style={[styles.changeText, { color: pctChange >= 0 ? '#4ADE80' : '#F87171' }]}>
+                    {Math.abs(pctChange)}% vs last month
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.heroRight}>
@@ -219,18 +237,28 @@ export default function OwnerSales() {
       {/* ── Date range + Filters row ──────────────────────────────── */}
       <Animated.View entering={FadeInDown.duration(440).delay(160)} style={styles.dateFiltersRow}>
         <TouchableOpacity
-          style={styles.dateRangeBtn}
+          style={[styles.dateRangeBtn, { flex: 1 }]}
           onPress={() => setShowStartPicker(true)}
           activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={`Date range: ${formatDateRange(startDate, endDate)}. Tap to change.`}
         >
           <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
           <Text style={styles.dateRangeText}>{formatDateRange(startDate, endDate)}</Text>
           <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.filtersBtn} activeOpacity={0.75} onPress={() => {}}>
-          <Ionicons name="filter-outline" size={15} color={Colors.textSecondary} />
-          <Text style={styles.filtersBtnText}>Filters</Text>
-        </TouchableOpacity>
+        {(startDate || endDate) && (
+          <TouchableOpacity
+            style={styles.filtersBtn}
+            onPress={() => { setStartDate(null); setEndDate(null); }}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Clear date filter"
+          >
+            <Ionicons name="close-circle-outline" size={15} color={Colors.textSecondary} />
+            <Text style={styles.filtersBtnText}>Clear</Text>
+          </TouchableOpacity>
+        )}
       </Animated.View>
 
       {/* ── Search bar ────────────────────────────────────────────── */}
@@ -244,6 +272,11 @@ export default function OwnerSales() {
           onClearRecent={clearRecent}
           placeholder="Search invoice or cashier name…"
         />
+        {!!searchQuery && (
+          <Text style={styles.searchScopeNote}>
+            Searching within loaded results. Use the date filter to narrow your range first.
+          </Text>
+        )}
       </Animated.View>
 
       {/* ── Filter pill tabs ──────────────────────────────────────── */}
@@ -261,9 +294,12 @@ export default function OwnerSales() {
                 style={[styles.filterTab, active && styles.filterTabActive]}
                 onPress={() => setPaymentFilter(tab.key)}
                 activeOpacity={0.75}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={tab.label}
               >
                 <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>
-                  {tab.label} ({tab.count})
+                  {tab.count !== null ? `${tab.label} (${tab.count})` : tab.label}
                 </Text>
               </TouchableOpacity>
             );
@@ -274,16 +310,29 @@ export default function OwnerSales() {
       {/* ── Section header ───────────────────────────────────────── */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Sales History</Text>
-        <TouchableOpacity style={styles.sortLatestBtn} activeOpacity={0.75}>
-          <Text style={styles.sortLatestText}>Latest</Text>
-          <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
+        <TouchableOpacity
+          onPress={() => setSortOrder((s) => (s === 'desc' ? 'asc' : 'desc'))}
+          style={styles.sortLatestBtn}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={`Sort order: ${sortOrder === 'desc' ? 'newest first' : 'oldest first'}`}
+        >
+          <Ionicons
+            name={sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'}
+            size={12}
+            color={Colors.textSecondary}
+          />
+          <Text style={styles.sortLatestText}>
+            {sortOrder === 'desc' ? 'Latest' : 'Oldest'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [totalSales, txCount, pctChange, cashTotal, mpesaTotal, cardTotal, avgSale,
       cashPct, mpesaPct, cardPct, cashCount, mpesaCount, cardCount, totalCount,
-      paymentFilter, searchValue, searchQuery, recentSearches, startDate, endDate, currency]);
+      paymentFilter, searchValue, searchQuery, recentSearches, startDate, endDate,
+      currency, isDateFiltered, sortOrder]);
 
   return (
     <View style={styles.container}>
@@ -293,9 +342,14 @@ export default function OwnerSales() {
           <Text style={styles.pageTitle}>Sales</Text>
           <Text style={styles.pageSubtitle}>Track, analyze and manage all your sales</Text>
         </View>
-        <TouchableOpacity style={styles.notifBtn} activeOpacity={0.75}>
-          <Ionicons name="notifications-outline" size={22} color={Colors.textPrimary} />
-          <View style={styles.notifDot} />
+        <TouchableOpacity
+          style={styles.notifBtn}
+          onPress={() => router.push('/(owner)/reports' as any)}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="View reports"
+        >
+          <Ionicons name="bar-chart-outline" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -443,18 +497,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  notifDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.accent,
-    borderWidth: 1.5,
-    borderColor: Colors.surface,
-  },
-
   // ── Hero card
   heroWrapper: {
     marginBottom: Spacing.md,
@@ -601,6 +643,13 @@ const styles = StyleSheet.create({
   // ── Search wrapper (ContextualSearchBar manages its own internal styles)
   searchWrapper: {
     marginBottom: Spacing.sm,
+  },
+  searchScopeNote: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textTertiary,
+    marginTop: 4,
+    marginHorizontal: 4,
   },
 
   // ── Filter pill tabs

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +27,7 @@ export default function StaffInventory() {
     clearRecent,
   } = useSearch('staff_inventory');
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ['products', searchQuery],
     queryFn: () => getProducts({ search: searchQuery }),
     enabled: canViewProducts,
@@ -53,7 +53,7 @@ export default function StaffInventory() {
   }
 
   if (isLoading && allProducts.length === 0) {
-    return <LoadingState />;
+    return <ListSkeleton rows={7} showSearch />;
   }
 
   return (
@@ -78,7 +78,7 @@ export default function StaffInventory() {
           <ProductCard product={item} showCostPrice={false} showActions={false} />
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
         ListEmptyComponent={<EmptyState title="No products found" />}
       />
     </View>

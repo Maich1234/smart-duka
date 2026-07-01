@@ -19,7 +19,7 @@ import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useSearch } from '@/hooks/useSearch';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getMpesaTransactions, type MpesaTransaction, type MpesaTransactionStatus } from '@/services/mpesa';
-import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import { formatCurrency, formatDateTime, formatKenyanPhone } from '@/utils/formatters';
 
 const STATUS_FILTERS: Array<{ label: string; value: MpesaTransactionStatus | 'all' }> = [
   { label: 'All', value: 'all' },
@@ -55,6 +55,7 @@ export default function PaymentsScreen() {
   const {
     data,
     isLoading,
+    isRefetching,
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
@@ -86,7 +87,7 @@ export default function PaymentsScreen() {
         onEndReachedThreshold={0.3}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl }}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={Colors.primary} />
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />
         }
         ListHeaderComponent={
           <View>
@@ -199,7 +200,7 @@ const TransactionCard: React.FC<{ tx: MpesaTransaction; onPress: () => void }> =
       <View style={styles.txLeft}>
         <View style={[styles.txDot, { backgroundColor: colors.dot }]} />
         <View style={styles.txInfo}>
-          <Text style={styles.txPhone}>{formatPhone(tx.phoneNumber)}</Text>
+          <Text style={styles.txPhone}>{formatKenyanPhone(tx.phoneNumber)}</Text>
           {tx.mpesaReceiptNumber && (
             <Text style={styles.txRef}>{tx.mpesaReceiptNumber}</Text>
           )}
@@ -248,7 +249,7 @@ const TransactionDetailSheet: React.FC<{ tx: MpesaTransaction; onClose: () => vo
         </View>
 
         <View style={styles.detailRows}>
-          <DetailRow label="Phone Number" value={formatPhone(tx.phoneNumber)} />
+          <DetailRow label="Phone Number" value={formatKenyanPhone(tx.phoneNumber)} />
           {tx.mpesaReceiptNumber && <DetailRow label="M-Pesa Receipt" value={tx.mpesaReceiptNumber} highlight />}
           {tx.saleId && <DetailRow label="Invoice" value={tx.saleId.invoiceNumber} />}
           {tx.requestedBy && <DetailRow label="Cashier" value={tx.requestedBy.name} />}
@@ -267,14 +268,6 @@ const DetailRow: React.FC<{ label: string; value: string; highlight?: boolean }>
     <Text style={[styles.detailRowValue, highlight && styles.detailRowHighlight]}>{value}</Text>
   </View>
 );
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatPhone(phone: string): string {
-  const d = phone.replace(/\D/g, '');
-  if (d.startsWith('254') && d.length === 12) return `+254 ${d.slice(3, 6)} ${d.slice(6, 9)} ${d.slice(9)}`;
-  return phone;
-}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 

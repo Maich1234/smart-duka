@@ -26,6 +26,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Module-level flag prevents the logout side-effects (token clear, navigation)
+// from firing twice when both SessionExpiredHandler's timer and a route guard
+// call logout() in the same tick.
+let logoutInProgress = false;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, setAuth, logout: storeLogout, isLoading, setLoading } = useAuthStore();
 
@@ -77,12 +82,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    // Must run before clearAll/storeLogout — it needs the still-valid auth token.
-    await unregisterDeviceFromNotifications();
-    await clearAll();
-    storeLogout();
-    router.replace('/(auth)/login');
+    if (logoutInProgress) return;
+    logoutInProgress = true;
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      // Must run before clearAll/storeLogout — it needs the still-valid auth token.
+      await unregisterDeviceFromNotifications();
+      await clearAll();
+      storeLogout();
+      router.replace('/(auth)/login');
+    } finally {
+      // Reset after navigation settles so a fresh login can log out again.
+      setTimeout(() => { logoutInProgress = false; }, 2000);
+    }
   };
 
   const refreshUser = async () => {
@@ -93,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuth(profile.data as any, currentToken!);
       }
     } catch {
-      console.error('Failed to refresh user');
+      if (__DEV__) console.error('Failed to refresh user profile');
     }
   };
 

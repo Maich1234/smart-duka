@@ -9,7 +9,9 @@ export const isNetworkError = (error: any): boolean =>
 
 export const handleApiError = (error: any, defaultMessage?: string): string => {
   const message = getErrorMessage(error);
-  console.error('[API Error]', message, error);
+  // Never log the raw error object in production — it may contain auth headers
+  // or customer phone numbers from request/response bodies.
+  if (__DEV__) console.error('[API Error]', message, error);
   return defaultMessage || message;
 };
 

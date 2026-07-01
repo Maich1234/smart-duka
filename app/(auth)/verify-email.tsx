@@ -23,6 +23,8 @@ export default function VerifyEmailScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_SECONDS);
+  const [verifyAttempts, setVerifyAttempts] = useState(0);
+  const [verifyCooldown, setVerifyCooldown] = useState(0);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -31,6 +33,12 @@ export default function VerifyEmailScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, [countdown]);
+
+  useEffect(() => {
+    if (verifyCooldown <= 0) return;
+    const timer = setInterval(() => setVerifyCooldown((prev) => prev - 1), 1000);
+    return () => clearInterval(timer);
+  }, [verifyCooldown]);
 
   const startCountdown = useCallback(() => {
     setCountdown(RESEND_SECONDS);
@@ -50,6 +58,10 @@ export default function VerifyEmailScreen() {
       router.replace({ pathname: '/(auth)/login', params: { email, verified: '1' } });
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const attempts = verifyAttempts + 1;
+      setVerifyAttempts(attempts);
+      if (attempts >= 5) setVerifyCooldown(30);
+      else if (attempts >= 3) setVerifyCooldown(10);
       setCodeError(error.response?.data?.message || 'Invalid or expired code. Try again.');
     } finally {
       setLoading(false);
@@ -116,13 +128,18 @@ export default function VerifyEmailScreen() {
           </View>
         ) : null}
 
+        {verifyCooldown > 0 && (
+          <Text style={styles.cooldownText}>
+            Too many attempts — try again in {verifyCooldown}s
+          </Text>
+        )}
         <Button
           title="Verify Email"
           onPress={onSubmit}
           loading={loading}
           style={styles.button}
           size="lg"
-          disabled={code.length < 6}
+          disabled={code.length < 6 || verifyCooldown > 0}
         />
 
         {/* Resend row */}
@@ -238,5 +255,12 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     fontFamily: Typography.fontFamily,
     lineHeight: 18,
+  },
+  cooldownText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.danger,
+    textAlign: 'center',
+    marginBottom: Spacing.xs,
   },
 });

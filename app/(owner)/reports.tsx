@@ -25,8 +25,10 @@ import {
   StaffPerformanceSection,
   RatingsModule,
   StockIntelligence,
+  RevenueBreakdownCard,
+  PeakActivitySection,
 } from '@/components/reports/ReportSections';
-import { LoadingState } from '@/components/ui/LoadingState';
+import { ReportsSkeleton } from '@/components/reports/ReportsSkeleton';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -43,8 +45,13 @@ function ReportsHeader() {
         <Text style={h.title}>Reports</Text>
         <Text style={h.subtitle}>Track performance and grow your business</Text>
       </View>
-      <TouchableOpacity style={h.iconBtn} activeOpacity={0.7}>
-        <Ionicons name="options-outline" size={18} color={Colors.textSecondary} />
+      <TouchableOpacity
+        style={[h.iconBtn, h.iconBtnDisabled]}
+        activeOpacity={1}
+        accessibilityLabel="Report options (coming soon)"
+        accessibilityState={{ disabled: true }}
+      >
+        <Ionicons name="options-outline" size={18} color={Colors.border} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -86,6 +93,9 @@ const h = StyleSheet.create({
     marginTop: 4,
     ...Shadows.sm,
   },
+  iconBtnDisabled: {
+    opacity: 0.45,
+  },
 });
 
 // ─── screen ───────────────────────────────────────────────────────────────────
@@ -122,7 +132,7 @@ export default function OwnerReports() {
     queryFn: () => getDepletionAnalytics(),
   });
 
-  if (isLoading) return <LoadingState />;
+  if (isLoading) return <ReportsSkeleton />;
 
   const report = data?.data;
   const ratingsSummary = ratingsData?.data;
@@ -173,6 +183,11 @@ export default function OwnerReports() {
 
       <View style={s.gap} />
 
+      {/* ── revenue / expenses / profit breakdown ──────────────────── */}
+      <RevenueBreakdownCard summary={summary} currency={currency} />
+
+      <View style={s.gap} />
+
       {/* ── insight carousel ───────────────────────────────────────── */}
       <InsightCards
         summary={summary}
@@ -180,6 +195,11 @@ export default function OwnerReports() {
         currency={currency}
         period={period}
       />
+
+      <View style={s.gap} />
+
+      {/* ── peak activity bar chart ────────────────────────────────── */}
+      <PeakActivitySection series={series} currency={currency} period={period} />
 
       <View style={s.gap} />
 

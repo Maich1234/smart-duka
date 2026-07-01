@@ -83,6 +83,7 @@ export const enqueueOperation = (
 
 type QueueRow = {
   id: string;
+  idempotency_key: string;
   method: string;
   url: string;
   body: string | null;
@@ -109,20 +110,26 @@ export const processQueue = async (): Promise<void> => {
 
   try {
     const rows = db.getAllSync<QueueRow>(
-      `SELECT id, method, url, body, attempts, max_attempts
+      `SELECT id, idempotency_key, method, url, body, attempts, max_attempts
        FROM offline_queue
        WHERE status = 'pending' AND next_attempt_at <= ?
        ORDER BY created_at ASC`,
       [Date.now()]
     );
 
+    // Fetch token once — if the user logs out mid-sync this becomes null and
+    // all remaining items fail cleanly on 401 rather than using a stale token.
+    const token = useAuthStore.getState().token;
+
     for (const row of rows) {
       // Re-check connectivity before each item
       const check = await NetInfo.fetch();
       if (!check.isConnected) break;
 
+      // Abort if the user logged out while we were processing
+      if (!useAuthStore.getState().token) break;
+
       try {
-        const token = useAuthStore.getState().token;
         const body = row.body ? JSON.parse(row.body) : undefined;
         await axios({
           method: row.method,
@@ -130,6 +137,9 @@ export const processQueue = async (): Promise<void> => {
           data: body,
           headers: {
             'Content-Type': 'application/json',
+            // Forward the original idempotency key so the server can deduplicate
+            // in case this request was partially received on the first attempt.
+            'X-Idempotency-Key': row.idempotency_key,
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
@@ -137,14 +147,26 @@ export const processQueue = async (): Promise<void> => {
         db.runSync(`DELETE FROM offline_queue WHERE id = ?`, [row.id]);
       } catch (err: any) {
         const httpStatus: number | undefined = err?.response?.status;
+        // 4xx = business logic rejection (bad payload, not found, auth) — fail permanently.
+        // 5xx + network errors = transient — keep retrying.
         const isPermanent =
           httpStatus != null && httpStatus >= 400 && httpStatus < 500;
         const newAttempts = row.attempts + 1;
 
-        if (isPermanent || newAttempts >= row.max_attempts) {
+        if (isPermanent) {
+          // 4xx: server won't accept this payload on any retry — mark failed.
           db.runSync(
             `UPDATE offline_queue SET status = 'failed', attempts = ? WHERE id = ?`,
             [newAttempts, row.id]
+          );
+        } else if (newAttempts >= row.max_attempts) {
+          // Exhausted fast-backoff budget but not a permanent error.
+          // Switch to a slow 5-minute cadence so the item keeps retrying
+          // indefinitely (e.g. server is down for hours) without hammering.
+          const SLOW_RETRY_MS = 5 * 60 * 1000;
+          db.runSync(
+            `UPDATE offline_queue SET attempts = ?, next_attempt_at = ? WHERE id = ?`,
+            [newAttempts, Date.now() + SLOW_RETRY_MS, row.id]
           );
         } else {
           db.runSync(
