@@ -2,11 +2,15 @@ import React, { useEffect, useCallback, useRef } from 'react';
 import { Stack, router, usePathname } from 'expo-router';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PressablesConfig } from 'pressto';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+// Subpath imports so Metro bundles only these three weights, not all 18 Inter fonts.
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { QueryClient, useQueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
@@ -24,6 +28,7 @@ import { getProducts } from '@/services/products';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { Motion } from '@/constants/Motion';
 
 // Initialise SQLite queue DB synchronously before any React render
 initOfflineDb();
@@ -260,6 +265,12 @@ export default function RootLayout() {
       }}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
+        <PressablesConfig
+          animationType="spring"
+          animationConfig={Motion.spring.press}
+          config={{ minScale: Motion.press.scale, activeOpacity: 0.7 }}
+          defaultProps={{ rippleColor: 'transparent' }}
+        >
         <KeyboardProvider>
           <SafeAreaProvider>
             <AlertProvider>
@@ -283,6 +294,7 @@ export default function RootLayout() {
             </AlertProvider>
           </SafeAreaProvider>
         </KeyboardProvider>
+        </PressablesConfig>
       </GestureHandlerRootView>
     </PersistQueryClientProvider>
   );

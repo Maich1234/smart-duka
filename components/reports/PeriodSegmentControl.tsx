@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import type { ReportPeriod } from '@/services/reports';
 import { Colors } from '@/constants/Colors';
@@ -51,16 +52,15 @@ export const PeriodSegmentControl: React.FC<Props> = ({ value, onChange }) => {
         <Animated.View style={[styles.pill, { width: segWidth }, pillStyle]} />
       )}
       {PERIODS.map((p) => (
-        <TouchableOpacity
+        <AnimatedPressable
           key={p.value}
           style={[styles.option, { width: segWidth }]}
           onPress={() => onChange(p.value)}
-          activeOpacity={0.8}
         >
           <Text style={[styles.label, value === p.value && styles.labelActive]}>
             {p.label}
           </Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       ))}
     </View>
   );

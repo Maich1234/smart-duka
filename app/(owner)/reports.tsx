@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
   RefreshControl,
-  TouchableOpacity,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { getSalesReport, type ReportPeriod } from '@/services/reports';
@@ -45,14 +45,13 @@ function ReportsHeader() {
         <Text style={h.title}>Reports</Text>
         <Text style={h.subtitle}>Track performance and grow your business</Text>
       </View>
-      <TouchableOpacity
+      <AnimatedPressable
         style={[h.iconBtn, h.iconBtnDisabled]}
-        activeOpacity={1}
         accessibilityLabel="Report options (coming soon)"
         accessibilityState={{ disabled: true }}
       >
         <Ionicons name="options-outline" size={18} color={Colors.border} />
-      </TouchableOpacity>
+      </AnimatedPressable>
     </Animated.View>
   );
 }

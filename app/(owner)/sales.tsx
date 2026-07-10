@@ -1,17 +1,19 @@
 import React, { useState, useMemo } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { getSales, getSalesStats, type Sale, type SalesResponse } from '@/services/sales';
+import { getSales, getSalesStats, voidSale, type Sale, type SalesResponse } from '@/services/sales';
+import { useAlert } from '@/context/AlertContext';
+import { isOfflineQueued } from '@/utils/errors';
 import { getShopConfig } from '@/services/shop';
 import { SalesList } from '@/components/sales/SalesList';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
@@ -39,6 +41,8 @@ function formatDateRange(start: Date | null, end: Date | null): string {
 export default function OwnerSales() {
   const user = useAuthStore((s: AuthState) => s.user);
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { alert, toast } = useAlert();
   const currency = user?.shop?.currency ?? 'KES';
 
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -80,13 +84,16 @@ export default function OwnerSales() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['sales', startDate, endDate, staffId, paymentFilter],
+    queryKey: ['sales', startDate, endDate, staffId, paymentFilter, searchQuery],
     queryFn: ({ pageParam }) =>
       getSales({
         startDate: startDate?.toISOString(),
         endDate: endDate?.toISOString(),
         staffId: staffId || undefined,
         paymentMethod: paymentFilter !== 'all' ? paymentFilter : undefined,
+        // Server-side: matches invoice number and cashier name across the
+        // whole dataset, not just loaded pages.
+        search: searchQuery || undefined,
         page: pageParam,
         limit: 20,
       }),
@@ -108,21 +115,43 @@ export default function OwnerSales() {
   const allSales = salesData?.pages.flatMap((p) => p.data) ?? [];
   const totalCount = salesData?.pages[0]?.pagination.total ?? 0;
 
-  // Client-side filter: sales API doesn't support full-text search, so we
-  // filter the already-fetched pages by invoice number and cashier name.
-  const sales = useMemo(() => {
-    const base = !searchQuery
-      ? allSales
-      : (() => {
-          const q = searchQuery.toLowerCase();
-          return allSales.filter(
-            (s) =>
-              s.invoiceNumber.toLowerCase().includes(q) ||
-              s.staff?.name?.toLowerCase().includes(q),
-          );
-        })();
-    return sortOrder === 'asc' ? [...base].reverse() : base;
-  }, [allSales, searchQuery, sortOrder]);
+  // Search happens server-side (invoice number + cashier name); this only
+  // applies the display sort order.
+  const sales = useMemo(
+    () => (sortOrder === 'asc' ? [...allSales].reverse() : allSales),
+    [allSales, sortOrder],
+  );
+
+  const voidMutation = useMutation({
+    mutationFn: (saleId: string) => voidSale(saleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['salesStats'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // stock restored
+      setModalVisible(false);
+      toast({ type: 'success', message: 'Sale voided — stock restored.' });
+    },
+    onError: (error: any) => {
+      if (isOfflineQueued(error)) {
+        setModalVisible(false);
+        toast({ type: 'info', message: 'Void saved offline — will sync when connected.' });
+        return;
+      }
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not void this sale.' });
+    },
+  });
+
+  const handleVoid = (sale: Sale) => {
+    alert({
+      type: 'confirm',
+      title: 'Void This Sale?',
+      message: `${sale.invoiceNumber} (${formatCurrency(sale.totalAmount, currency)}) will be removed from your totals and its stock restored. This cannot be undone.`,
+      buttons: [
+        { label: 'Keep Sale', variant: 'ghost' },
+        { label: 'Void Sale', variant: 'danger', onPress: () => voidMutation.mutate(sale._id) },
+      ],
+    });
+  };
 
   const stats = statsData?.data;
   const totalSales = stats?.totalSales ?? 0;
@@ -236,28 +265,26 @@ export default function OwnerSales() {
 
       {/* ── Date range + Filters row ──────────────────────────────── */}
       <Animated.View entering={FadeInDown.duration(440).delay(160)} style={styles.dateFiltersRow}>
-        <TouchableOpacity
+        <AnimatedPressable
           style={[styles.dateRangeBtn, { flex: 1 }]}
           onPress={() => setShowStartPicker(true)}
-          activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityLabel={`Date range: ${formatDateRange(startDate, endDate)}. Tap to change.`}
         >
           <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
           <Text style={styles.dateRangeText}>{formatDateRange(startDate, endDate)}</Text>
           <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-        </TouchableOpacity>
+        </AnimatedPressable>
         {(startDate || endDate) && (
-          <TouchableOpacity
+          <AnimatedPressable
             style={styles.filtersBtn}
             onPress={() => { setStartDate(null); setEndDate(null); }}
-            activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel="Clear date filter"
           >
             <Ionicons name="close-circle-outline" size={15} color={Colors.textSecondary} />
             <Text style={styles.filtersBtnText}>Clear</Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         )}
       </Animated.View>
 
@@ -272,11 +299,6 @@ export default function OwnerSales() {
           onClearRecent={clearRecent}
           placeholder="Search invoice or cashier name…"
         />
-        {!!searchQuery && (
-          <Text style={styles.searchScopeNote}>
-            Searching within loaded results. Use the date filter to narrow your range first.
-          </Text>
-        )}
       </Animated.View>
 
       {/* ── Filter pill tabs ──────────────────────────────────────── */}
@@ -289,11 +311,10 @@ export default function OwnerSales() {
           {FILTER_TABS.map((tab) => {
             const active = paymentFilter === tab.key;
             return (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={tab.key}
                 style={[styles.filterTab, active && styles.filterTabActive]}
                 onPress={() => setPaymentFilter(tab.key)}
-                activeOpacity={0.75}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={tab.label}
@@ -301,7 +322,7 @@ export default function OwnerSales() {
                 <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>
                   {tab.count !== null ? `${tab.label} (${tab.count})` : tab.label}
                 </Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             );
           })}
         </ScrollView>
@@ -310,10 +331,9 @@ export default function OwnerSales() {
       {/* ── Section header ───────────────────────────────────────── */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Sales History</Text>
-        <TouchableOpacity
+        <AnimatedPressable
           onPress={() => setSortOrder((s) => (s === 'desc' ? 'asc' : 'desc'))}
           style={styles.sortLatestBtn}
-          activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityLabel={`Sort order: ${sortOrder === 'desc' ? 'newest first' : 'oldest first'}`}
         >
@@ -325,7 +345,7 @@ export default function OwnerSales() {
           <Text style={styles.sortLatestText}>
             {sortOrder === 'desc' ? 'Latest' : 'Oldest'}
           </Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </View>
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -342,15 +362,14 @@ export default function OwnerSales() {
           <Text style={styles.pageTitle}>Sales</Text>
           <Text style={styles.pageSubtitle}>Track, analyze and manage all your sales</Text>
         </View>
-        <TouchableOpacity
+        <AnimatedPressable
           style={styles.notifBtn}
           onPress={() => router.push('/(owner)/reports' as any)}
-          activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityLabel="View reports"
         >
           <Ionicons name="bar-chart-outline" size={22} color={Colors.textPrimary} />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </Animated.View>
 
       <SalesList
@@ -391,6 +410,9 @@ export default function OwnerSales() {
         thankYouNote={thankYouNote}
         logoUrl={shopLogoUrl}
         motto={shopMotto}
+        canVoid
+        onVoid={handleVoid}
+        voiding={voidMutation.isPending}
       />
     </View>
   );
@@ -407,7 +429,7 @@ interface PaymentStatCardProps {
 }
 
 const PaymentStatCard: React.FC<PaymentStatCardProps> = ({ icon, label, amount, pct, iconColor, iconBg, onPress }) => (
-  <TouchableOpacity style={statStyles.card} onPress={onPress} activeOpacity={onPress ? 0.72 : 1} disabled={!onPress}>
+  <AnimatedPressable style={statStyles.card} onPress={onPress} disabled={!onPress}>
     <View style={[statStyles.iconBox, { backgroundColor: iconBg }]}>
       <Ionicons name={icon as any} size={16} color={iconColor} />
     </View>
@@ -415,7 +437,7 @@ const PaymentStatCard: React.FC<PaymentStatCardProps> = ({ icon, label, amount, 
     <Text style={statStyles.amount} numberOfLines={1}>{amount}</Text>
     {pct ? <Text style={[statStyles.pct, { color: iconColor }]}>{pct}</Text> : <Text style={statStyles.dash}>—</Text>}
     {onPress && <Ionicons name="chevron-forward" size={10} color={Colors.textTertiary} style={{ marginTop: 2 }} />}
-  </TouchableOpacity>
+  </AnimatedPressable>
 );
 
 const statStyles = StyleSheet.create({
@@ -644,14 +666,6 @@ const styles = StyleSheet.create({
   searchWrapper: {
     marginBottom: Spacing.sm,
   },
-  searchScopeNote: {
-    fontSize: 11,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textTertiary,
-    marginTop: 4,
-    marginHorizontal: 4,
-  },
-
   // ── Filter pill tabs
   filterTabs: {
     flexDirection: 'row',

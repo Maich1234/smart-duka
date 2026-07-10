@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, Linking } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getPublicReceipt, submitPublicRating } from '@/services/ratings';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -62,7 +63,7 @@ export default function ReceiptVerificationScreen() {
       <Text style={styles.poweredBy}>{APP_NAME} POS</Text>
 
       {Platform.OS === 'web' && (
-        <TouchableOpacity
+        <AnimatedPressable
           style={styles.openAppButton}
           onPress={() => {
             Linking.openURL(`${APP_SCHEME}://r/${token}`).catch(() => {
@@ -72,7 +73,7 @@ export default function ReceiptVerificationScreen() {
         >
           <Ionicons name="phone-portrait-outline" size={16} color={Colors.primary} />
           <Text style={styles.openAppText}>Open in Smart Duka App</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       )}
 
       <Card style={styles.receiptCard}>
@@ -116,13 +117,13 @@ export default function ReceiptVerificationScreen() {
             <Text style={styles.ratePrompt}>How was your service today?</Text>
             <View style={styles.starRow}>
               {STAR_VALUES.map((s) => (
-                <TouchableOpacity key={s} onPress={() => setStars(s)} hitSlop={8}>
+                <AnimatedPressable key={s} onPress={() => setStars(s)} hitSlop={8}>
                   <Ionicons
                     name={s <= stars ? 'star' : 'star-outline'}
                     size={36}
                     color={Colors.warning}
                   />
-                </TouchableOpacity>
+                </AnimatedPressable>
               ))}
             </View>
             <Input

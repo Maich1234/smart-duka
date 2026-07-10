@@ -8,6 +8,7 @@ import React, {
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
+  LinearTransition,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -15,7 +16,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { AnimatedPressable } from '../AnimatedPressable';
+import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -92,6 +95,12 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
     opacity.value = withTiming(1, { duration: 200 });
     scale.value = withSpring(1, { damping: 20, stiffness: 280 });
 
+    // Feel the outcome without reading it — meaningful states only, so a
+    // burst of info toasts never turns into vibration noise.
+    if (toast.type === 'success') haptics.success();
+    else if (toast.type === 'error') haptics.error();
+    else if (toast.type === 'warning') haptics.warning();
+
     const duration = toast.duration ?? DEFAULT_DURATION;
     timerRef.current = setTimeout(() => {
       animateOut();
@@ -105,6 +114,7 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
   const animateOut = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     opacity.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.ease) });
+    scale.value = withTiming(0.96, { duration: 200 });
     translateY.value = withTiming(-40, { duration: 200 }, (finished) => {
       if (finished) runOnJS(remove)();
     });
@@ -116,7 +126,10 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
   }));
 
   return (
-    <Animated.View style={[styles.toast, containerAnim]}>
+    <Animated.View
+      layout={LinearTransition.springify().damping(22).stiffness(260)}
+      style={[styles.toast, containerAnim]}
+    >
       {/* Left accent stripe */}
       <View style={[styles.stripe, { backgroundColor: cfg.border }]} />
 
@@ -127,11 +140,15 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
         <Text style={styles.toastMessage} numberOfLines={2}>
           {toast.message}
         </Text>
-        <Animated.View>
-          <Text onPress={animateOut} style={styles.toastClose}>
-            ✕
-          </Text>
-        </Animated.View>
+        <AnimatedPressable
+          onPress={animateOut}
+          pressScale={0.85}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss notification"
+        >
+          <Ionicons name="close" size={15} color={Colors.textTertiary} style={styles.toastClose} />
+        </AnimatedPressable>
       </View>
     </Animated.View>
   );
@@ -229,9 +246,6 @@ const styles = StyleSheet.create({
     lineHeight: Typography.lineHeight.small,
   },
   toastClose: {
-    fontFamily: Typography.fontFamily,
-    fontSize: 13,
-    color: Colors.textTertiary,
     paddingHorizontal: 4,
     paddingVertical: 2,
   },

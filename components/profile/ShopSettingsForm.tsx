@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   interpolate,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SelectPicker, type PickerOption } from '../ui/SelectPicker';
@@ -74,7 +75,7 @@ const CollapsibleSection: React.FC<SectionProps> = ({
 
   return (
     <View style={[ss.wrapper, !isLast && ss.wrapperBorder]}>
-      <TouchableOpacity style={ss.header} onPress={toggle} activeOpacity={0.68}>
+      <AnimatedPressable style={ss.header} onPress={toggle}>
         <View style={[ss.iconWrap, { backgroundColor: iconBg }]}>
           <Ionicons name={icon} size={15} color={iconColor} />
         </View>
@@ -85,7 +86,7 @@ const CollapsibleSection: React.FC<SectionProps> = ({
         <Animated.View style={chevronStyle}>
           <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
         </Animated.View>
-      </TouchableOpacity>
+      </AnimatedPressable>
 
       {expanded && <View style={ss.content}>{children}</View>}
     </View>
@@ -233,11 +234,10 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
       >
         {/* Logo picker */}
         <Text style={styles.fieldLabel}>Business Logo</Text>
-        <TouchableOpacity
+        <AnimatedPressable
           style={styles.logoPicker}
           onPress={onPickLogo}
           disabled={uploadingLogo}
-          activeOpacity={0.75}
         >
           {uploadingLogo ? (
             <ActivityIndicator size="small" color={Colors.primary} />
@@ -255,7 +255,7 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
               <Text style={styles.logoPlaceholderText}>Tap to add logo</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </AnimatedPressable>
 
         <Input
           label="Business Motto / Tagline"

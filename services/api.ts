@@ -2,6 +2,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/constants/config';
 import { useAuthStore } from '@/store/authStore';
 import { enqueueOperation } from '@/utils/offlineQueue';
+import { refreshAuthToken } from '@/utils/tokenRefresh';
 import NetInfo from '@react-native-community/netinfo';
 
 const api = axios.create({
@@ -74,8 +75,9 @@ api.interceptors.request.use(async (config) => {
 
   if (config.method && config.method.toLowerCase() !== 'get') {
     // Generate ONE stable key per request attempt. Stored on the config so the
-    // response interceptor can use it if the request fails mid-flight.
-    const idempotencyKey = crypto.randomUUID();
+    // response interceptor can use it if the request fails mid-flight, and
+    // reused when the same config is replayed after a token refresh.
+    const idempotencyKey = (config as any)._idempotencyKey ?? crypto.randomUUID();
     (config as any)._idempotencyKey = idempotencyKey;
     // Forward to server so it can deduplicate on its end.
     config.headers['X-Idempotency-Key'] = idempotencyKey;
@@ -139,9 +141,27 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      // Signal the React layer — SessionExpiredHandler in _layout.tsx will
-      // show the animated toast and then call logout(). Avoids calling logout()
-      // directly from the axios layer which would give no user feedback.
+      const cfg = error.config;
+      // Access token expired mid-session: refresh once (single-flight) and
+      // replay the original request so the user never notices.
+      if (cfg && !cfg._retriedAfterRefresh && useAuthStore.getState().refreshToken) {
+        try {
+          const newToken = await refreshAuthToken();
+          if (newToken) {
+            cfg._retriedAfterRefresh = true;
+            cfg.headers = { ...(cfg.headers ?? {}), Authorization: `Bearer ${newToken}` };
+            return api(cfg);
+          }
+        } catch {
+          // Refresh unreachable (network) — session may still be valid, so
+          // fail this request without logging the user out.
+          return Promise.reject(error);
+        }
+      }
+      // No refresh token, already retried, or the server rejected the
+      // refresh: the session is over. Signal the React layer —
+      // SessionExpiredHandler in _layout.tsx shows the animated toast and
+      // then calls logout().
       useAuthStore.getState().setSessionExpired(true);
     }
     return Promise.reject(error);

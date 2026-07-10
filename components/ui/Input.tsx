@@ -1,18 +1,18 @@
 import React, { useRef, useState } from 'react';
+import { AnimatedPressable } from './AnimatedPressable';
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
   TextInputProps,
-  TouchableOpacity,
   Animated,
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -109,7 +109,7 @@ export const Input: React.FC<InputProps> = ({
         />
 
         {secureTextEntry ? (
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
             style={styles.iconButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -121,12 +121,12 @@ export const Input: React.FC<InputProps> = ({
               size={20}
               color={Colors.textSecondary}
             />
-          </TouchableOpacity>
+          </AnimatedPressable>
         ) : rightIcon ? (
           onRightIconPress ? (
-            <TouchableOpacity onPress={onRightIconPress} style={styles.iconButton}>
+            <AnimatedPressable onPress={onRightIconPress} style={styles.iconButton}>
               <Ionicons name={rightIcon} size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
+            </AnimatedPressable>
           ) : (
             <View style={styles.iconButton}>
               <Ionicons name={rightIcon} size={20} color={Colors.textSecondary} />

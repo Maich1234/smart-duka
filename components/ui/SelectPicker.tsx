@@ -3,14 +3,17 @@ import {
   View,
   Text,
   Modal,
-  TouchableOpacity,
   FlatList,
   StyleSheet,
   TextInput,
   SafeAreaView,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { AnimatedPressable } from './AnimatedPressable';
+import { haptics } from '@/utils/haptics';
+import { Motion } from '@/constants/Motion';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -61,6 +64,7 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
   }, [options, query]);
 
   const handleSelect = (val: string) => {
+    haptics.selection();
     onChange(val);
     setOpen(false);
     setQuery('');
@@ -71,10 +75,9 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
       {/* Trigger row — mimics the Input component appearance */}
       <View style={styles.wrapper}>
         <Text style={styles.label}>{label}</Text>
-        <TouchableOpacity
+        <AnimatedPressable
           style={[styles.trigger, disabled && styles.triggerDisabled]}
           onPress={() => !disabled && setOpen(true)}
-          activeOpacity={0.75}
         >
           {leftIcon && (
             <View style={styles.leftIconWrap}>
@@ -99,22 +102,25 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
             )}
           </View>
           <Ionicons name="chevron-down" size={15} color={Colors.textTertiary} />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
 
       {/* Full-screen modal picker */}
       <Modal visible={open} animationType="slide" transparent presentationStyle="overFullScreen" accessibilityViewIsModal>
+        {/* RNGH pressables inside a RN Modal need their own gesture root on Android */}
+        <GestureHandlerRootView style={styles.gestureRoot}>
         <View style={styles.overlay}>
           <SafeAreaView style={styles.sheet}>
             {/* Header */}
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{label}</Text>
-              <TouchableOpacity
+              <AnimatedPressable
                 onPress={() => { setOpen(false); setQuery(''); }}
+                pressScale={0.9}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="close" size={22} color={Colors.textPrimary} />
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
 
             {/* Search */}
@@ -131,9 +137,9 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
                   returnKeyType="search"
                 />
                 {query.length > 0 && (
-                  <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <AnimatedPressable onPress={() => setQuery('')} pressScale={0.85} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close-circle" size={16} color={Colors.textTertiary} />
-                  </TouchableOpacity>
+                  </AnimatedPressable>
                 )}
               </View>
             )}
@@ -147,10 +153,10 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
               renderItem={({ item }) => {
                 const active = item.value === value;
                 return (
-                  <TouchableOpacity
+                  <AnimatedPressable
                     style={[styles.option, active && styles.optionActive]}
                     onPress={() => handleSelect(item.value)}
-                    activeOpacity={0.7}
+                    pressScale={Motion.press.scaleCard}
                   >
                     {item.leftEmoji ? (
                       <Text style={styles.optionEmoji}>{item.leftEmoji}</Text>
@@ -171,7 +177,7 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
                     {active && (
                       <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />
                     )}
-                  </TouchableOpacity>
+                  </AnimatedPressable>
                 );
               }}
               ListEmptyComponent={
@@ -182,6 +188,7 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
             />
           </SafeAreaView>
         </View>
+        </GestureHandlerRootView>
       </Modal>
     </>
   );
@@ -230,6 +237,9 @@ const styles = StyleSheet.create({
   },
 
   // Modal
+  gestureRoot: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: Colors.overlay,
@@ -251,7 +261,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.divider,
   },
   sheetTitle: {
-    fontSize: Typography.size.base,
+    fontSize: Typography.size.body,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
   },

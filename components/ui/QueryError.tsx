@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from './AnimatedPressable';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -21,10 +22,10 @@ export const QueryError: React.FC<QueryErrorProps> = ({
     <Text style={styles.title}>Something went wrong</Text>
     <Text style={styles.message}>{message}</Text>
     {onRetry && (
-      <TouchableOpacity onPress={onRetry} style={styles.btn} activeOpacity={0.8}>
+      <AnimatedPressable onPress={onRetry} style={styles.btn}>
         <Ionicons name="refresh-outline" size={15} color={Colors.white} />
         <Text style={styles.btnText}>Try Again</Text>
-      </TouchableOpacity>
+      </AnimatedPressable>
     )}
   </View>
 );

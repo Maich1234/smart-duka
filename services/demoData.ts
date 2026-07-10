@@ -13,6 +13,7 @@ let mockShop: Shop = {
   address: 'Mombasa Road, Nairobi',
   phone: '+254 712 345 678',
   email: 'demo@smartduka.co.ke',
+  country: 'KE',
   taxRate: 16,
   currency: 'KES',
   isActive: true,

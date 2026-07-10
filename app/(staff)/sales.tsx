@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Text, TouchableOpacity, BackHandler } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { useFocusEffect, useNavigation } from "expo-router/react-navigation";
 import { useAlert } from '@/context/AlertContext';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
-import { createSale, getMySales, type Sale } from '@/services/sales';
+import { createSale, getMySales, voidSale, type Sale } from '@/services/sales';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { ProductCard } from '@/components/inventory/ProductCard';
@@ -27,7 +28,7 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { usePermission } from '@/utils/permissions';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCartStore, cartKey, type CartEntry } from '@/store/staffCartStore';
 
 export default function StaffSales() {
@@ -35,6 +36,7 @@ export default function StaffSales() {
   const tabBarHeight = useBottomTabBarHeight();
   const canRecordSale = usePermission('record_sale');
   const canViewSales = usePermission('view_sales');
+  const canVoidSale = usePermission('void_sale');
   const { toast, alert } = useAlert();
 
   const {
@@ -181,6 +183,36 @@ export default function StaffSales() {
       toast({ type: 'error', message: error.response?.data?.message || 'Sale failed' });
     },
   });
+
+  const voidMutation = useMutation({
+    mutationFn: (saleId: string) => voidSale(saleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mySales'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // stock restored
+      setDetailsModalVisible(false);
+      toast({ type: 'success', message: 'Sale voided — stock restored.' });
+    },
+    onError: (error: any) => {
+      if (isOfflineQueued(error)) {
+        setDetailsModalVisible(false);
+        toast({ type: 'info', message: 'Void saved offline — will sync when connected.' });
+        return;
+      }
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not void this sale.' });
+    },
+  });
+
+  const handleVoid = (sale: Sale) => {
+    alert({
+      type: 'confirm',
+      title: 'Void This Sale?',
+      message: `${sale.invoiceNumber} will be removed from totals and its stock restored. This cannot be undone.`,
+      buttons: [
+        { label: 'Keep Sale', variant: 'ghost' },
+        { label: 'Void Sale', variant: 'danger', onPress: () => voidMutation.mutate(sale._id) },
+      ],
+    });
+  };
 
   const products = productsData?.data || [];
   const mySales = mySalesData?.data || [];
@@ -339,13 +371,13 @@ export default function StaffSales() {
           ListFooterComponent={
             salesTotalPages > 1 ? (
               <View style={salesPaginationStyle}>
-                <TouchableOpacity onPress={() => setSalesPage((p) => Math.max(1, p - 1))} disabled={salesPage <= 1} style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}>
+                <AnimatedPressable onPress={() => setSalesPage((p) => Math.max(1, p - 1))} disabled={salesPage <= 1} style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}>
                   <Ionicons name="chevron-back" size={16} color={salesPage <= 1 ? '#94A3B8' : '#0F766E'} />
-                </TouchableOpacity>
+                </AnimatedPressable>
                 <Text style={pageLabelStyle}>Page {salesPage} of {salesTotalPages}</Text>
-                <TouchableOpacity onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))} disabled={salesPage >= salesTotalPages} style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}>
+                <AnimatedPressable onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))} disabled={salesPage >= salesTotalPages} style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}>
                   <Ionicons name="chevron-forward" size={16} color={salesPage >= salesTotalPages ? '#94A3B8' : '#0F766E'} />
-                </TouchableOpacity>
+                </AnimatedPressable>
               </View>
             ) : null
           }
@@ -360,6 +392,9 @@ export default function StaffSales() {
           thankYouNote={thankYouNote}
           logoUrl={shopLogoUrl}
           motto={shopMotto}
+          canVoid={canVoidSale}
+          onVoid={handleVoid}
+          voiding={voidMutation.isPending}
         />
       </View>
     );
@@ -443,7 +478,7 @@ export default function StaffSales() {
                 need to scroll past products to change pages. */}
             {productsTotalPages > 1 && (
               <View style={[styles.paginationRow, styles.productsPaginationHeader]}>
-                <TouchableOpacity
+                <AnimatedPressable
                   onPress={() => setProductsPage((p) => Math.max(1, p - 1))}
                   disabled={productsPage <= 1}
                   style={[styles.paginationBtn, productsPage <= 1 && styles.paginationBtnDisabled]}
@@ -452,9 +487,9 @@ export default function StaffSales() {
                   accessibilityState={{ disabled: productsPage <= 1 }}
                 >
                   <Ionicons name="chevron-back" size={16} color={productsPage <= 1 ? Colors.textSecondary : Colors.primary} />
-                </TouchableOpacity>
+                </AnimatedPressable>
                 <Text style={styles.paginationLabel}>Page {productsPage} of {productsTotalPages}</Text>
-                <TouchableOpacity
+                <AnimatedPressable
                   onPress={() => setProductsPage((p) => Math.min(productsTotalPages, p + 1))}
                   disabled={productsPage >= productsTotalPages}
                   style={[styles.paginationBtn, productsPage >= productsTotalPages && styles.paginationBtnDisabled]}
@@ -463,7 +498,7 @@ export default function StaffSales() {
                   accessibilityState={{ disabled: productsPage >= productsTotalPages }}
                 >
                   <Ionicons name="chevron-forward" size={16} color={productsPage >= productsTotalPages ? Colors.textSecondary : Colors.primary} />
-                </TouchableOpacity>
+                </AnimatedPressable>
               </View>
             )}
           </View>
@@ -490,7 +525,7 @@ export default function StaffSales() {
                 )}
                 {salesTotalPages > 1 && (
                   <View style={styles.paginationRow}>
-                    <TouchableOpacity
+                    <AnimatedPressable
                       onPress={() => setSalesPage((p) => Math.max(1, p - 1))}
                       disabled={salesPage <= 1}
                       style={[styles.paginationBtn, salesPage <= 1 && styles.paginationBtnDisabled]}
@@ -499,9 +534,9 @@ export default function StaffSales() {
                       accessibilityState={{ disabled: salesPage <= 1 }}
                     >
                       <Ionicons name="chevron-back" size={16} color={salesPage <= 1 ? Colors.textSecondary : Colors.primary} />
-                    </TouchableOpacity>
+                    </AnimatedPressable>
                     <Text style={styles.paginationLabel}>Page {salesPage} of {salesTotalPages}</Text>
-                    <TouchableOpacity
+                    <AnimatedPressable
                       onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
                       disabled={salesPage >= salesTotalPages}
                       style={[styles.paginationBtn, salesPage >= salesTotalPages && styles.paginationBtnDisabled]}
@@ -510,7 +545,7 @@ export default function StaffSales() {
                       accessibilityState={{ disabled: salesPage >= salesTotalPages }}
                     >
                       <Ionicons name="chevron-forward" size={16} color={salesPage >= salesTotalPages ? Colors.textSecondary : Colors.primary} />
-                    </TouchableOpacity>
+                    </AnimatedPressable>
                   </View>
                 )}
               </View>
@@ -561,6 +596,9 @@ export default function StaffSales() {
         thankYouNote={thankYouNote}
         logoUrl={shopLogoUrl}
         motto={shopMotto}
+        canVoid={canVoidSale}
+        onVoid={handleVoid}
+        voiding={voidMutation.isPending}
       />
 
       <ReceiptModal

@@ -1,14 +1,15 @@
 import React, { useEffect } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { haptics } from '@/utils/haptics';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Platform,
   Dimensions,
 } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -156,15 +157,15 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
               canPreventDefault: true,
             });
             if (!isFocused && !event.defaultPrevented) {
+              haptics.light();
               navigation.navigate({ name: route.name, merge: true });
             }
           };
 
           return (
-            <TouchableOpacity
+            <AnimatedPressable
               key={route.key}
               onPress={onPress}
-              activeOpacity={0.7}
               style={styles.tabItem}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
@@ -180,7 +181,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
               >
                 {config.label}
               </Animated.Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           );
         })}
       </View>

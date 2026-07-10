@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   RefreshControl,
-  TouchableOpacity,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -140,15 +140,14 @@ export default function PaymentsScreen() {
                 keyExtractor={(item) => item.value}
                 contentContainerStyle={styles.statusFilters}
                 renderItem={({ item }) => (
-                  <TouchableOpacity
+                  <AnimatedPressable
                     style={[styles.filterChip, statusFilter === item.value && styles.filterChipActive]}
                     onPress={() => setStatusFilter(item.value as any)}
-                    activeOpacity={0.72}
                   >
                     <Text style={[styles.filterChipText, statusFilter === item.value && styles.filterChipTextActive]}>
                       {item.label}
                     </Text>
-                  </TouchableOpacity>
+                  </AnimatedPressable>
                 )}
               />
             </View>
@@ -196,7 +195,7 @@ const HeroStat: React.FC<{ label: string; value: string }> = ({ label, value }) 
 const TransactionCard: React.FC<{ tx: MpesaTransaction; onPress: () => void }> = ({ tx, onPress }) => {
   const colors = STATUS_COLORS[tx.status] ?? STATUS_COLORS.failed;
   return (
-    <TouchableOpacity style={styles.txCard} onPress={onPress} activeOpacity={0.72}>
+    <AnimatedPressable style={styles.txCard} onPress={onPress}>
       <View style={styles.txLeft}>
         <View style={[styles.txDot, { backgroundColor: colors.dot }]} />
         <View style={styles.txInfo}>
@@ -218,7 +217,7 @@ const TransactionCard: React.FC<{ tx: MpesaTransaction; onPress: () => void }> =
           <Text style={styles.txSaleRef}>{tx.saleId.invoiceNumber}</Text>
         )}
       </View>
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 };
 
@@ -229,7 +228,7 @@ const TransactionDetailSheet: React.FC<{ tx: MpesaTransaction; onClose: () => vo
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={onClose} />
+      <AnimatedPressable style={styles.sheetBackdrop} onPress={onClose} />
       <Animated.View entering={FadeInDown.springify()} style={styles.detailSheet}>
         <View style={styles.sheetHandle} />
 
@@ -238,9 +237,9 @@ const TransactionDetailSheet: React.FC<{ tx: MpesaTransaction; onClose: () => vo
           <Text style={styles.detailTitle}>
             {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)} Transaction
           </Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <AnimatedPressable onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="close" size={20} color={Colors.textTertiary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
 
         <View style={styles.detailAmount}>
@@ -431,7 +430,7 @@ const styles = StyleSheet.create({
   },
   // Detail sheet
   sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(15,23,42,0.55)',
   },
   detailSheet: {

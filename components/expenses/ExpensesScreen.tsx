@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -7,9 +8,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ListRow } from '@/components/ui/ListRow';
 import { Button } from '@/components/ui/Button';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   getExpenses,
   getExpenseSummary,
@@ -217,9 +218,9 @@ export const ExpensesScreen: React.FC = () => {
             trailing={
               <View style={styles.expenseRight}>
                 <Text style={styles.expenseAmount}>{formatCurrency(item.amount, currency)}</Text>
-                <TouchableOpacity onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <AnimatedPressable onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="trash-outline" size={16} color={Colors.danger} />
-                </TouchableOpacity>
+                </AnimatedPressable>
               </View>
             }
           />
@@ -234,9 +235,9 @@ export const ExpensesScreen: React.FC = () => {
               <Text style={styles.emptySearchSub}>
                 No results for "{searchValue}". Try a different term or{' '}
               </Text>
-              <TouchableOpacity onPress={clearSearch}>
+              <AnimatedPressable onPress={clearSearch}>
                 <Text style={styles.emptySearchLink}>clear search</Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
           ) : (
             <EmptyState title="No expenses recorded" subtitle="Add your first expense to start tracking spending." />
@@ -245,21 +246,21 @@ export const ExpensesScreen: React.FC = () => {
         ListFooterComponent={
           totalPages > 1 ? (
             <View style={styles.paginationBar}>
-              <TouchableOpacity
+              <AnimatedPressable
                 onPress={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
                 style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
               >
                 <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
-              </TouchableOpacity>
+              </AnimatedPressable>
               <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-              <TouchableOpacity
+              <AnimatedPressable
                 onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
                 style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
               >
                 <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
           ) : null
         }

@@ -1,6 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, StyleProp, TextStyle, ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Text, StyleSheet, StyleProp, TextStyle, ViewStyle } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -15,15 +16,14 @@ interface HelpLinkProps {
 
 export const HelpLink: React.FC<HelpLinkProps> = ({ slug, label = 'Learn more', style, textStyle }) => {
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       style={[styles.row, style]}
       onPress={() => openHelp(slug)}
       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-      activeOpacity={0.7}
     >
       <Ionicons name="help-circle-outline" size={14} color={Colors.primary} />
       <Text style={[styles.text, textStyle]}>{label}</Text>
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 };
 

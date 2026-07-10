@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Picker } from '@react-native-picker/picker';
 import { Button } from '../ui/Button';
 import { Colors } from '@/constants/Colors';
@@ -33,12 +34,12 @@ export const SalesFilters: React.FC<SalesFiltersProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <TouchableOpacity style={styles.dateButton} onPress={onStartDatePress}>
+        <AnimatedPressable style={styles.dateButton} onPress={onStartDatePress}>
           <Text style={styles.dateText}>{startDate ? formatDate(startDate.toISOString()) : 'Start Date'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.dateButton} onPress={onEndDatePress}>
+        </AnimatedPressable>
+        <AnimatedPressable style={styles.dateButton} onPress={onEndDatePress}>
           <Text style={styles.dateText}>{endDate ? formatDate(endDate.toISOString()) : 'End Date'}</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
       <View style={styles.row}>
         <View style={styles.pickerContainer}>

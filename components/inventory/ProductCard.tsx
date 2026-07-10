@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '../ui/AnimatedPressable';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -221,7 +221,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <View style={styles.divider} />
             <View style={styles.actionRow}>
               {onUpdateStock && (
-                <TouchableOpacity
+                <AnimatedPressable
                   onPress={onUpdateStock}
                   style={styles.actionBtn}
                   hitSlop={HIT_SLOP}
@@ -230,10 +230,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 >
                   <Ionicons name="archive-outline" size={15} color={Colors.warning} />
                   <Text style={[styles.actionLabel, { color: Colors.warning }]}>Adjust</Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
               )}
               {onEdit && (
-                <TouchableOpacity
+                <AnimatedPressable
                   onPress={onEdit}
                   style={styles.actionBtn}
                   hitSlop={HIT_SLOP}
@@ -242,13 +242,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 >
                   <Ionicons name="pencil-outline" size={15} color={Colors.primary} />
                   <Text style={[styles.actionLabel, { color: Colors.primary }]}>Edit</Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
               )}
 
               <View style={styles.actionSpacer} />
 
               {onDelete && (
-                <TouchableOpacity
+                <AnimatedPressable
                   onPress={onDelete}
                   style={[styles.actionBtn, styles.deleteBtn]}
                   hitSlop={HIT_SLOP}
@@ -257,7 +257,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 >
                   <Ionicons name="trash-outline" size={15} color={Colors.danger} />
                   <Text style={[styles.actionLabel, { color: Colors.danger }]}>Delete</Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
               )}
             </View>
           </>

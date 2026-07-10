@@ -3,12 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   TextInput,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { haptics } from '@/utils/haptics';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -22,7 +24,7 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -114,6 +116,14 @@ export const MpesaPaymentModal: React.FC<Props> = ({
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
   }));
+
+  // Physical confirmation of payment outcomes — staff feel the result without
+  // looking at the screen (busy counter, phone in pocket while bagging goods).
+  useEffect(() => {
+    if (status === 'success') haptics.success();
+    else if (status === 'failed') haptics.error();
+    else if (status === 'cancelled' || status === 'timeout') haptics.warning();
+  }, [status]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -314,9 +324,8 @@ export const MpesaPaymentModal: React.FC<Props> = ({
 
   return (
     <Animated.View entering={FadeIn.duration(200)} style={StyleSheet.absoluteFill}>
-      <TouchableOpacity
+      <Pressable
         style={styles.backdrop}
-        activeOpacity={1}
         onPress={status === 'pending' || status === 'initiating' ? undefined : onCancel}
       />
       <KeyboardAvoidingView
@@ -371,9 +380,9 @@ export const MpesaPaymentModal: React.FC<Props> = ({
                   Waiting {countdown}s…
                 </Text>
               )}
-              <TouchableOpacity onPress={onCancel} style={styles.cancelLink}>
+              <AnimatedPressable onPress={onCancel} style={styles.cancelLink}>
                 <Text style={styles.cancelLinkText}>Cancel transaction</Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </Animated.View>
           )}
 
@@ -467,7 +476,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
               </View>
 
               {/* ── Verify with M-Pesa code section ───────────────────────── */}
-              <TouchableOpacity
+              <AnimatedPressable
                 style={styles.verifyToggle}
                 onPress={() => setShowVerifyInput((v) => !v)}
               >
@@ -475,7 +484,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
                 <Text style={styles.verifyToggleText}>
                   {showVerifyInput ? 'Hide verification' : 'Customer already paid? Verify with M-Pesa code'}
                 </Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
 
               {showVerifyInput && (
                 <Animated.View entering={FadeInDown.duration(220)} style={styles.verifyBox}>
@@ -554,7 +563,7 @@ const WaitingDots: React.FC = () => (
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(15,23,42,0.55)',
   },
   sheetWrap: {

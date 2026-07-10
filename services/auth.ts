@@ -8,6 +8,8 @@ export interface LoginResponse {
     email: string;
     role: 'owner' | 'staff';
     token: string;
+    /** Rotating 30-day refresh token — exchanged at POST /auth/refresh. */
+    refreshToken?: string;
     shop: {
       _id: string;
       name: string;

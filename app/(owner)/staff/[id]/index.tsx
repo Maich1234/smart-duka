@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getStaffById, deleteStaff, resetStaffPassword, getAllPermissions, type Permission } from '@/services/staff';
 import { Button } from '@/components/ui/Button';
@@ -132,18 +133,18 @@ export default function StaffDetailsScreen() {
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push(`/(owner)/staff/${id}/edit`)} activeOpacity={0.7}>
+        <AnimatedPressable style={styles.actionBtn} onPress={() => router.push(`/(owner)/staff/${id}/edit`)}>
           <Ionicons name="pencil-outline" size={16} color={Colors.primary} />
           <Text style={styles.actionBtnText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setResetModalVisible(true)} activeOpacity={0.7}>
+        </AnimatedPressable>
+        <AnimatedPressable style={styles.actionBtn} onPress={() => setResetModalVisible(true)}>
           <Ionicons name="lock-closed-outline" size={16} color={Colors.primary} />
           <Text style={styles.actionBtnText}>Reset Password</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={handleDelete} activeOpacity={0.7}>
+        </AnimatedPressable>
+        <AnimatedPressable style={[styles.actionBtn, styles.actionBtnDanger]} onPress={handleDelete}>
           <Ionicons name="trash-outline" size={16} color={Colors.danger} />
           <Text style={[styles.actionBtnText, { color: Colors.danger }]}>Delete</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
 
       {/* Permissions */}

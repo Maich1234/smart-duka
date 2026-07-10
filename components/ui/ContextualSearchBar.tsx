@@ -1,9 +1,9 @@
 import React, { useRef, useState, useCallback } from 'react';
+import { AnimatedPressable } from './AnimatedPressable';
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   Platform,
 } from 'react-native';
@@ -15,7 +15,7 @@ import Animated, {
   FadeOut,
   interpolateColor,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -105,13 +105,13 @@ export const ContextualSearchBar: React.FC<ContextualSearchBarProps> = ({
           autoFocus={autoFocus}
         />
         {value.length > 0 && (
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={() => onChangeText('')}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Clear search"
           >
             <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
         )}
       </Animated.View>
 
@@ -126,23 +126,22 @@ export const ContextualSearchBar: React.FC<ContextualSearchBarProps> = ({
               <Ionicons name="time-outline" size={13} color={Colors.textTertiary} />
               <Text style={styles.dropdownTitle}>Recent</Text>
             </View>
-            <TouchableOpacity
+            <AnimatedPressable
               onPress={onClearRecent}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.clearText}>Clear all</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           </View>
 
           {recentSearches.map((term) => (
-            <TouchableOpacity
+            <AnimatedPressable
               key={term}
               style={styles.dropdownItem}
               onPress={() => {
                 onSelectRecent?.(term);
                 inputRef.current?.blur();
               }}
-              activeOpacity={0.6}
             >
               <Ionicons name="search-outline" size={14} color={Colors.textTertiary} />
               <Text style={styles.dropdownItemText} numberOfLines={1}>
@@ -154,7 +153,7 @@ export const ContextualSearchBar: React.FC<ContextualSearchBarProps> = ({
                 color={Colors.textTertiary}
                 style={styles.fillArrow}
               />
-            </TouchableOpacity>
+            </AnimatedPressable>
           ))}
         </Animated.View>
       )}

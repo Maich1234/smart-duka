@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
@@ -6,16 +7,15 @@ import {
   ScrollView,
   RefreshControl,
   StyleSheet,
-  TouchableOpacity,
 } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getProducts, deleteProduct, updateStock, type Product } from '@/services/products';
 import { getDepletionAnalytics } from '@/services/analytics';
 import { InventoryHeader } from '@/components/inventory/InventoryHeader';
@@ -244,10 +244,9 @@ export default function OwnerInventory() {
             const count = filterCounts[opt.value];
             const showBadge = opt.value !== 'all' && count > 0;
             return (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={opt.value}
                 onPress={() => setVelocityFilter(opt.value)}
-                activeOpacity={0.75}
                 style={[styles.filterChip, isActive && styles.filterChipActive]}
                 accessibilityRole="button"
                 accessibilityLabel={opt.label}
@@ -292,7 +291,7 @@ export default function OwnerInventory() {
                     </Text>
                   </View>
                 )}
-              </TouchableOpacity>
+              </AnimatedPressable>
             );
           })}
         </ScrollView>
@@ -324,7 +323,7 @@ export default function OwnerInventory() {
         ListFooterComponent={
           totalPages > 1 ? (
             <View style={styles.paginationBar}>
-              <TouchableOpacity
+              <AnimatedPressable
                 onPress={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
                 style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
@@ -333,9 +332,9 @@ export default function OwnerInventory() {
                 accessibilityState={{ disabled: page <= 1 }}
               >
                 <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
-              </TouchableOpacity>
+              </AnimatedPressable>
               <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-              <TouchableOpacity
+              <AnimatedPressable
                 onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
                 style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
@@ -344,7 +343,7 @@ export default function OwnerInventory() {
                 accessibilityState={{ disabled: page >= totalPages }}
               >
                 <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
           ) : null
         }
@@ -422,28 +421,26 @@ function IntelligenceBanner({
       </View>
       <View style={bannerStyles.chips}>
         {fastCount > 0 && (
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={onViewFast}
             style={[bannerStyles.chip, bannerStyles.chipGreen]}
-            activeOpacity={0.75}
           >
             <Ionicons name="trending-up" size={13} color="#15803D" />
             <Text style={[bannerStyles.chipText, { color: '#15803D' }]}>
               {fastCount} fast mover{fastCount !== 1 ? 's' : ''} — tap to view
             </Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         )}
         {stockoutCount > 0 && (
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={onViewStockout}
             style={[bannerStyles.chip, bannerStyles.chipRed]}
-            activeOpacity={0.75}
           >
             <Ionicons name="alert-circle" size={13} color="#DC2626" />
             <Text style={[bannerStyles.chipText, { color: '#DC2626' }]}>
               {stockoutCount} item{stockoutCount !== 1 ? 's' : ''} stocking out soon
             </Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         )}
       </View>
     </View>
@@ -529,18 +526,17 @@ function EmptyInventoryState({ hasSearch, onAddProduct, onClearSearch }: EmptyIn
           : 'Start tracking your stock by adding your first product. Manage pricing, quantities, and get smart restocking alerts.'}
       </Text>
       {hasSearch ? (
-        <TouchableOpacity onPress={onClearSearch} style={emptyStyles.secondaryAction}>
+        <AnimatedPressable onPress={onClearSearch} style={emptyStyles.secondaryAction}>
           <Text style={emptyStyles.secondaryActionText}>Clear Search</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       ) : (
-        <TouchableOpacity
+        <AnimatedPressable
           onPress={onAddProduct}
           style={emptyStyles.primaryAction}
-          activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color={Colors.white} />
           <Text style={emptyStyles.primaryActionText}>Add First Product</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       )}
     </View>
   );

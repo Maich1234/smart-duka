@@ -10,7 +10,7 @@ import Svg, {
   LinearGradient as SvgGrad,
   Stop,
 } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReportSummary, ReportBucket, ReportPeriod } from '@/services/reports';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';

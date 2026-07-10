@@ -1,37 +1,56 @@
-import React, { useState, useRef, useEffect, useCallback, forwardRef } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
+  Modal,
+  Pressable,
+  ScrollView,
   StyleSheet,
-  TouchableOpacity,
-  TextInput,
   ActivityIndicator,
+  AccessibilityInfo,
   useWindowDimensions,
-  Platform,
-  KeyboardAvoidingView,
+  type LayoutChangeEvent,
 } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInDown,
-  FadeOut,
   ZoomIn,
-  useSharedValue,
+  runOnJS,
   useAnimatedStyle,
-  withSequence,
-  withTiming,
-  withSpring,
+  useReducedMotion,
+  useSharedValue,
   withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
+import { Motion } from '@/constants/Motion';
 import { requestOTP, verifyOTP, type OtpMethod } from '@/services/otp';
 import { useAuthStore, type AuthState } from '@/store/authStore';
+import { OtpCodeField } from '@/components/ui/OtpCodeField';
+import { VerifyButton, type VerifyButtonState } from './verification/VerifyButton';
+import { MethodCard } from './verification/MethodCard';
+import { ResendSection } from './verification/ResendSection';
+import { mapOtpError, maskEmail, maskPhone } from './verification/helpers';
 
 interface Props {
   visible: boolean;
@@ -39,693 +58,598 @@ interface Props {
   onClose: () => void;
 }
 
-type Step = 'choose' | 'enter' | 'success';
-type BtnState = 'idle' | 'loading' | 'success';
+type Phase = 'boot' | 'select' | 'enter' | 'success';
+type DismissSource = 'backdrop' | 'button' | 'back';
 
-const RESEND_COOLDOWN = 60;
 const OTP_LENGTH = 6;
-const BODY_H_PAD = 20;
+const RESEND_COOLDOWN = 60;
+/** Must stay in sync with the verification-token TTL in PaymentsSection. */
+const SESSION_MINUTES = 10;
+const SHEET_MAX_WIDTH = 480;
+/** Above this window width the sheet floats as a centered card (tablet/landscape). */
+const FLOATING_BREAKPOINT = 560;
 
-// ─── Main component ────────────────────────────────────────────────────────────
+interface MethodOption {
+  method: OtpMethod;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  destination: string;
+}
 
+/**
+ * Identity verification for payment-settings access. Rendered inside a real
+ * RN Modal so it layers above all navigation chrome, handles the Android back
+ * button, and resets its state on every open (Modal unmounts children when
+ * hidden).
+ */
 export const VerificationModal: React.FC<Props> = ({ visible, onVerified, onClose }) => {
-  const { width: screenWidth } = useWindowDimensions();
-  const user = useAuthStore((s: AuthState) => s.user);
+  const sheetRef = useRef<VerificationSheetHandle>(null);
 
-  const [step, setStep] = useState<Step>('choose');
-  const [method, setMethod] = useState<OtpMethod>('email');
-  const [sessionId, setSessionId] = useState('');
-  const [sentTo, setSentTo] = useState('');
-  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
-  const [focusedIdx, setFocusedIdx] = useState(-1);
-  const [btnState, setBtnState] = useState<BtnState>('idle');
-  const [sendingMethod, setSendingMethod] = useState<OtpMethod | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [error, setError] = useState('');
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={() => sheetRef.current?.requestClose()}
+    >
+      {/* RNGH pressables inside a RN Modal need their own gesture root on Android */}
+      <GestureHandlerRootView style={styles.gestureRoot}>
+        <VerificationSheet ref={sheetRef} onVerified={onVerified} onClose={onClose} />
+      </GestureHandlerRootView>
+    </Modal>
+  );
+};
 
-  const shakeX = useSharedValue(0);
+// ─── Sheet (all flow state lives here; fresh mount per open) ──────────────────
+
+interface VerificationSheetHandle {
+  requestClose: () => void;
+}
+
+interface SheetProps {
+  onVerified: (token: string) => void;
+  onClose: () => void;
+}
+
+const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
+  ({ onVerified, onClose }, ref) => {
+    const user = useAuthStore((s: AuthState) => s.user);
+    const insets = useSafeAreaInsets();
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+    const reducedMotion = useReducedMotion();
+
+    const methods = useMemo<MethodOption[]>(() => {
+      const list: MethodOption[] = [];
+      if (user?.shop?.phone) {
+        list.push({
+          method: 'sms',
+          icon: 'phone-portrait-outline',
+          title: 'Text message (SMS)',
+          destination: maskPhone(user.shop.phone),
+        });
+      }
+      if (user?.email) {
+        list.push({
+          method: 'email',
+          icon: 'mail-outline',
+          title: 'Email',
+          destination: maskEmail(user.email),
+        });
+      }
+      return list;
+    }, [user]);
+
+    const [phase, setPhase] = useState<Phase>(methods.length === 1 ? 'boot' : 'select');
+    const [method, setMethod] = useState<OtpMethod>('email');
+    const [sessionId, setSessionId] = useState('');
+    const [sentTo, setSentTo] = useState('');
+    const [code, setCode] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [btnState, setBtnState] = useState<VerifyButtonState>('idle');
+    const [sendingMethod, setSendingMethod] = useState<OtpMethod | null>(null);
+    const [cooldownKey, setCooldownKey] = useState(0);
+    const [resentFlash, setResentFlash] = useState(false);
+
+    const verifyingRef = useRef(false);
+    const clearCodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const entranceStarted = useRef(false);
+
+    // Presentation: spring-in sheet + fading blurred backdrop, timed fade-out.
+    const progress = useSharedValue(0);
+    const sheetHeight = useSharedValue(windowHeight);
+
+    const schedule = useCallback((fn: () => void, ms: number) => {
+      const id = setTimeout(fn, ms);
+      timers.current.push(id);
+      return id;
+    }, []);
+
+    useEffect(
+      () => () => {
+        timers.current.forEach(clearTimeout);
+        if (clearCodeTimer.current) clearTimeout(clearCodeTimer.current);
+      },
+      []
+    );
+
+    const handleSheetLayout = useCallback(
+      (e: LayoutChangeEvent) => {
+        sheetHeight.value = e.nativeEvent.layout.height;
+        if (!entranceStarted.current) {
+          entranceStarted.current = true;
+          progress.value = reducedMotion
+            ? withTiming(1, { duration: 200 })
+            : withSpring(1, { damping: 26, stiffness: 280, mass: 0.9 });
+        }
+      },
+      [progress, sheetHeight, reducedMotion]
+    );
+
+    const closeWith = useCallback(
+      (cb: () => void) => {
+        progress.value = withTiming(
+          0,
+          { duration: reducedMotion ? 150 : 220 },
+          (finished) => {
+            if (finished) runOnJS(cb)();
+          }
+        );
+      },
+      [progress, reducedMotion]
+    );
+
+    const dismiss = useCallback(
+      (source: DismissSource) => {
+        // A stray backdrop tap must not abort an in-flight verification or the
+        // success handoff (which would discard the just-issued token); the
+        // explicit close button and back gesture always work.
+        if (btnState !== 'idle' && source === 'backdrop') return;
+        closeWith(onClose);
+      },
+      [btnState, closeWith, onClose]
+    );
+
+    useImperativeHandle(ref, () => ({ requestClose: () => dismiss('back') }), [dismiss]);
+
+    // ── Flow actions ─────────────────────────────────────────────────────────
+
+    const send = useCallback(
+      async (m: OtpMethod, opts: { isResend?: boolean } = {}) => {
+        setSendingMethod(m);
+        setError(null);
+        try {
+          const res = await requestOTP(m);
+          setMethod(m);
+          setSessionId(res.data.sessionId);
+          setSentTo(res.data.sentTo);
+          setCode('');
+          setBtnState('idle');
+          setPhase('enter');
+          setCooldownKey((k) => k + 1);
+          haptics.light();
+          AccessibilityInfo.announceForAccessibility(
+            `Verification code sent to ${res.data.sentTo}`
+          );
+          if (opts.isResend) {
+            setResentFlash(true);
+            schedule(() => setResentFlash(false), 2600);
+          }
+        } catch (err) {
+          const e = mapOtpError(err, 'Could not send the code. Please try again.');
+          haptics.error();
+          setError(e.message);
+          if (!opts.isResend) setPhase('select');
+        } finally {
+          setSendingMethod(null);
+        }
+      },
+      [schedule]
+    );
+
+    // Single available method → skip the chooser and send immediately.
+    useEffect(() => {
+      if (phase === 'boot' && methods.length === 1) void send(methods[0].method);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const verify = useCallback(
+      async (codeArg?: string) => {
+        const otpCode = codeArg ?? code;
+        if (otpCode.length < OTP_LENGTH || verifyingRef.current) return;
+        verifyingRef.current = true;
+        setBtnState('loading');
+        setError(null);
+        try {
+          const res = await verifyOTP(sessionId, otpCode);
+          setBtnState('success');
+          haptics.success();
+          AccessibilityInfo.announceForAccessibility('Identity verified');
+          schedule(() => setPhase('success'), 700);
+          schedule(() => closeWith(() => onVerified(res.data.verificationToken)), 2100);
+        } catch (err) {
+          const e = mapOtpError(err, 'Verification failed. Please try again.');
+          haptics.error();
+          setBtnState('idle');
+          setError(e.message);
+          // Leave the wrong code visible through the shake, then clear it —
+          // cancelled if the user starts editing first.
+          clearCodeTimer.current = setTimeout(() => setCode(''), 650);
+        } finally {
+          verifyingRef.current = false;
+        }
+      },
+      [code, sessionId, schedule, closeWith, onVerified]
+    );
+
+    const handleCodeChange = useCallback((v: string) => {
+      if (clearCodeTimer.current) {
+        clearTimeout(clearCodeTimer.current);
+        clearCodeTimer.current = null;
+      }
+      setCode(v);
+      setError(null);
+    }, []);
+
+    const handleChangeMethod = useCallback(() => {
+      haptics.selection();
+      setPhase('select');
+      setCode('');
+      setError(null);
+      setBtnState('idle');
+    }, []);
+
+    // ── Animated styles ──────────────────────────────────────────────────────
+
+    const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+    const sheetStyle = useAnimatedStyle(() => ({
+      opacity: reducedMotion ? progress.value : 1,
+      transform: [
+        { translateY: reducedMotion ? 0 : (1 - progress.value) * sheetHeight.value },
+      ],
+    }));
+
+    const isFloating = windowWidth >= FLOATING_BREAKPOINT;
+    const currentMethod = methods.find((m) => m.method === method);
+    const stepAnim = reducedMotion
+      ? FadeIn.duration(Motion.duration.base)
+      : FadeInDown.duration(Motion.duration.slow);
+
+    return (
+      <View style={styles.root}>
+        <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.dim} />
+        </Animated.View>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => dismiss('backdrop')}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss verification"
+        />
+
+        <KeyboardAvoidingView behavior="padding" style={styles.kav} pointerEvents="box-none">
+          <Animated.View
+            onLayout={handleSheetLayout}
+            style={[
+              styles.sheet,
+              isFloating
+                ? [styles.sheetFloating, { marginBottom: Math.max(insets.bottom, Spacing.lg) }]
+                : { paddingBottom: Math.max(insets.bottom, Spacing.md) + Spacing.sm },
+              sheetStyle,
+            ]}
+          >
+            <View style={styles.handle} />
+            <Pressable
+              style={styles.closeBtn}
+              onPress={() => dismiss('button')}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Close verification"
+            >
+              <Ionicons name="close" size={16} color={Colors.textSecondary} />
+            </Pressable>
+
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {phase === 'success' ? (
+                <SuccessBlock reducedMotion={reducedMotion} />
+              ) : (
+                <>
+                  <Hero phase={phase} reducedMotion={reducedMotion} />
+
+                  {phase === 'boot' && (
+                    <Animated.View key="boot" entering={stepAnim} style={styles.body}>
+                      <View style={styles.sendingRow}>
+                        <ActivityIndicator size="small" color={Colors.primary} />
+                        <Text style={styles.sendingText} maxFontSizeMultiplier={1.6}>
+                          Sending your code to {methods[0]?.destination}…
+                        </Text>
+                      </View>
+                    </Animated.View>
+                  )}
+
+                  {phase === 'select' && (
+                    <Animated.View key="select" entering={stepAnim} style={styles.body}>
+                      {methods.map((m) => (
+                        <MethodCard
+                          key={m.method}
+                          icon={m.icon}
+                          title={m.title}
+                          destination={m.destination}
+                          loading={sendingMethod === m.method}
+                          disabled={!!sendingMethod}
+                          onPress={() => send(m.method)}
+                        />
+                      ))}
+                      {methods.length === 0 && (
+                        <View style={styles.noContactCard}>
+                          <Ionicons
+                            name="alert-circle-outline"
+                            size={18}
+                            color={Colors.warning}
+                          />
+                          <Text style={styles.noContactText}>
+                            {"There's no phone number or email on your account. Add one in your profile to verify your identity."}
+                          </Text>
+                        </View>
+                      )}
+                      {error ? (
+                        <Animated.View
+                          entering={FadeIn.duration(Motion.duration.base)}
+                          style={styles.selectErrorRow}
+                          accessibilityLiveRegion="polite"
+                        >
+                          <Ionicons name="alert-circle" size={14} color={Colors.danger} />
+                          <Text style={styles.selectErrorText}>{error}</Text>
+                        </Animated.View>
+                      ) : null}
+                    </Animated.View>
+                  )}
+
+                  {phase === 'enter' && (
+                    <Animated.View key="enter" entering={stepAnim} style={styles.body}>
+                      <DestinationCard
+                        icon={method === 'email' ? 'mail' : 'chatbubble-ellipses'}
+                        label="Code sent to"
+                        destination={sentTo || currentMethod?.destination || ''}
+                        resentFlash={resentFlash}
+                      />
+
+                      <OtpCodeField
+                        value={code}
+                        onChange={handleCodeChange}
+                        length={OTP_LENGTH}
+                        error={error}
+                        disabled={btnState !== 'idle'}
+                        onComplete={verify}
+                      />
+
+                      <View style={styles.ctaBlock}>
+                        <VerifyButton
+                          state={btnState}
+                          disabled={code.length < OTP_LENGTH}
+                          onPress={() => verify()}
+                        />
+                        <ResendSection
+                          key={cooldownKey}
+                          cooldownSeconds={RESEND_COOLDOWN}
+                          sending={sendingMethod !== null}
+                          disabled={btnState !== 'idle'}
+                          onResend={() => send(method, { isResend: true })}
+                        />
+                      </View>
+
+                      {methods.length > 1 && (
+                        <Pressable
+                          style={styles.changeMethodBtn}
+                          onPress={handleChangeMethod}
+                          disabled={btnState !== 'idle'}
+                          accessibilityRole="button"
+                          accessibilityLabel="Use a different verification method"
+                        >
+                          <Ionicons
+                            name="swap-horizontal-outline"
+                            size={14}
+                            color={Colors.primary}
+                          />
+                          <Text style={styles.changeMethodText} maxFontSizeMultiplier={1.6}>
+                            Verify another way
+                          </Text>
+                        </Pressable>
+                      )}
+                    </Animated.View>
+                  )}
+
+                  <View style={styles.trustRow}>
+                    <Ionicons name="lock-closed" size={12} color={Colors.textSecondary} />
+                    <Text style={styles.trustText} maxFontSizeMultiplier={1.6}>
+                      Codes are single-use and expire after 5 minutes
+                    </Text>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    );
+  }
+);
+VerificationSheet.displayName = 'VerificationSheet';
+
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+
+const HERO_SUB: Record<Exclude<Phase, 'success'>, string> = {
+  boot: 'This extra step keeps your M-Pesa payment settings secure.',
+  select: 'Choose where to receive your one-time security code.',
+  enter: 'Enter the 6-digit code we sent you. This extra step keeps your M-Pesa payment settings secure.',
+};
+
+const Hero: React.FC<{ phase: Exclude<Phase, 'success'>; reducedMotion: boolean }> = ({
+  phase,
+  reducedMotion,
+}) => {
   const pulseScale = useSharedValue(1);
-  const pulseOpacity = useSharedValue(0.25);
+  const pulseOpacity = useSharedValue(0.22);
 
-  const hasSms = !!user?.shop?.phone;
-  const hasEmail = !!user?.email;
-
-  // Responsive OTP sizing — always fits within the modal
-  const boxGap = 8;
-  const totalGaps = (OTP_LENGTH - 1) * boxGap;
-  const rawBoxWidth = (screenWidth - BODY_H_PAD * 2 - totalGaps) / OTP_LENGTH;
-  const boxWidth = Math.max(36, Math.min(52, rawBoxWidth));
-  const boxHeight = Math.round(boxWidth * 1.14);
-
-  // Shield pulsing glow
   useEffect(() => {
+    if (reducedMotion) return;
     pulseScale.value = withRepeat(
-      withSequence(
-        withTiming(1.22, { duration: 1600 }),
-        withTiming(1, { duration: 1600 })
-      ),
-      -1,
-      false
+      withSequence(withTiming(1.2, { duration: 1600 }), withTiming(1, { duration: 1600 })),
+      -1
     );
     pulseOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.1, { duration: 1600 }),
-        withTiming(0.3, { duration: 1600 })
-      ),
-      -1,
-      false
+      withSequence(withTiming(0.1, { duration: 1600 }), withTiming(0.28, { duration: 1600 })),
+      -1
     );
-  }, []);
-
-  // Countdown timer
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const id = setInterval(() => setResendCooldown((c) => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(id);
-  }, [resendCooldown]);
+  }, [reducedMotion, pulseScale, pulseOpacity]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
     opacity: pulseOpacity.value,
   }));
 
-  const shakeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shakeX.value }],
-  }));
-
-  const triggerShake = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    shakeX.value = withSequence(
-      withTiming(-10, { duration: 55 }),
-      withTiming(10, { duration: 55 }),
-      withTiming(-8, { duration: 55 }),
-      withTiming(8, { duration: 55 }),
-      withTiming(-4, { duration: 55 }),
-      withTiming(0, { duration: 55 })
-    );
-  }, []);
-
-  const handleSendOTP = useCallback(async (selectedMethod: OtpMethod) => {
-    setSendingMethod(selectedMethod);
-    setError('');
-    try {
-      const res = await requestOTP(selectedMethod);
-      setSessionId(res.data.sessionId);
-      setSentTo(res.data.sentTo);
-      setMethod(selectedMethod);
-      setOtp(Array(OTP_LENGTH).fill(''));
-      setBtnState('idle');
-      setStep('enter');
-      setResendCooldown(RESEND_COOLDOWN);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setTimeout(() => inputRefs.current[0]?.focus(), 300);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Failed to send code';
-      setError(msg);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setSendingMethod(null);
-    }
-  }, []);
-
-  const handleOtpChange = (value: string, index: number) => {
-    const digits = value.replace(/\D/g, '');
-    setError('');
-
-    // Paste: fill from this cell forward
-    if (digits.length > 1) {
-      const next = [...otp];
-      let lastFilled = index;
-      for (let i = 0; i < digits.length && index + i < OTP_LENGTH; i++) {
-        next[index + i] = digits[i];
-        lastFilled = index + i;
-      }
-      setOtp(next);
-      const focusTarget = Math.min(lastFilled + 1, OTP_LENGTH - 1);
-      inputRefs.current[focusTarget]?.focus();
-      if (next.every(Boolean)) handleVerify(next.join(''));
-      return;
-    }
-
-    const digit = digits.slice(-1);
-    const next = [...otp];
-    next[index] = digit;
-    setOtp(next);
-    if (digit && index < OTP_LENGTH - 1) inputRefs.current[index + 1]?.focus();
-    if (next.every(Boolean)) handleVerify(next.join(''));
-  };
-
-  const handleKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace' && !otp[index] && index > 0) {
-      const next = [...otp];
-      next[index - 1] = '';
-      setOtp(next);
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerify = async (code?: string) => {
-    const otpCode = code ?? otp.join('');
-    if (otpCode.length < OTP_LENGTH) return;
-    setBtnState('loading');
-    setError('');
-    try {
-      const res = await verifyOTP(sessionId, otpCode);
-      setBtnState('success');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep('success');
-      setTimeout(() => onVerified(res.data.verificationToken), 1400);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Invalid code';
-      setError(msg);
-      setBtnState('idle');
-      triggerShake();
-      setOtp(Array(OTP_LENGTH).fill(''));
-      setTimeout(() => inputRefs.current[0]?.focus(), 150);
-    }
-  };
-
-  const handleResend = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    handleSendOTP(method);
-  };
-
-  const handleChangeMethod = () => {
-    Haptics.selectionAsync();
-    setStep('choose');
-    setError('');
-    setBtnState('idle');
-    setOtp(Array(OTP_LENGTH).fill(''));
-  };
-
-  if (!visible) return null;
-
-  const countdown = `${Math.floor(resendCooldown / 60)}:${String(resendCooldown % 60).padStart(2, '0')}`;
-
   return (
-    <Animated.View
-      entering={FadeIn.duration(220)}
-      exiting={FadeOut.duration(180)}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="box-none"
-    >
-      {/* Blurred backdrop */}
-      <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={styles.backdropOverlay} />
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-
-      {/* Bottom sheet */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.sheetWrap}
-        pointerEvents="box-none"
-      >
-        <Animated.View
-          entering={FadeInDown.springify().damping(24).stiffness(230).mass(0.85)}
-          style={styles.sheet}
-        >
-          {/* Drag handle */}
-          <View style={styles.handle} />
-
-          {/* Close button */}
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={onClose}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Close verification"
-          >
-            <Ionicons name="close" size={14} color={Colors.textSecondary} />
-          </TouchableOpacity>
-
-          {/* ── Hero ─────────────────────────────────────────────────────── */}
-          <View style={styles.heroSection}>
-            <View style={styles.shieldContainer}>
-              <Animated.View style={[styles.glowRing, pulseStyle]} />
-              <LinearGradient
-                colors={['#0D6B63', '#14B8A6']}
-                start={{ x: 0.2, y: 0 }}
-                end={{ x: 0.8, y: 1 }}
-                style={styles.shieldGradient}
-              >
-                <Ionicons name="shield-checkmark" size={26} color="#fff" />
-              </LinearGradient>
-            </View>
-            <Text style={styles.heroTitle}>Identity Verification</Text>
-            <Text style={styles.heroSub}>
-              {step === 'choose'
-                ? 'Choose how to receive your one-time verification code.'
-                : step === 'enter'
-                ? 'Verify your identity before approving this M-Pesa transaction.'
-                : 'Your identity has been verified.'}
-            </Text>
-          </View>
-
-          {/* ── Step: Choose method ───────────────────────────────────────── */}
-          {step === 'choose' && (
-            <Animated.View entering={FadeInDown.duration(240)} style={styles.body}>
-              {hasSms && (
-                <MethodCard
-                  icon="phone-portrait-outline"
-                  title="SMS Verification"
-                  sub={maskPhone(user?.shop?.phone)}
-                  badge={!hasEmail ? 'Recommended' : undefined}
-                  loading={sendingMethod === 'sms'}
-                  disabled={!!sendingMethod}
-                  onPress={() => handleSendOTP('sms')}
-                />
-              )}
-              {hasEmail && (
-                <MethodCard
-                  icon="mail-outline"
-                  title="Email Verification"
-                  sub={maskEmail(user?.email)}
-                  badge={!hasSms ? 'Recommended' : undefined}
-                  loading={sendingMethod === 'email'}
-                  disabled={!!sendingMethod}
-                  onPress={() => handleSendOTP('email')}
-                />
-              )}
-              {!hasSms && !hasEmail && (
-                <View style={styles.noContactCard}>
-                  <Ionicons name="alert-circle-outline" size={18} color={Colors.warning} />
-                  <Text style={styles.noContactText}>
-                    No phone or email on file. Please update your profile to use this feature.
-                  </Text>
-                </View>
-              )}
-              {error ? (
-                <Animated.Text entering={FadeIn.duration(150)} style={styles.errorText}>
-                  {error}
-                </Animated.Text>
-              ) : null}
-            </Animated.View>
-          )}
-
-          {/* ── Step: Enter OTP ───────────────────────────────────────────── */}
-          {step === 'enter' && (
-            <Animated.View entering={FadeInDown.duration(240)} style={styles.body}>
-
-              {/* Destination pill */}
-              <View style={styles.destinationPill}>
-                <LinearGradient colors={['#E6F4F2', '#CCE9E6']} style={styles.destIconWrap}>
-                  <Ionicons
-                    name={method === 'email' ? 'mail' : 'phone-portrait'}
-                    size={12}
-                    color={Colors.primary}
-                  />
-                </LinearGradient>
-                <Text style={styles.destText} numberOfLines={1} ellipsizeMode="middle">
-                  {sentTo}
-                </Text>
-                <View style={styles.destSentBadge}>
-                  <View style={styles.destSentDot} />
-                  <Text style={styles.destSentText}>Sent</Text>
-                </View>
-              </View>
-
-              {/* OTP inputs */}
-              <Animated.View style={[styles.otpRow, shakeStyle]}>
-                {otp.map((digit, i) => (
-                  <OtpCell
-                    key={i}
-                    ref={(r) => { inputRefs.current[i] = r; }}
-                    value={digit}
-                    index={i}
-                    isFocused={focusedIdx === i}
-                    hasError={!!error}
-                    boxWidth={boxWidth}
-                    boxHeight={boxHeight}
-                    onChangeText={(v) => handleOtpChange(v, i)}
-                    onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
-                    onFocus={() => setFocusedIdx(i)}
-                    onBlur={() => setFocusedIdx(-1)}
-                    editable={btnState !== 'loading'}
-                  />
-                ))}
-              </Animated.View>
-
-              {/* Error */}
-              {error ? (
-                <Animated.Text entering={FadeIn.duration(150)} style={styles.errorText}>
-                  {error}
-                </Animated.Text>
-              ) : null}
-
-              {/* Expiry note */}
-              <View style={styles.securityNote}>
-                <Ionicons name="lock-closed" size={10} color={Colors.textTertiary} />
-                <Text style={styles.securityNoteText}>Code expires in 5 minutes</Text>
-              </View>
-
-              {/* Verify button */}
-              <VerifyButton
-                state={btnState}
-                disabled={otp.join('').length < OTP_LENGTH || btnState !== 'idle'}
-                onPress={handleVerify}
-              />
-
-              {/* Resend section */}
-              <View style={styles.resendSection}>
-                <Text style={styles.resendQuestion}>Didn't receive a code?</Text>
-                {resendCooldown > 0 ? (
-                  <View style={styles.countdownRow}>
-                    <Ionicons name="time-outline" size={12} color={Colors.textTertiary} />
-                    <Text style={styles.countdownText}>Resend in {countdown}</Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={handleResend}
-                    style={styles.resendActionBtn}
-                    activeOpacity={0.72}
-                    disabled={btnState === 'loading'}
-                    accessibilityRole="button"
-                    accessibilityLabel="Resend verification code"
-                  >
-                    <Ionicons name="refresh-outline" size={12} color={Colors.primary} />
-                    <Text style={styles.resendActionText}>Resend Code</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Change method */}
-              <TouchableOpacity
-                style={styles.changeMethodBtn}
-                onPress={handleChangeMethod}
-                activeOpacity={0.7}
-                disabled={btnState === 'loading'}
-                accessibilityRole="button"
-              >
-                <Ionicons name="swap-horizontal-outline" size={13} color={Colors.textTertiary} />
-                <Text style={styles.changeMethodText}>Try a different verification method</Text>
-              </TouchableOpacity>
-
-              {/* Trust card */}
-              <View style={styles.trustCard}>
-                <Ionicons name="lock-closed-outline" size={13} color={Colors.primary} />
-                <Text style={styles.trustText}>
-                  Verification codes are encrypted end-to-end and used solely to authorize this transaction.
-                </Text>
-              </View>
-
-            </Animated.View>
-          )}
-
-          {/* ── Step: Success ──────────────────────────────────────────────── */}
-          {step === 'success' && (
-            <Animated.View entering={FadeInDown.duration(260)} style={styles.body}>
-              <View style={styles.successWrap}>
-                <Animated.View entering={ZoomIn.springify().damping(14).stiffness(180)}>
-                  <View style={styles.successRing}>
-                    <LinearGradient colors={['#15803D', '#22C55E']} style={styles.successCircle}>
-                      <Ionicons name="checkmark" size={30} color="#fff" />
-                    </LinearGradient>
-                  </View>
-                </Animated.View>
-                <Text style={styles.successTitle}>Transaction Authorized</Text>
-                <Text style={styles.successSub}>
-                  Your identity has been verified. Opening payment settings…
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Animated.View>
-  );
-};
-
-// ─── OTP Cell ─────────────────────────────────────────────────────────────────
-
-interface OtpCellProps {
-  value: string;
-  index: number;
-  isFocused: boolean;
-  hasError: boolean;
-  boxWidth: number;
-  boxHeight: number;
-  onChangeText: (v: string) => void;
-  onKeyPress: (e: any) => void;
-  onFocus: () => void;
-  onBlur: () => void;
-  editable: boolean;
-}
-
-const OtpCell = forwardRef<TextInput, OtpCellProps>(
-  ({ value, index, isFocused, hasError, boxWidth, boxHeight, ...inputProps }, ref) => {
-    const scale = useSharedValue(1);
-
-    useEffect(() => {
-      scale.value = withSpring(isFocused ? 1.07 : 1, { damping: 16, stiffness: 240 });
-    }, [isFocused]);
-
-    const cellAnim = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
-    }));
-
-    const isFilled = value.length > 0;
-
-    let borderColor: string = Colors.border;
-    let borderWidth = 1.5;
-    let bgColor: string = Colors.background;
-    let textColor: string = Colors.textPrimary;
-    let shadowColor = 'transparent';
-    let shadowOpacity = 0;
-    let shadowRadius = 0;
-    let elevation = 0;
-
-    if (hasError) {
-      borderColor = Colors.danger;
-      borderWidth = 2;
-      bgColor = Colors.dangerSubtle;
-      textColor = Colors.danger;
-    } else if (isFocused) {
-      borderColor = Colors.primary;
-      borderWidth = 2;
-      bgColor = Colors.primarySubtle;
-      shadowColor = Colors.primary;
-      shadowOpacity = 0.22;
-      shadowRadius = 8;
-      elevation = 4;
-    } else if (isFilled) {
-      borderColor = Colors.success;
-      borderWidth = 1.5;
-      bgColor = Colors.successSubtle;
-      textColor = Colors.success;
-    }
-
-    return (
-      <Animated.View
-        style={[
-          cellAnim,
-          {
-            shadowColor,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity,
-            shadowRadius,
-            elevation,
-            borderRadius: 12,
-          },
-        ]}
-      >
-        <TextInput
-          ref={ref}
-          style={{
-            width: boxWidth,
-            height: boxHeight,
-            borderRadius: 12,
-            borderWidth,
-            borderColor,
-            backgroundColor: bgColor,
-            textAlign: 'center',
-            fontSize: 20,
-            fontFamily: Typography.fontFamilyBold,
-            color: textColor,
-            includeFontPadding: false,
-          }}
-          value={value}
-          keyboardType="number-pad"
-          maxLength={OTP_LENGTH}
-          selectTextOnFocus
-          accessibilityLabel={`Digit ${index + 1} of ${OTP_LENGTH}`}
-          {...inputProps}
-        />
-      </Animated.View>
-    );
-  }
-);
-
-// ─── Verify button ────────────────────────────────────────────────────────────
-
-interface VerifyButtonProps {
-  state: BtnState;
-  disabled: boolean;
-  onPress: () => void;
-}
-
-const VerifyButton: React.FC<VerifyButtonProps> = ({ state, disabled, onPress }) => {
-  const handlePress = () => {
-    if (!disabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      onPress();
-    }
-  };
-
-  if (state === 'success') {
-    return (
-      <Animated.View entering={ZoomIn.springify().damping(16)} style={styles.verifyBtnShadow}>
-        <View style={styles.verifyBtnClip}>
-          <LinearGradient
-            colors={['#15803D', '#22C55E']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.verifyBtnInner}
-          >
-            <Ionicons name="checkmark-circle" size={18} color="#fff" />
-            <Text style={styles.verifyBtnText}>Verified Successfully</Text>
-          </LinearGradient>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  const isDisabled = disabled || state === 'loading';
-  const gradColors: [string, string] = isDisabled && state !== 'loading'
-    ? [Colors.disabledBackground, Colors.disabledBackground]
-    : ['#0F766E', '#14B8A6'];
-
-  return (
-    <View style={[styles.verifyBtnShadow, isDisabled && { shadowOpacity: 0, elevation: 0 }]}>
-      <TouchableOpacity
-        style={styles.verifyBtnClip}
-        onPress={handlePress}
-        disabled={isDisabled}
-        activeOpacity={0.84}
-        accessibilityRole="button"
-        accessibilityLabel={state === 'loading' ? 'Verifying transaction' : 'Verify transaction'}
-        accessibilityState={{ disabled: isDisabled }}
-      >
+    <View style={styles.hero}>
+      <View style={styles.shieldContainer}>
+        {!reducedMotion && <Animated.View style={[styles.glowRing, pulseStyle]} />}
         <LinearGradient
-          colors={gradColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.verifyBtnInner}
+          colors={[Colors.primaryDark, Colors.primaryLight]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={styles.shield}
         >
-          {state === 'loading' ? (
-            <>
-              <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.verifyBtnText}>Verifying…</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons
-                name="shield-checkmark"
-                size={16}
-                color={isDisabled ? Colors.textDisabled : '#fff'}
-              />
-              <Text style={[styles.verifyBtnText, isDisabled && styles.verifyBtnTextDisabled]}>
-                Verify Transaction
-              </Text>
-            </>
-          )}
+          <Ionicons name="shield-checkmark" size={24} color={Colors.white} />
         </LinearGradient>
-      </TouchableOpacity>
+      </View>
+      <Text style={styles.heroTitle} maxFontSizeMultiplier={1.8} accessibilityRole="header">
+        Verify your identity
+      </Text>
+      <Text style={styles.heroSub} maxFontSizeMultiplier={1.8}>
+        {HERO_SUB[phase]}
+      </Text>
     </View>
   );
 };
 
-// ─── Method card ──────────────────────────────────────────────────────────────
+// ─── Destination card ─────────────────────────────────────────────────────────
 
-interface MethodCardProps {
+const DestinationCard: React.FC<{
   icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  sub: string;
-  badge?: string;
-  loading: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}
-
-const MethodCard: React.FC<MethodCardProps> = ({
-  icon, title, sub, badge, loading, disabled, onPress,
-}) => (
-  <TouchableOpacity
-    style={styles.methodCard}
-    onPress={onPress}
-    disabled={disabled}
-    activeOpacity={0.74}
-    accessibilityRole="button"
-    accessibilityLabel={title}
-  >
-    <View style={styles.methodIconWrap}>
-      {loading ? (
-        <ActivityIndicator size="small" color={Colors.primary} />
+  label: string;
+  destination: string;
+  resentFlash: boolean;
+}> = ({ icon, label, destination, resentFlash }) => (
+  <View style={styles.destCard}>
+    <View style={styles.destIconWrap}>
+      <Ionicons name={icon} size={16} color={Colors.primary} />
+    </View>
+    <View style={styles.destText}>
+      <Text style={styles.destLabel} maxFontSizeMultiplier={1.4}>
+        {label.toUpperCase()}
+      </Text>
+      <Text
+        style={styles.destValue}
+        numberOfLines={1}
+        ellipsizeMode="middle"
+        maxFontSizeMultiplier={1.4}
+      >
+        {destination}
+      </Text>
+    </View>
+    <View style={styles.sentBadge}>
+      {resentFlash ? (
+        <Animated.View entering={FadeIn.duration(Motion.duration.base)} style={styles.sentBadgeInner}>
+          <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+          <Text style={styles.sentBadgeText} maxFontSizeMultiplier={1.2}>
+            New code
+          </Text>
+        </Animated.View>
       ) : (
-        <Ionicons name={icon} size={18} color={Colors.primary} />
+        <View style={styles.sentBadgeInner}>
+          <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+          <Text style={styles.sentBadgeText} maxFontSizeMultiplier={1.2}>
+            Sent
+          </Text>
+        </View>
       )}
     </View>
-    <View style={styles.methodText}>
-      <View style={styles.methodTitleRow}>
-        <Text style={styles.methodTitle}>{title}</Text>
-        {badge && (
-          <View style={styles.methodBadge}>
-            <Text style={styles.methodBadgeText}>{badge}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.methodSub} numberOfLines={1}>{sub}</Text>
-    </View>
-    <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />
-  </TouchableOpacity>
+  </View>
 );
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Success ──────────────────────────────────────────────────────────────────
 
-function maskPhone(phone?: string | null): string {
-  if (!phone) return 'your phone number';
-  const c = phone.replace(/\s/g, '');
-  return c.length < 4 ? c : c.slice(0, -3).replace(/\d/g, '*') + c.slice(-3);
-}
-
-function maskEmail(email?: string | null): string {
-  if (!email) return 'your email';
-  const [local, domain] = email.split('@');
-  if (!domain) return email;
-  const masked = '*'.repeat(Math.max(1, local.length - 1));
-  return `${local[0]}${masked}@${domain}`;
-}
+const SuccessBlock: React.FC<{ reducedMotion: boolean }> = ({ reducedMotion }) => (
+  <View style={styles.successWrap}>
+    <Animated.View
+      entering={
+        reducedMotion
+          ? FadeIn.duration(Motion.duration.base)
+          : ZoomIn.springify().damping(14).stiffness(180)
+      }
+    >
+      <View style={styles.successRing}>
+        <LinearGradient
+          colors={[Colors.success, Colors.successLight]}
+          style={styles.successCircle}
+        >
+          <Ionicons name="checkmark" size={30} color={Colors.white} />
+        </LinearGradient>
+      </View>
+    </Animated.View>
+    <Text style={styles.successTitle} maxFontSizeMultiplier={1.8} accessibilityRole="header">
+      Identity verified
+    </Text>
+    <Text style={styles.successSub} maxFontSizeMultiplier={1.8}>
+      Payment settings are unlocked for the next {SESSION_MINUTES} minutes.
+    </Text>
+  </View>
+);
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
+  root: {
+    flex: 1,
+  },
+  dim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+  },
+  kav: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
 
-  // ── Layout ─────────────────────────────────────────────────────
-  backdropOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.32)',
-  },
-  sheetWrap: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
+  // Sheet chrome
   sheet: {
+    width: '100%',
+    maxWidth: SHEET_MAX_WIDTH,
+    maxHeight: '90%',
     backgroundColor: Colors.surface,
     borderTopLeftRadius: BorderRadius.sheet,
     borderTopRightRadius: BorderRadius.sheet,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -12 },
+    shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.14,
-    shadowRadius: 32,
-    elevation: 28,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: 'rgba(226,232,240,0.7)',
+    shadowRadius: 24,
+    elevation: 24,
+  },
+  sheetFloating: {
+    borderRadius: BorderRadius.sheet,
+    paddingBottom: Spacing.lg,
   },
   handle: {
     width: 40,
@@ -733,16 +657,16 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: Colors.borderStrong,
     alignSelf: 'center',
-    marginTop: 12,
-    opacity: 0.45,
+    marginTop: Spacing.sm + 4,
+    opacity: 0.5,
   },
   closeBtn: {
     position: 'absolute',
-    top: 18,
-    right: 18,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    top: Spacing.md,
+    right: Spacing.md,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -750,324 +674,217 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
+  scroll: {
+    flexGrow: 0,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xs,
+  },
   body: {
-    paddingHorizontal: BODY_H_PAD,
-    paddingTop: 4,
+    gap: Spacing.md,
   },
 
-  // ── Hero ───────────────────────────────────────────────────────
-  heroSection: {
+  // Hero
+  hero: {
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 20,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
   },
   shieldContainer: {
-    width: 76,
-    height: 76,
+    width: 72,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.md - 4,
   },
   glowRing: {
     position: 'absolute',
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: Colors.primary,
   },
-  shieldGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
+  shield: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.42,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   heroTitle: {
-    fontSize: Typography.size.h2,
+    fontSize: Typography.size.h3,
+    lineHeight: Typography.lineHeight.h3,
     fontFamily: Typography.fontFamilyBold,
     color: Colors.textPrimary,
     textAlign: 'center',
-    letterSpacing: -0.4,
-    marginBottom: 7,
+    letterSpacing: Typography.letterSpacing.tight,
+    marginBottom: Spacing.xs + 2,
   },
   heroSub: {
     fontSize: Typography.size.small,
+    lineHeight: Typography.lineHeight.small,
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
   },
 
-  // ── Method cards ───────────────────────────────────────────────
-  methodCard: {
+  // Boot (auto-send)
+  sendingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 12,
-  },
-  methodIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: Colors.primarySubtle,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+    gap: Spacing.sm + 4,
+    paddingVertical: Spacing.lg,
   },
-  methodText: { flex: 1 },
-  methodTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 3,
-  },
-  methodTitle: {
+  sendingText: {
+    flexShrink: 1,
     fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textPrimary,
-  },
-  methodBadge: {
-    backgroundColor: Colors.accentSubtle,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-  },
-  methodBadgeText: {
-    fontSize: 10,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.accentDark,
-  },
-  methodSub: {
-    fontSize: 12,
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
   },
+
+  // Select
   noContactCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: Spacing.sm + 4,
     backgroundColor: Colors.warningSubtle,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    marginBottom: 12,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
   },
   noContactText: {
     flex: 1,
     fontSize: Typography.size.small,
+    lineHeight: Typography.lineHeight.small,
     fontFamily: Typography.fontFamily,
-    color: Colors.textSecondary,
-    lineHeight: 20,
+    color: Colors.textPrimary,
+  },
+  selectErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs + 2,
+  },
+  selectErrorText: {
+    flexShrink: 1,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.danger,
+    textAlign: 'center',
   },
 
-  // ── Destination pill ───────────────────────────────────────────
-  destinationPill: {
+  // Destination card
+  destCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.background,
-    borderRadius: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm + 4,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 8,
-    marginBottom: 20,
+    gap: Spacing.sm + 4,
   },
   destIconWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.sm + 2,
+    backgroundColor: Colors.primarySubtle,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   destText: {
     flex: 1,
+    gap: 2,
+  },
+  destLabel: {
+    fontSize: Typography.fontSize.xxs + 1,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
+    letterSpacing: 0.8,
+  },
+  destValue: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
   },
-  destSentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.successSubtle,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.full,
+  sentBadge: {
     flexShrink: 0,
   },
-  destSentDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: Colors.success,
+  sentBadgeInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.successSubtle,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
   },
-  destSentText: {
-    fontSize: 10,
+  sentBadgeText: {
+    fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.success,
   },
 
-  // ── OTP inputs ─────────────────────────────────────────────────
-  otpRow: {
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    marginBottom: 10,
+  // CTA block
+  ctaBlock: {
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
   },
-  securityNote: {
+  changeMethodBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    marginBottom: 16,
+    gap: Spacing.xs + 2,
+    paddingVertical: Spacing.sm,
+    minHeight: 44,
   },
-  securityNoteText: {
-    fontSize: 11,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textTertiary,
-  },
-
-  // ── Verify button ──────────────────────────────────────────────
-  verifyBtnShadow: {
-    borderRadius: 14,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 7,
-    marginBottom: 16,
-  },
-  verifyBtnClip: {
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  verifyBtnInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 24,
-  },
-  verifyBtnText: {
-    fontSize: Typography.size.body,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: '#fff',
-  },
-  verifyBtnTextDisabled: {
-    color: Colors.textDisabled,
-  },
-
-  // ── Resend section ─────────────────────────────────────────────
-  resendSection: {
-    alignItems: 'center',
-    gap: 7,
-    marginBottom: 8,
-  },
-  resendQuestion: {
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textSecondary,
-  },
-  countdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  countdownText: {
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textTertiary,
-  },
-  resendActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.primarySubtle,
-    borderRadius: BorderRadius.full,
-  },
-  resendActionText: {
+  changeMethodText: {
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.primary,
   },
 
-  // ── Change method ──────────────────────────────────────────────
-  changeMethodBtn: {
+  // Trust footer
+  trustRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
-    marginBottom: 12,
-  },
-  changeMethodText: {
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textTertiary,
-    textDecorationLine: 'underline',
-  },
-
-  // ── Trust card ─────────────────────────────────────────────────
-  trustCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: Colors.primarySubtle,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.2)',
+    gap: Spacing.xs + 2,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.xs,
   },
   trustText: {
-    flex: 1,
-    fontSize: 11,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textSecondary,
-    lineHeight: 16,
-  },
-
-  // ── Error ──────────────────────────────────────────────────────
-  errorText: {
+    flexShrink: 1,
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,
-    color: Colors.danger,
+    color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: Spacing.sm,
   },
 
-  // ── Success ────────────────────────────────────────────────────
+  // Success
   successWrap: {
     alignItems: 'center',
-    paddingVertical: 28,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
   },
   successRing: {
-    padding: 7,
-    borderRadius: 44,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.successSubtle,
-    marginBottom: 18,
+    marginBottom: Spacing.md,
     shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   successCircle: {
     width: 64,
@@ -1077,18 +894,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   successTitle: {
-    fontSize: Typography.size.h2,
+    fontSize: Typography.size.h3,
+    lineHeight: Typography.lineHeight.h3,
     fontFamily: Typography.fontFamilyBold,
     color: Colors.textPrimary,
-    letterSpacing: -0.4,
-    marginBottom: 8,
+    letterSpacing: Typography.letterSpacing.tight,
+    marginBottom: Spacing.xs + 2,
   },
   successSub: {
     fontSize: Typography.size.small,
+    lineHeight: Typography.lineHeight.small,
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 24,
   },
 });

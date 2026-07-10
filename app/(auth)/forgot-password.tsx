@@ -1,22 +1,23 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { OTPInput } from '@/components/auth/OTPInput';
+import { OtpCodeField } from '@/components/ui/OtpCodeField';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import api from '@/services/api';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/utils/haptics';
 
 type Step = 'request' | 'verify' | 'reset' | 'success';
 
@@ -98,7 +99,7 @@ export default function ForgotPasswordScreen() {
   const handleRequestOtp = async (data: EmailForm) => {
     setLoading(true);
     setFormError('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     try {
       await api.post('/auth/forgot-password', { email: data.email });
       setEmail(data.email);
@@ -117,7 +118,7 @@ export default function ForgotPasswordScreen() {
     }
     setLoading(true);
     setOtpError('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.light();
     try {
       await api.post('/auth/verify-otp', { email, otp });
       setStep('reset');
@@ -135,7 +136,7 @@ export default function ForgotPasswordScreen() {
   const handleResetPassword = async (data: ResetForm) => {
     setLoading(true);
     setFormError('');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptics.success();
     try {
       await api.post('/auth/reset-password', { email, newPassword: data.newPassword });
       setStep('success');
@@ -156,13 +157,13 @@ export default function ForgotPasswordScreen() {
     >
       <View style={styles.inner}>
         {step !== 'success' ? (
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={() => (step === 'request' ? router.back() : setStep('request'))}
             style={styles.backButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
         ) : null}
 
         <AuthHeader headline={headline} description={description} />
@@ -202,13 +203,14 @@ export default function ForgotPasswordScreen() {
         {/* ── Step 2: Verify OTP ── */}
         {step === 'verify' && (
           <>
-            <OTPInput
+            <OtpCodeField
               value={otp}
               onChange={(v) => {
                 setOtp(v);
                 if (otpError) setOtpError('');
               }}
               error={otpError}
+              style={{ marginBottom: Spacing.md }}
             />
             {formError ? <InlineError message={formError} /> : null}
             {verifyCooldown > 0 && (
@@ -224,7 +226,7 @@ export default function ForgotPasswordScreen() {
               size="lg"
               disabled={otp.length < 6 || verifyCooldown > 0}
             />
-            <TouchableOpacity
+            <AnimatedPressable
               onPress={() => {
                 setOtp('');
                 setOtpError('');
@@ -233,7 +235,7 @@ export default function ForgotPasswordScreen() {
               style={styles.secondaryLink}
             >
               <Text style={styles.secondaryLinkText}>Wrong email? Go back</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           </>
         )}
 

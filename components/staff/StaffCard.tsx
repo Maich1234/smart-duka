@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -50,7 +51,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
   const role = deriveRole(staff.permissions);
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <AnimatedPressable style={styles.card} onPress={onPress}>
       <View style={[styles.avatar, { backgroundColor: colors.bg }]}>
         <Text style={[styles.avatarText, { color: colors.text }]}>{initials(staff.name)}</Text>
       </View>
@@ -71,7 +72,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
       </View>
 
       <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 };
 

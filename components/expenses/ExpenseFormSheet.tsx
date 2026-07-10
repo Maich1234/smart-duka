@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
@@ -66,15 +67,14 @@ export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
         {CATEGORY_OPTIONS.map((opt) => {
           const active = category === opt.value;
           return (
-            <TouchableOpacity
+            <AnimatedPressable
               key={opt.value}
               style={[styles.categoryChip, active && styles.categoryChipActive]}
               onPress={() => setCategory(opt.value)}
-              activeOpacity={0.8}
             >
               <Ionicons name={opt.icon} size={16} color={active ? Colors.white : Colors.textSecondary} />
               <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>{opt.label}</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           );
         })}
       </ScrollView>
@@ -83,10 +83,10 @@ export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
       <Input label="Description (optional)" value={description} onChangeText={setDescription} placeholder="What was this for?" />
 
       <Text style={styles.sectionLabel}>Date</Text>
-      <TouchableOpacity style={styles.dateRow} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+      <AnimatedPressable style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
         <Ionicons name="calendar-outline" size={18} color={Colors.textSecondary} />
         <Text style={styles.dateText}>{formatDate(date)}</Text>
-      </TouchableOpacity>
+      </AnimatedPressable>
       {showDatePicker && (
         <DatePicker
           value={date}

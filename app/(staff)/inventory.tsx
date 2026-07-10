@@ -2,7 +2,7 @@ import React from 'react';
 import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery } from '@tanstack/react-query';
 import { getProducts } from '@/services/products';
 import { InventoryHeader } from '@/components/inventory/InventoryHeader';

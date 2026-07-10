@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -58,7 +59,7 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove })
       <View style={styles.controls}>
         <Text style={styles.quantity}>{quantityLabel}</Text>
         <Text style={styles.subtotal}>{formatCurrency(subtotal)}</Text>
-        <TouchableOpacity
+        <AnimatedPressable
           onPress={onRemove}
           style={styles.removeBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -66,7 +67,7 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove })
           accessibilityRole="button"
         >
           <Ionicons name="trash-outline" size={20} color={Colors.danger} />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </Animated.View>
   );

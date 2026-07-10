@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { CrossfadeCircle } from '@/components/ui/motion';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getStaff } from '@/services/staff';
 import { StaffCard } from '@/components/staff/StaffCard';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
@@ -66,8 +68,8 @@ export default function OwnerStaffList() {
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}
         >
-          <View style={styles.heroDecorCircle} />
-          <View style={styles.heroDecorCircleSmall} />
+          <CrossfadeCircle phase="in" style={styles.heroDecorCircle} />
+          <CrossfadeCircle phase="out" style={styles.heroDecorCircleSmall} />
 
           <View style={styles.heroTop}>
             <View style={styles.heroLeft}>
@@ -121,13 +123,13 @@ export default function OwnerStaffList() {
       {/* Pagination */}
       {totalPages > 1 && (
         <View style={styles.paginationBar}>
-          <TouchableOpacity onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}>
+          <AnimatedPressable onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}>
             <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
           <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-          <TouchableOpacity onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}>
+          <AnimatedPressable onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}>
             <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
       )}
 
@@ -154,14 +156,13 @@ export default function OwnerStaffList() {
           <Text style={styles.title}>Staff</Text>
           <Text style={styles.subtitle}>Manage your team and their access</Text>
         </View>
-        <TouchableOpacity
+        <AnimatedPressable
           style={styles.addBtn}
-          activeOpacity={0.8}
           onPress={() => router.push('/(owner)/staff/new')}
         >
           <Ionicons name="add" size={20} color="#FFFFFF" />
           <Text style={styles.addBtnText}>Add Staff</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
 
       <ContextualSearchBar

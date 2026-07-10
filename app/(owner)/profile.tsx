@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  TouchableOpacity,
   Switch,
   RefreshControl,
   ScrollView,
@@ -14,8 +14,8 @@ import {
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -478,10 +478,9 @@ export default function OwnerProfile() {
         <SectionLabel label="HELP & LEARNING" />
         <Animated.View entering={FadeInUp.duration(360).delay(160)} style={styles.helpRow}>
           {HELP_ITEMS.map((item) => (
-            <TouchableOpacity
+            <AnimatedPressable
               key={item.label}
               style={styles.helpCard}
-              activeOpacity={0.72}
               onPress={() => openHelp(item.slug)}
             >
               <View style={styles.helpIconWrap}>
@@ -489,13 +488,13 @@ export default function OwnerProfile() {
               </View>
               <Text style={styles.helpLabel}>{item.label}</Text>
               <Text style={styles.helpSub}>{item.sub}</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           ))}
         </Animated.View>
 
         {/* ── SIGN OUT ──────────────────────────────────────────────────── */}
         <Animated.View entering={FadeIn.duration(300).delay(180)} style={styles.signOutWrap}>
-          <TouchableOpacity style={styles.signOutBtn} onPress={handleLogout} activeOpacity={0.78}>
+          <AnimatedPressable style={styles.signOutBtn} onPress={handleLogout}>
             <View style={styles.signOutLeft}>
               <View style={styles.signOutIconWrap}>
                 <Ionicons name="log-out-outline" size={17} color={Colors.danger} />
@@ -503,7 +502,7 @@ export default function OwnerProfile() {
               <Text style={styles.signOutText}>Sign out of Smart Duka</Text>
             </View>
             <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
         </Animated.View>
 
       </ScrollView>

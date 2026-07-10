@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { OTPInput } from '@/components/auth/OTPInput';
+import { OtpCodeField } from '@/components/ui/OtpCodeField';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { verifyEmail, resendVerificationEmail } from '@/services/auth';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/utils/haptics';
 
 const RESEND_SECONDS = 60;
 
@@ -54,10 +55,10 @@ export default function VerifyEmailScreen() {
     setFormError('');
     try {
       await verifyEmail(email, code);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       router.replace({ pathname: '/(auth)/login', params: { email, verified: '1' } });
     } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      haptics.error();
       const attempts = verifyAttempts + 1;
       setVerifyAttempts(attempts);
       if (attempts >= 5) setVerifyCooldown(30);
@@ -112,13 +113,14 @@ export default function VerifyEmailScreen() {
           </Text>
         </View>
 
-        <OTPInput
+        <OtpCodeField
           value={code}
           onChange={(v) => {
             setCode(v);
             if (codeError) setCodeError('');
           }}
           error={codeError}
+          style={{ marginBottom: Spacing.md }}
         />
 
         {formError ? (
@@ -146,7 +148,7 @@ export default function VerifyEmailScreen() {
         <View style={styles.resendRow}>
           <Text style={styles.resendPrompt}>Didn't get the code?</Text>
           {canResend ? (
-            <TouchableOpacity
+            <AnimatedPressable
               onPress={handleResend}
               disabled={resending}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -154,7 +156,7 @@ export default function VerifyEmailScreen() {
               <Text style={styles.resendLink}>
                 {resending ? 'Sending…' : 'Resend code'}
               </Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           ) : (
             <Text style={styles.resendCountdown}>
               Resend in {countdown}s

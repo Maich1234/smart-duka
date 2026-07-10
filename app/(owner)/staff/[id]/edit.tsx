@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getStaffById, updateStaff, updateStaffPermissions } from '@/services/staff';
 import { Input } from '@/components/ui/Input';
@@ -103,7 +104,7 @@ export default function EditStaffScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>ACCESS</Text>
-          <TouchableOpacity style={styles.permissionsRow} onPress={() => router.push('/(owner)/staff/permissions')} activeOpacity={0.7}>
+          <AnimatedPressable style={styles.permissionsRow} onPress={() => router.push('/(owner)/staff/permissions')}>
             <View style={styles.permissionsIcon}>
               <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} />
             </View>
@@ -112,7 +113,7 @@ export default function EditStaffScreen() {
               <Text style={styles.permissionsCount}>{permissions.length} permission{permissions.length !== 1 ? 's' : ''} selected</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={Colors.textTertiary} />
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
 
         <Button title="Save Changes" onPress={handleSave} loading={saveMutation.isPending} style={styles.button} />

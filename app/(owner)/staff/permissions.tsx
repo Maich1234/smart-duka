@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { getAllPermissions, type Permission } from '@/services/staff';
 import { Button } from '@/components/ui/Button';
@@ -54,11 +55,10 @@ export default function StaffPermissionsScreen() {
             {perms.map((perm) => {
               const isSelected = selected.includes(perm.value);
               return (
-                <TouchableOpacity
+                <AnimatedPressable
                   key={perm.value}
                   style={styles.permissionRow}
                   onPress={() => toggle(perm.value)}
-                  activeOpacity={0.7}
                 >
                   <Ionicons
                     name={isSelected ? 'checkbox' : 'square-outline'}
@@ -66,7 +66,7 @@ export default function StaffPermissionsScreen() {
                     color={isSelected ? Colors.primary : Colors.textSecondary}
                   />
                   <Text style={styles.permissionLabel}>{perm.label}</Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
               );
             })}
           </View>

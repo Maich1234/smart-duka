@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Colors } from '@/constants/Colors';

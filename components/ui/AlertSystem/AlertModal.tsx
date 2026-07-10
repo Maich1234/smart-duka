@@ -16,8 +16,9 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { haptics } from '@/utils/haptics';
 import { AnimatedPressable } from '../AnimatedPressable';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -228,13 +229,13 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
 
       // Haptics
       if (config.type === 'error') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        haptics.error();
       } else if (config.type === 'success') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        haptics.success();
       } else if (config.type === 'warning') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        haptics.warning();
       } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        haptics.medium();
       }
 
       // Auto-dismiss
@@ -293,6 +294,8 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
       accessibilityViewIsModal
       onRequestClose={canDismissOnOverlay ? handleDismiss : undefined}
     >
+      {/* RNGH pressables inside a RN Modal need their own gesture root on Android */}
+      <GestureHandlerRootView style={styles.gestureRoot}>
       {/* Overlay */}
       <Animated.View style={[StyleSheet.absoluteFill, styles.overlay, overlayAnim]}>
         <Pressable
@@ -337,11 +340,15 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
           </View>
         </Animated.View>
       </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
   overlay: {
     backgroundColor: Colors.overlay,
   },

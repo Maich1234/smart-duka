@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
+import { AnimatedPressable } from './AnimatedPressable';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { onQueueCountChange, onSyncStateChange, getPendingCount } from '@/utils/offlineQueue';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -163,13 +164,13 @@ export const OfflineIndicator: React.FC = () => {
 
         {/* Close button — lets user dismiss the toast early */}
         {phase !== 'done' && (
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={() => setPhase('hidden')}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={styles.close}
           >
             <Ionicons name="close" size={14} color="rgba(255,255,255,0.75)" />
-          </TouchableOpacity>
+          </AnimatedPressable>
         )}
       </View>
     </Animated.View>

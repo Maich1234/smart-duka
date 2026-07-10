@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { haptics } from '@/utils/haptics';
 import { AnimatedPressable } from './AnimatedPressable';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -39,7 +39,7 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const handlePress = () => {
     if (haptic && !disabled && !loading) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      haptics.light();
     }
     onPress();
   };

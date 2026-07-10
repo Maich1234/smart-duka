@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import { router } from 'expo-router';
+import axios from 'axios';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/store/authStore';
 import { login as loginApi, getProfile } from '@/services/auth';
+import { API_BASE_URL } from '@/constants/config';
 import { clearAll } from '@/utils/storage';
 import {
   registerDeviceForNotifications,
@@ -48,9 +50,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             registerDeviceForNotifications();
           }
         }
-      } catch {
-        await clearAll();
-        storeLogout();
+      } catch (error: any) {
+        // Only clear the session when the server explicitly rejected it.
+        // A network failure here just means the app started offline — the
+        // cached session must survive, or offline-first is dead on arrival
+        // (the login screen can't authenticate without a connection).
+        if (error?.response?.status === 401) {
+          await clearAll();
+          storeLogout();
+        }
       } finally {
         setLoading(false);
       }
@@ -63,8 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const response = await loginApi(email, password);
       if (response.success) {
-        const { token, ...userData } = response.data;
-        setAuth(userData, token);
+        const { token, refreshToken, ...userData } = response.data;
+        setAuth(userData, token, refreshToken);
         // Only owners receive sales-anomaly/low-stock pushes — skip the
         // permission prompt for staff, who'd never get a notification.
         // Also respect a previously-saved "notifications off" preference.
@@ -86,6 +94,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logoutInProgress = true;
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      // Best-effort server-side revocation of the refresh token (raw axios:
+      // must not be queued offline, and needs no auth header). Fire and
+      // forget — logout must never hang on a dead connection.
+      const { refreshToken } = useAuthStore.getState();
+      if (refreshToken) {
+        axios
+          .post(`${API_BASE_URL}/auth/logout`, { refreshToken }, { timeout: 5000 })
+          .catch(() => {});
+      }
       // Must run before clearAll/storeLogout — it needs the still-valid auth token.
       await unregisterDeviceFromNotifications();
       await clearAll();

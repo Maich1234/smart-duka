@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { View, Text, StyleSheet, RefreshControl } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { ScrollView } from 'react-native-gesture-handler';
+import { ScreenFade } from '@/components/ui/motion';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getStaffDashboard } from '@/services/dashboard';
@@ -15,7 +17,6 @@ import { ListRow } from '@/components/ui/ListRow';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { Motion } from '@/constants/Motion';
 
 export default function StaffDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
@@ -32,24 +33,24 @@ export default function StaffDashboard() {
 
   if (isError) {
     return (
-      <Animated.View entering={FadeIn.duration(300)} style={styles.errorCenter}>
+      <ScreenFade rise={0} style={styles.errorCenter}>
         <Ionicons name="cloud-offline-outline" size={48} color="#94A3B8" />
         <Text style={styles.errorTitle}>Could not load dashboard</Text>
         <Text style={styles.errorSub}>Check your connection and try again.</Text>
-        <TouchableOpacity onPress={() => refetch()} style={styles.retryBtn} activeOpacity={0.8}>
+        <AnimatedPressable onPress={() => refetch()} style={styles.retryBtn}>
           <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
           <Text style={styles.retryBtnText}>Retry</Text>
-        </TouchableOpacity>
-      </Animated.View>
+        </AnimatedPressable>
+      </ScreenFade>
     );
   }
 
   const dashboard = data?.data;
 
   return (
-    <Animated.ScrollView
-      entering={FadeIn.duration(Motion.duration.slow)}
-      style={styles.container}
+    <ScreenFade style={styles.container}>
+    <ScrollView
+      style={styles.flex}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
@@ -80,12 +81,14 @@ export default function StaffDashboard() {
       )}
 
       <RecentTransactions transactions={dashboard?.recentSales || []} showStaff={false} />
-    </Animated.ScrollView>
+    </ScrollView>
+    </ScreenFade>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  flex: { flex: 1 },
   header: { padding: Spacing.lg, paddingBottom: Spacing.sm },
   greeting: { fontSize: Typography.size.body, color: Colors.textSecondary },
   name: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },

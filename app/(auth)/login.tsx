@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Pressable,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
@@ -11,7 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '@/context/AuthContext';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -43,7 +43,7 @@ export default function LoginScreen() {
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: prefillEmail || '' },
+    defaultValues: { email: prefillEmail || '', password: '' },
   });
 
   const onSubmit = async (data: LoginForm) => {
@@ -124,13 +124,13 @@ export default function LoginScreen() {
           )}
         />
 
-        <TouchableOpacity
+        <AnimatedPressable
           onPress={() => router.push('/(auth)/forgot-password')}
           style={styles.forgotLink}
           hitSlop={{ top: 8, bottom: 8 }}
         >
           <Text style={styles.forgotText}>Forgot password?</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
         <Button
           title="Sign In"

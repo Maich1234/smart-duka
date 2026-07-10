@@ -1,9 +1,14 @@
 import React from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
-  ScrollView, View, Text, StyleSheet, TouchableOpacity,
-  Switch, TextInput,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  Switch,
+  TextInput,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SelectPicker, type PickerOption } from '../ui/SelectPicker';
@@ -153,7 +158,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     <View style={styles.wrapper}>
       {/* Custom header */}
       <View style={styles.header}>
-        <TouchableOpacity
+        <AnimatedPressable
           style={styles.backBtn}
           onPress={onCancel}
           hitSlop={HIT_SLOP}
@@ -161,7 +166,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
-        </TouchableOpacity>
+        </AnimatedPressable>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>{isEditing ? 'Edit Product' : 'Add Product'}</Text>
           <Text style={styles.headerSub} numberOfLines={1}>
@@ -185,11 +190,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           {TYPE_OPTIONS.map((opt) => {
             const active = form.productType === opt.value;
             return (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={opt.value}
                 style={[styles.typeCard, active && styles.typeCardActive]}
                 onPress={() => update({ productType: opt.value })}
-                activeOpacity={0.75}
               >
                 {active && (
                   <View style={styles.typeCardCheck}>
@@ -203,7 +207,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   {opt.label}
                 </Text>
                 <Text style={styles.typeCardSub} numberOfLines={1}>{opt.sub}</Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             );
           })}
         </View>
@@ -383,12 +387,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <View style={styles.stepperInner}>
                       <Text style={styles.stepperValue}>{form.quantity || '0'}</Text>
                       <View style={styles.stepperBtns}>
-                        <TouchableOpacity style={styles.stepperBtn} onPress={() => stepQuantity(1)} hitSlop={HIT_SLOP}>
+                        <AnimatedPressable style={styles.stepperBtn} onPress={() => stepQuantity(1)} hitSlop={HIT_SLOP}>
                           <Ionicons name="chevron-up" size={15} color={Colors.textSecondary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.stepperBtn} onPress={() => stepQuantity(-1)} hitSlop={HIT_SLOP}>
+                        </AnimatedPressable>
+                        <AnimatedPressable style={styles.stepperBtn} onPress={() => stepQuantity(-1)} hitSlop={HIT_SLOP}>
                           <Ionicons name="chevron-down" size={15} color={Colors.textSecondary} />
-                        </TouchableOpacity>
+                        </AnimatedPressable>
                       </View>
                     </View>
                   </View>
@@ -399,12 +403,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <View style={styles.stepperInner}>
                       <Text style={styles.stepperValue}>{form.lowStockAlert || '5'}</Text>
                       <View style={styles.stepperBtns}>
-                        <TouchableOpacity style={styles.stepperBtn} onPress={() => stepLowStock(1)} hitSlop={HIT_SLOP}>
+                        <AnimatedPressable style={styles.stepperBtn} onPress={() => stepLowStock(1)} hitSlop={HIT_SLOP}>
                           <Ionicons name="chevron-up" size={15} color={Colors.textSecondary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.stepperBtn} onPress={() => stepLowStock(-1)} hitSlop={HIT_SLOP}>
+                        </AnimatedPressable>
+                        <AnimatedPressable style={styles.stepperBtn} onPress={() => stepLowStock(-1)} hitSlop={HIT_SLOP}>
                           <Ionicons name="chevron-down" size={15} color={Colors.textSecondary} />
-                        </TouchableOpacity>
+                        </AnimatedPressable>
                       </View>
                     </View>
                   </View>
@@ -440,7 +444,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <View key={i} style={styles.bundleRow}>
                   <View style={styles.bundlePicker}>
                     {availableProducts.map((p) => (
-                      <TouchableOpacity
+                      <AnimatedPressable
                         key={p._id}
                         style={[styles.unitChip, item.product === p._id && styles.unitChipActive]}
                         onPress={() => updateBundleItem(i, { product: p._id })}
@@ -451,7 +455,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         >
                           {p.name}
                         </Text>
-                      </TouchableOpacity>
+                      </AnimatedPressable>
                     ))}
                   </View>
                   <View style={styles.qtyInput}>
@@ -461,7 +465,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       keyboardType="numeric"
                     />
                   </View>
-                  <TouchableOpacity
+                  <AnimatedPressable
                     onPress={() => removeBundleItem(i)}
                     style={styles.removeBtn}
                     hitSlop={HIT_SLOP}
@@ -469,7 +473,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     accessibilityRole="button"
                   >
                     <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                  </TouchableOpacity>
+                  </AnimatedPressable>
                 </View>
               ))}
               <Button
@@ -503,7 +507,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         onChangeText={(t) => updateVariant(i, { name: t })}
                       />
                     </View>
-                    <TouchableOpacity
+                    <AnimatedPressable
                       onPress={() => removeVariant(i)}
                       style={styles.removeBtn}
                       hitSlop={HIT_SLOP}
@@ -511,7 +515,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       accessibilityRole="button"
                     >
                       <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                    </TouchableOpacity>
+                    </AnimatedPressable>
                   </View>
                   <View style={styles.row}>
                     <View style={styles.flexInput}>
@@ -577,7 +581,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         onChangeText={(t) => updatePromotion(i, { label: t })}
                       />
                     </View>
-                    <TouchableOpacity
+                    <AnimatedPressable
                       onPress={() => removePromotion(i)}
                       style={styles.removeBtn}
                       hitSlop={HIT_SLOP}
@@ -585,7 +589,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       accessibilityRole="button"
                     >
                       <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                    </TouchableOpacity>
+                    </AnimatedPressable>
                   </View>
                   <View style={styles.row}>
                     <View style={styles.flexInput}>
@@ -609,13 +613,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               ))}
 
               {form.hasPromotions && (
-                <TouchableOpacity style={styles.addPromoDashed} onPress={addPromotion} activeOpacity={0.7}>
+                <AnimatedPressable style={styles.addPromoDashed} onPress={addPromotion}>
                   <Ionicons name="add" size={18} color={Colors.primary} />
                   <View>
                     <Text style={styles.addPromoTitle}>Add Promotion</Text>
                     <Text style={styles.addPromoSub}>Add promotional offers or discounts</Text>
                   </View>
-                </TouchableOpacity>
+                </AnimatedPressable>
               )}
             </View>
           </>

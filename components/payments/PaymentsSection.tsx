@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -316,7 +317,7 @@ const CredentialRow: React.FC<{ label: string; isSet: boolean; maskedValue: stri
           <Text style={styles.credMasked} selectable>
             {revealed ? (maskedValue ?? '••••••••••••••••') : '••••••••••••••••'}
           </Text>
-          <TouchableOpacity
+          <AnimatedPressable
             style={styles.revealBtn}
             onPress={() => setRevealed((v) => !v)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -326,7 +327,7 @@ const CredentialRow: React.FC<{ label: string; isSet: boolean; maskedValue: stri
               size={14}
               color={Colors.textTertiary}
             />
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
       )}
     </View>

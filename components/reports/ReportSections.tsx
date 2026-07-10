@@ -5,15 +5,15 @@
  * primitives so the visual hierarchy can be fully bespoke.
  */
 import React from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import Svg, { Rect, Text as SvgText, Line as SvgLine } from 'react-native-svg';
@@ -360,10 +360,9 @@ export function QuickShortcuts() {
         contentContainerStyle={qs.scroll}
       >
         {SHORTCUTS.map((s) => (
-          <TouchableOpacity
+          <AnimatedPressable
             key={s.id}
             onPress={() => router.push(s.route as never)}
-            activeOpacity={0.82}
           >
             <LinearGradient
               colors={s.colors}
@@ -377,7 +376,7 @@ export function QuickShortcuts() {
               <Text style={qs.label}>{s.label}</Text>
               <Text style={qs.sub}>{s.sub}</Text>
             </LinearGradient>
-          </TouchableOpacity>
+          </AnimatedPressable>
         ))}
       </ScrollView>
     </Animated.View>
@@ -1257,7 +1256,7 @@ const rb = StyleSheet.create({
     position: 'relative',
   },
   barBg: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.primarySubtle,
     borderRadius: 3,
   },

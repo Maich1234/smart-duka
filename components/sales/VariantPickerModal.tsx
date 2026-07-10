@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -65,7 +66,7 @@ export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
           const active = v._id === selectedId;
           const outOfStock = v.quantity === 0;
           return (
-            <TouchableOpacity
+            <AnimatedPressable
               key={v._id}
               style={[styles.chip, active && styles.chipActive, outOfStock && styles.chipDisabled]}
               onPress={() => !outOfStock && setSelectedId(v._id)}
@@ -75,7 +76,7 @@ export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
               <Text style={[styles.chipPrice, active && styles.chipTextActive]}>
                 {formatCurrency(v.sellingPrice)}{outOfStock ? ' · Out of stock' : ''}
               </Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           );
         })}
       </View>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Colors } from '@/constants/Colors';
@@ -81,10 +82,9 @@ export const MpesaConfigForm: React.FC<Props> = ({
       <View style={styles.fieldGroup}>
         <Text style={styles.fieldLabel}>Environment</Text>
         <View style={styles.envRow}>
-          <TouchableOpacity
+          <AnimatedPressable
             style={[styles.envBtn, environment === 'sandbox' && styles.envBtnActive]}
             onPress={() => setEnvironment('sandbox')}
-            activeOpacity={0.75}
           >
             <Ionicons
               name="code-slash-outline"
@@ -94,11 +94,10 @@ export const MpesaConfigForm: React.FC<Props> = ({
             <Text style={[styles.envBtnText, environment === 'sandbox' && styles.envBtnTextActive]}>
               Sandbox
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </AnimatedPressable>
+          <AnimatedPressable
             style={[styles.envBtn, environment === 'production' && styles.envBtnActive]}
             onPress={() => setEnvironment('production')}
-            activeOpacity={0.75}
           >
             <Ionicons
               name="globe-outline"
@@ -108,7 +107,7 @@ export const MpesaConfigForm: React.FC<Props> = ({
             <Text style={[styles.envBtnText, environment === 'production' && styles.envBtnTextActive]}>
               Production
             </Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
         {environment === 'sandbox' && (
           <View style={styles.envNote}>

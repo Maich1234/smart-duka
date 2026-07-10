@@ -1,11 +1,26 @@
 import React from 'react';
-import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { createAnimatedPressable, type CustomPressableProps } from 'pressto';
 import { Motion } from '@/constants/Motion';
 
-const AnimatedPressableBase = Animated.createAnimatedComponent(Pressable);
+type PressMeta = { pressScale?: number };
 
-interface AnimatedPressableProps extends Omit<PressableProps, 'style'> {
+/**
+ * pressto-powered scale pressable — the press animation runs entirely on the
+ * UI thread (gesture-driven, spring physics from the root PressablesConfig),
+ * so cancelled presses restore smoothly and taps react on the same frame even
+ * while JS is busy with API calls.
+ */
+const ScalePressable = createAnimatedPressable<PressMeta>((progress, { metadata }) => {
+  'worklet';
+  const target = metadata?.pressScale ?? Motion.press.scale;
+  return {
+    transform: [{ scale: 1 + (target - 1) * progress }],
+  };
+});
+
+export interface AnimatedPressableProps
+  extends Omit<CustomPressableProps<PressMeta>, 'metadata'> {
   style?: StyleProp<ViewStyle>;
   /** Scale applied on press-in; defaults to a subtle, consistent dip. */
   pressScale?: number;
@@ -17,35 +32,6 @@ interface AnimatedPressableProps extends Omit<PressableProps, 'style'> {
  * opacity/feedback. Disabled elements get no animation.
  */
 export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
-  style,
   pressScale = Motion.press.scale,
-  onPressIn,
-  onPressOut,
-  disabled,
-  children,
   ...props
-}) => {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <AnimatedPressableBase
-      disabled={disabled}
-      onPressIn={(e) => {
-        if (!disabled) scale.value = withTiming(pressScale, { duration: Motion.duration.fast });
-        onPressIn?.(e);
-      }}
-      onPressOut={(e) => {
-        scale.value = withTiming(1, { duration: Motion.duration.fast });
-        onPressOut?.(e);
-      }}
-      style={[style, animatedStyle]}
-      {...props}
-    >
-      {children}
-    </AnimatedPressableBase>
-  );
-};
+}) => <ScalePressable metadata={{ pressScale }} {...props} />;

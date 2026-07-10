@@ -1,3 +1,4 @@
+import React from 'react';
 import { Stack } from 'expo-router';
 
 // Native fallback for app/help/_layout.web.tsx — the Help Center only has

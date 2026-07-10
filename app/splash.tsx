@@ -89,18 +89,22 @@ function FloatingNode({
       -1,
       true
     );
+    // Fade in, then settle into a slow shimmer. Composed declaratively — chaining the
+    // repeat from a withTiming callback recurses infinitely on web when the OS has
+    // reduced motion enabled (animations complete synchronously → stack overflow).
     opacity.value = withDelay(
       300,
-      withTiming(1, { duration: 1200 }, () => {
-        opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1200 }),
+        withRepeat(
           withSequence(
             withTiming(0.35, { duration: duration * 0.8, easing: Easing.inOut(Easing.ease) }),
             withTiming(0.15, { duration: duration * 0.8, easing: Easing.inOut(Easing.ease) })
           ),
           -1,
           true
-        );
-      })
+        )
+      )
     );
   }, []);
 

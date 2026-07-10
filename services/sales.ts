@@ -32,6 +32,10 @@ export interface Sale {
   // M-Pesa fields (populated for mpesa payment method)
   mpesaTransactionId?: string;
   mpesaReceiptNumber?: string;
+  /** 'voided' sales stay in history but are excluded from all revenue stats */
+  status?: 'completed' | 'voided';
+  voidedAt?: string;
+  voidReason?: string;
 }
 
 export interface CreateSaleData {
@@ -104,10 +108,22 @@ export const getSales = async (params?: {
   endDate?: string;
   staffId?: string;
   paymentMethod?: 'cash' | 'mpesa' | 'card';
+  /** Server-side search across invoice number and cashier name */
+  search?: string;
   page?: number;
   limit?: number;
 }): Promise<SalesResponse> => {
   const response = await api.get('/sales', { params });
+  return response.data;
+};
+
+/**
+ * Void a mis-recorded sale: restores the stock it deducted and removes it
+ * from all revenue stats (it stays in history with a voided badge).
+ * Owner, or staff with the 'void_sale' permission.
+ */
+export const voidSale = async (id: string, reason?: string): Promise<SaleResponse> => {
+  const response = await api.post(`/sales/${id}/void`, reason ? { reason } : {});
   return response.data;
 };
 

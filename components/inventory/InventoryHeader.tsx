@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -65,16 +66,15 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
           )}
 
           {showAddButton && (
-            <TouchableOpacity
+            <AnimatedPressable
               onPress={onAddPress}
               style={styles.addButton}
-              activeOpacity={0.82}
               accessibilityLabel="Add product"
               accessibilityRole="button"
             >
               <Ionicons name="add" size={20} color={Colors.white} />
               <Text style={styles.addButtonText}>Add</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           )}
         </View>
       </View>

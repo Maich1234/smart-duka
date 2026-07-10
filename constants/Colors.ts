@@ -9,6 +9,7 @@ export const Colors = {
   accentLight: '#E0AC4C',
   accentSubtle: '#FBF1DD',
   success: '#15803D',
+  successLight: '#22C55E',
   successSubtle: '#E6F4EA',
   warning: '#F59E0B',
   warningSubtle: '#FEF3C7',

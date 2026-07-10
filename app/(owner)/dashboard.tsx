@@ -1,20 +1,21 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
   RefreshControl,
-  TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { ScreenFade, CrossfadeCircle } from '@/components/ui/motion';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { getOwnerDashboard } from '@/services/dashboard';
 import { SalesSummaryCard } from '@/components/dashboard/SalesSummaryCard';
@@ -136,23 +137,23 @@ export default function OwnerDashboard() {
 
   if (isLoading) {
     return (
-      <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
+      <ScreenFade rise={0} style={styles.container}>
         <DashboardSkeleton />
-      </Animated.View>
+      </ScreenFade>
     );
   }
 
   if (isError) {
     return (
-      <Animated.View entering={FadeIn.duration(300)} style={[styles.container, styles.errorCenter]}>
+      <ScreenFade rise={0} style={[styles.container, styles.errorCenter]}>
         <Ionicons name="cloud-offline-outline" size={48} color="#94A3B8" />
         <Text style={styles.errorTitle}>Could not load dashboard</Text>
         <Text style={styles.errorSub}>Check your connection and try again.</Text>
-        <TouchableOpacity onPress={() => refetch()} style={styles.retryBtn} activeOpacity={0.8}>
+        <AnimatedPressable onPress={() => refetch()} style={styles.retryBtn}>
           <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
           <Text style={styles.retryBtnText}>Retry</Text>
-        </TouchableOpacity>
-      </Animated.View>
+        </AnimatedPressable>
+      </ScreenFade>
     );
   }
 
@@ -161,8 +162,8 @@ export default function OwnerDashboard() {
   return (
     <>
       <StatusBar style="dark" />
+      <ScreenFade style={styles.flex}>
       <Animated.ScrollView
-        entering={FadeIn.duration(400)}
         style={styles.container}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl }}
@@ -194,9 +195,8 @@ export default function OwnerDashboard() {
               </View>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity
+              <AnimatedPressable
                 style={styles.notifButton}
-                activeOpacity={0.75}
                 onPress={() => router.push('/(owner)/inventory')}
                 accessibilityRole="button"
                 accessibilityLabel="View low stock alerts in inventory"
@@ -205,10 +205,9 @@ export default function OwnerDashboard() {
                 {(dashboard?.lowStockItems?.length ?? 0) > 0 && (
                   <View style={styles.notifDot} />
                 )}
-              </TouchableOpacity>
-              <TouchableOpacity
+              </AnimatedPressable>
+              <AnimatedPressable
                 style={styles.avatarButton}
-                activeOpacity={0.8}
                 onPress={() => router.push('/(owner)/profile')}
                 accessibilityRole="button"
                 accessibilityLabel="Open profile"
@@ -219,7 +218,7 @@ export default function OwnerDashboard() {
                 >
                   <Text style={styles.avatarInitials}>{shopInitials}</Text>
                 </LinearGradient>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
           </View>
         </LinearGradient>
@@ -243,8 +242,7 @@ export default function OwnerDashboard() {
               entering={FadeInUp.duration(380).delay(220 + index * 60)}
               style={styles.actionWrapper}
             >
-              <TouchableOpacity
-                activeOpacity={0.82}
+              <AnimatedPressable
                 onPress={() => router.push(action.route as Parameters<typeof router.push>[0])}
                 style={styles.actionCard}
                 accessibilityRole="button"
@@ -256,14 +254,18 @@ export default function OwnerDashboard() {
                   end={{ x: 1, y: 1 }}
                   style={styles.actionGradient}
                 >
-                  <View style={styles.actionDecorCircle} />
+                  <CrossfadeCircle
+                    phase={index % 2 === 0 ? 'in' : 'out'}
+                    duration={5200}
+                    style={styles.actionDecorCircle}
+                  />
                   <View style={styles.actionIconWrap}>
                     <Ionicons name={action.icon} size={22} color="#FFFFFF" />
                   </View>
                   <Text style={styles.actionTitle}>{action.title}</Text>
                   <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
                 </LinearGradient>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </Animated.View>
           ))}
         </View>
@@ -285,6 +287,7 @@ export default function OwnerDashboard() {
         showStaff
       />
       </Animated.ScrollView>
+      </ScreenFade>
     </>
   );
 }
@@ -292,6 +295,9 @@ export default function OwnerDashboard() {
 const ACTION_CARD_WIDTH = (SCREEN_WIDTH - Spacing.lg * 2 - 12) / 2;
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',

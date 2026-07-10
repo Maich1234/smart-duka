@@ -9,7 +9,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { CrossfadeCircle } from '@/components/ui/motion';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { formatCurrency } from '@/utils/formatters';
@@ -79,9 +80,9 @@ export const SalesSummaryCard: React.FC<SalesSummaryCardProps> = ({
         end={{ x: 1.0, y: 1.0 }}
         style={styles.card}
       >
-        {/* Decorative circles */}
-        <View style={styles.decorCircleLarge} />
-        <View style={styles.decorCircleSmall} />
+        {/* Decorative circles — breathe in opposite phase so they crossfade */}
+        <CrossfadeCircle phase="in" style={styles.decorCircleLarge} />
+        <CrossfadeCircle phase="out" style={styles.decorCircleSmall} />
 
         {/* Header row */}
         <View style={styles.headerRow}>

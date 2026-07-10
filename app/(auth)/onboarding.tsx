@@ -1,15 +1,15 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   Dimensions,
-  TouchableOpacity,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -95,9 +95,9 @@ export default function OnboardingScreen() {
 
   return (
     <Screen backgroundColor={Colors.background} scroll={false} padded={false}>
-      <TouchableOpacity onPress={finish} style={styles.skip}>
+      <AnimatedPressable onPress={finish} style={styles.skip}>
         <Text style={styles.skipText}>Skip</Text>
-      </TouchableOpacity>
+      </AnimatedPressable>
 
       <FlatList
         ref={listRef}

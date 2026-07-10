@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '../ui/AnimatedPressable';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -15,6 +15,7 @@ interface SaleCardProps {
     paymentMethod: 'cash' | 'mpesa' | 'card';
     createdAt: string;
     staff?: { name: string };
+    status?: 'completed' | 'voided';
   };
   currency?: string;
   showStaff?: boolean;
@@ -63,7 +64,10 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
   const staffName = sale.staff?.name ?? 'Unknown';
   const initials = getInitials(staffName);
   const [avatarText, avatarBg] = getAvatarColors(staffName);
-  const payment = PAYMENT_CONFIG[sale.paymentMethod] ?? PAYMENT_CONFIG.cash;
+  const isVoided = sale.status === 'voided';
+  const payment = isVoided
+    ? { label: 'VOIDED', color: '#B91C1C', bg: '#FEE2E2' }
+    : PAYMENT_CONFIG[sale.paymentMethod] ?? PAYMENT_CONFIG.cash;
 
   return (
     <AnimatedPressable onPress={onPress} style={styles.row}>
@@ -84,7 +88,9 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
         <View style={[styles.badge, { backgroundColor: payment.bg }]}>
           <Text style={[styles.badgeText, { color: payment.color }]}>{payment.label}</Text>
         </View>
-        <Text style={styles.amount}>{formatCurrency(sale.totalAmount, currency)}</Text>
+        <Text style={[styles.amount, isVoided && styles.amountVoided]}>
+          {formatCurrency(sale.totalAmount, currency)}
+        </Text>
       </View>
 
       <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} style={styles.chevron} />
@@ -156,6 +162,10 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
+  },
+  amountVoided: {
+    textDecorationLine: 'line-through',
+    color: Colors.textTertiary,
   },
   chevron: {
     flexShrink: 0,

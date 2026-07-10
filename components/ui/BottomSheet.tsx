@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Pressable, StyleSheet, Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/Colors';
@@ -30,26 +31,32 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent accessibilityViewIsModal>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View
-          style={[
-            styles.sheet,
-            { maxHeight: `${maxHeightPercent}%`, paddingBottom: Spacing.xl + insets.bottom },
-          ]}
+      {/* RNGH pressables inside a RN Modal need their own gesture root on Android */}
+      <GestureHandlerRootView style={styles.gestureRoot}>
+        <KeyboardAvoidingView
+          style={styles.overlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.handle} />
-          {children}
-        </View>
-      </KeyboardAvoidingView>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          <View
+            style={[
+              styles.sheet,
+              { maxHeight: `${maxHeightPercent}%`, paddingBottom: Spacing.xl + insets.bottom },
+            ]}
+          >
+            <View style={styles.handle} />
+            {children}
+          </View>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: Colors.overlay,
