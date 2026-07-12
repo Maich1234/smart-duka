@@ -22,6 +22,8 @@ import { randomUUID } from '@/utils/uuid';
 import {
   initiateSubscriptionPayment,
   getSubscriptionPaymentStatus,
+  previewPricing,
+  validatePromo,
   type BillingCycle,
 } from '@/services/subscription';
 
@@ -64,6 +66,12 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
   const [digits, setDigits] = useState(() => (defaultPhone ?? '').replace(/^\+?254/, '').replace(/\D/g, '').slice(0, 9));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
+  const [showPromo, setShowPromo] = useState(false);
+  const [promoInput, setPromoInput] = useState('');
+  const [promoState, setPromoState] = useState<'idle' | 'checking' | 'applied' | 'error'>('idle');
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; title: string; description: string } | null>(null);
+  const [discountedAmount, setDiscountedAmount] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
 
@@ -82,6 +90,12 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
     setStage('input');
     setErrorMessage(null);
     setReceipt(null);
+    setShowPromo(false);
+    setPromoInput('');
+    setPromoState('idle');
+    setPromoError(null);
+    setAppliedPromo(null);
+    setDiscountedAmount(null);
   };
   const handleClose = () => {
     reset();
@@ -99,6 +113,37 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
   }, [stage]);
 
   const phoneValid = /^[17]\d{8}$/.test(digits);
+  const displayAmount = discountedAmount ?? amount;
+
+  const applyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    haptics.light();
+    setPromoState('checking');
+    setPromoError(null);
+    try {
+      const res = await validatePromo(code);
+      const preview = await previewPricing({ billingCycle, planSlug, promoCode: code });
+      setAppliedPromo({ code: res.data.code, title: res.data.title, description: res.data.description });
+      setDiscountedAmount(preview.data.amountDue);
+      setPromoState('applied');
+      haptics.success();
+    } catch (err: any) {
+      setPromoState('error');
+      setPromoError(err?.response?.data?.message ?? 'This promo code is invalid or has expired.');
+      setAppliedPromo(null);
+      setDiscountedAmount(null);
+    }
+  };
+
+  const removePromo = () => {
+    haptics.light();
+    setPromoInput('');
+    setPromoState('idle');
+    setPromoError(null);
+    setAppliedPromo(null);
+    setDiscountedAmount(null);
+  };
 
   const startPolling = (paymentId: string) => {
     startedAtRef.current = Date.now();
@@ -130,7 +175,7 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
     setErrorMessage(null);
     try {
       const res = await initiateSubscriptionPayment(
-        { phoneNumber: `+254${digits}`, billingCycle, planSlug, promoCode },
+        { phoneNumber: `+254${digits}`, billingCycle, planSlug, promoCode: appliedPromo?.code ?? promoCode },
         randomUUID()
       );
       if (res.data.status === 'pending') {
@@ -172,7 +217,7 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
               <Text style={styles.title}>Pay with M-PESA</Text>
               <Text style={styles.sub}>
                 We’ll send a payment prompt of{' '}
-                <Text style={styles.emph}>{formatCurrency(amount, currency)}</Text> to your phone.
+                <Text style={styles.emph}>{formatCurrency(displayAmount, currency)}</Text> to your phone.
               </Text>
 
               <View style={styles.phoneRow}>
@@ -192,11 +237,62 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
                 />
               </View>
 
+              {appliedPromo ? (
+                <View style={styles.promoApplied}>
+                  <Ionicons name="pricetag" size={15} color={Colors.success} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.promoAppliedTitle}>{appliedPromo.title || appliedPromo.code}</Text>
+                    {!!appliedPromo.description && (
+                      <Text style={styles.promoAppliedSub}>{appliedPromo.description}</Text>
+                    )}
+                  </View>
+                  <AnimatedPressable onPress={removePromo} accessibilityRole="button" accessibilityLabel="Remove promo code">
+                    <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
+                  </AnimatedPressable>
+                </View>
+              ) : showPromo ? (
+                <View style={styles.promoRow}>
+                  <TextInput
+                    style={styles.promoInput}
+                    value={promoInput}
+                    onChangeText={(t) => {
+                      setPromoInput(t.toUpperCase());
+                      if (promoState === 'error') setPromoState('idle');
+                    }}
+                    placeholder="Promo code"
+                    placeholderTextColor={Colors.textTertiary}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    accessibilityLabel="Promo code"
+                  />
+                  <AnimatedPressable
+                    onPress={applyPromo}
+                    disabled={!promoInput.trim() || promoState === 'checking'}
+                    style={[styles.promoApplyBtn, (!promoInput.trim() || promoState === 'checking') && styles.promoApplyBtnDisabled]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.promoApplyText}>{promoState === 'checking' ? '…' : 'Apply'}</Text>
+                  </AnimatedPressable>
+                </View>
+              ) : (
+                <AnimatedPressable
+                  onPress={() => setShowPromo(true)}
+                  style={styles.promoLink}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="pricetag-outline" size={14} color={Colors.primary} />
+                  <Text style={styles.promoLinkText}>Have a promo code?</Text>
+                </AnimatedPressable>
+              )}
+              {promoState === 'error' && !!promoError && (
+                <Text style={styles.promoErrorText}>{promoError}</Text>
+              )}
+
               <Button
-                title={`Pay ${formatCurrency(amount, currency)}`}
+                title={`Pay ${formatCurrency(displayAmount, currency)}`}
                 onPress={pay}
                 disabled={!phoneValid}
-                style={{ alignSelf: 'stretch' }}
+                style={{ alignSelf: 'stretch', marginTop: Spacing.md }}
               />
               <AnimatedPressable onPress={handleClose} style={styles.cancelLink} accessibilityRole="button">
                 <Text style={styles.cancelLinkText}>Not now</Text>
@@ -364,5 +460,79 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
+  },
+  promoLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.sm,
+  },
+  promoLinkText: {
+    color: Colors.primary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  promoRow: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  promoInput: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    color: Colors.textPrimary,
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    letterSpacing: 0.5,
+  },
+  promoApplyBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoApplyBtnDisabled: { opacity: 0.5 },
+  promoApplyText: {
+    color: '#FFFFFF',
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  promoErrorText: {
+    color: Colors.danger,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.sm,
+  },
+  promoApplied: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    alignSelf: 'stretch',
+    backgroundColor: Colors.successSubtle,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.success,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  promoAppliedTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  promoAppliedSub: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    marginTop: 1,
   },
 });

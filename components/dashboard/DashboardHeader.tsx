@@ -14,9 +14,9 @@ interface DashboardHeaderProps {
   shopName: string;
   formattedDate: string;
   shopInitials: string;
-  /** How many items are in Needs Attention — drives the bell badge. */
-  attentionCount: number;
-  /** Scrolls to the Needs Attention section (or wherever alerts live). */
+  /** Unread notifications count — drives the bell badge. */
+  unreadCount: number;
+  /** Opens the Notifications inbox. */
   onBellPress: () => void;
   profileRoute: string;
   insetsTop: number;
@@ -24,12 +24,12 @@ interface DashboardHeaderProps {
 
 /**
  * Identity strip: who you are, what day it is, and one honest signal (the
- * bell badge mirrors the Needs Attention count instead of a vague dot).
+ * bell badge mirrors the unread notifications count instead of a vague dot).
  * Flat surface with a hairline — the hero card below carries the visual
  * weight, so the header stays quiet.
  */
 export const DashboardHeader: React.FC<DashboardHeaderProps> = React.memo(
-  ({ greeting, shopName, formattedDate, shopInitials, attentionCount, onBellPress, profileRoute, insetsTop }) => {
+  ({ greeting, shopName, formattedDate, shopInitials, unreadCount, onBellPress, profileRoute, insetsTop }) => {
     return (
       <View style={[styles.header, { paddingTop: insetsTop + 10 }]}>
         <View style={styles.headerLeft}>
@@ -50,15 +50,15 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = React.memo(
             }}
             accessibilityRole="button"
             accessibilityLabel={
-              attentionCount > 0
-                ? `${attentionCount} item${attentionCount === 1 ? '' : 's'} need attention`
-                : 'No alerts'
+              unreadCount > 0
+                ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
+                : 'No unread notifications'
             }
           >
             <Ionicons name="notifications-outline" size={20} color={Colors.textSecondary} />
-            {attentionCount > 0 && (
+            {unreadCount > 0 && (
               <View style={styles.bellBadge}>
-                <Text style={styles.bellBadgeText}>{attentionCount > 9 ? '9+' : attentionCount}</Text>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
               </View>
             )}
           </AnimatedPressable>

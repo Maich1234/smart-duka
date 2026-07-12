@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { router } from 'expo-router';
 import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +13,7 @@ import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getStaffDashboard } from '@/services/dashboard';
 import { useStaffAttention } from '@/hooks/useAttention';
+import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { TodayCard } from '@/components/dashboard/TodayCard';
 import { QuickActions, type QuickActionTile } from '@/components/dashboard/QuickActions';
@@ -80,11 +82,7 @@ export default function StaffDashboard() {
     return list;
   }, [canManageExpenses]);
 
-  const scrollRef = useRef<ScrollView>(null);
-  const attentionY = useRef(0);
-  const scrollToAttention = useCallback(() => {
-    scrollRef.current?.scrollTo({ y: Math.max(attentionY.current - 12, 0), animated: true });
-  }, []);
+  const unreadCount = useUnreadNotificationsCount();
 
   if (isLoading) {
     return <ListSkeleton rows={4} heroHeight={180} />;
@@ -112,7 +110,6 @@ export default function StaffDashboard() {
       <StatusBar style="dark" />
       <ScreenFade style={styles.container}>
         <ScrollView
-          ref={scrollRef}
           style={styles.flex}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
@@ -125,8 +122,8 @@ export default function StaffDashboard() {
             shopName={user?.name ?? 'Staff'}
             formattedDate={timeContext.formattedDate}
             shopInitials={initials}
-            attentionCount={attentionItems.length}
-            onBellPress={scrollToAttention}
+            unreadCount={unreadCount}
+            onBellPress={() => router.push('/(staff)/notifications')}
             profileRoute="/(staff)/profile"
             insetsTop={insets.top}
           />
@@ -141,9 +138,7 @@ export default function StaffDashboard() {
 
           <QuickActions primaryRoute="/(staff)/sales" tiles={tiles} />
 
-          <View onLayout={(e) => { attentionY.current = e.nativeEvent.layout.y; }}>
-            <NeedsAttention items={attentionItems} />
-          </View>
+          <NeedsAttention items={attentionItems} />
 
           <RecentActivity
             transactions={dashboard?.recentSales ?? []}

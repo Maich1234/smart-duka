@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Button } from '@/components/ui/Button';
 import { SubscriptionPayModal } from '@/components/subscription/SubscriptionPayModal';
 import { useSubscription, useInvalidateSubscription } from '@/hooks/useSubscription';
-import { activateTrial, cancelSubscription, type SubscriptionPlan } from '@/services/subscription';
+import {
+  activateTrial,
+  cancelSubscription,
+  getPlans,
+  previewPricing,
+  type BillingCycle,
+  type SubscriptionPlan,
+} from '@/services/subscription';
 import { useAuthStore } from '@/store/authStore';
 import { useAlert } from '@/context/AlertContext';
 import { haptics } from '@/utils/haptics';
@@ -36,10 +44,40 @@ export default function SubscriptionScreen() {
   const [payVisible, setPayVisible] = useState(false);
   const [working, setWorking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
+  const [selectedCycle, setSelectedCycle] = useState<BillingCycle | null>(null);
 
   const plan = (subscription?.plan ?? null) as SubscriptionPlan | null;
   const state = access?.state ?? 'none';
   const meta = STATE_META[state];
+
+  // Defaults to the current renewal until the owner picks something else.
+  useEffect(() => {
+    if (renewal && selectedPlanSlug == null) setSelectedPlanSlug(renewal.planSlug);
+    if (renewal && selectedCycle == null) setSelectedCycle(renewal.billingCycle);
+  }, [renewal, selectedPlanSlug, selectedCycle]);
+
+  const { data: plansData } = useQuery({
+    queryKey: ['subscriptionPlans'],
+    queryFn: getPlans,
+    enabled: showPlanPicker,
+    staleTime: 60_000,
+  });
+
+  const effectivePlanSlug = selectedPlanSlug ?? renewal?.planSlug ?? null;
+  const effectiveCycle = selectedCycle ?? renewal?.billingCycle ?? 'monthly';
+  const planChanged = !!renewal && (effectivePlanSlug !== renewal.planSlug || effectiveCycle !== renewal.billingCycle);
+
+  const { data: previewData } = useQuery({
+    queryKey: ['subscriptionPreview', effectivePlanSlug, effectiveCycle],
+    queryFn: () => previewPricing({ planSlug: effectivePlanSlug!, billingCycle: effectiveCycle }),
+    enabled: planChanged && !!effectivePlanSlug,
+    staleTime: 30_000,
+  });
+
+  const payAmount = planChanged && previewData ? previewData.data.amountDue : renewal?.amountDue ?? 0;
+  const payCurrency = previewData?.data.currency ?? renewal?.currency ?? 'KES';
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -172,13 +210,87 @@ export default function SubscriptionScreen() {
           )}
 
           {canPay && (
+            <AnimatedPressable
+              onPress={() => {
+                haptics.light();
+                setShowPlanPicker((s) => !s);
+              }}
+              style={styles.changePlanLink}
+              accessibilityRole="button"
+              accessibilityLabel={showPlanPicker ? 'Hide plans' : 'Change plan'}
+            >
+              <Text style={styles.changePlanText}>{showPlanPicker ? 'Hide plans' : 'Change plan'}</Text>
+              <Ionicons name={showPlanPicker ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
+            </AnimatedPressable>
+          )}
+
+          {canPay && showPlanPicker && plansData && (
+            <Animated.View entering={FadeInUp.duration(240)} style={styles.planPicker}>
+              <View style={styles.cycleToggleRow}>
+                {(['monthly', 'yearly'] as const).map((cycle) => {
+                  const active = effectiveCycle === cycle;
+                  return (
+                    <AnimatedPressable
+                      key={cycle}
+                      onPress={() => {
+                        haptics.light();
+                        setSelectedCycle(cycle);
+                      }}
+                      style={[styles.cycleToggleBtn, active && styles.cycleToggleBtnActive]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text style={[styles.cycleToggleText, active && styles.cycleToggleTextActive]}>
+                        {cycle === 'monthly' ? 'Monthly' : 'Yearly'}
+                      </Text>
+                    </AnimatedPressable>
+                  );
+                })}
+              </View>
+
+              {plansData.data.plans.map((p) => {
+                const selected = effectivePlanSlug === p.slug;
+                const price = effectiveCycle === 'yearly'
+                  ? p.pricing.yearlyTotal
+                  : p.billingType === 'per_staff' ? p.monthlyPrice : p.pricing.monthlyTotal;
+                const unit = effectiveCycle === 'yearly' ? 'per year' : p.billingType === 'per_staff' ? 'per staff / month' : 'per month';
+                return (
+                  <AnimatedPressable
+                    key={p.slug}
+                    onPress={() => {
+                      haptics.light();
+                      setSelectedPlanSlug(p.slug);
+                    }}
+                    style={[styles.planRow, selected && styles.planRowSelected]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${p.name} plan`}
+                  >
+                    <View style={styles.planRowRadio}>
+                      {selected && <View style={styles.planRowRadioInner} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.planRowName}>{p.name}</Text>
+                      {!!p.tagline && <Text style={styles.planRowTagline}>{p.tagline}</Text>}
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.planRowPrice}>{formatCurrency(price, plansData.data.currency)}</Text>
+                      <Text style={styles.planRowUnit}>{unit}</Text>
+                    </View>
+                  </AnimatedPressable>
+                );
+              })}
+            </Animated.View>
+          )}
+
+          {canPay && (
             <Button
-              title={state === 'active' ? `Extend now · ${formatCurrency(renewal!.amountDue, renewal!.currency)}` : `Pay with M-PESA · ${formatCurrency(renewal!.amountDue, renewal!.currency)}`}
+              title={state === 'active' ? `Extend now · ${formatCurrency(payAmount, payCurrency)}` : `Pay with M-PESA · ${formatCurrency(payAmount, payCurrency)}`}
               onPress={() => {
                 haptics.medium();
                 setPayVisible(true);
               }}
-              style={{ alignSelf: 'stretch' }}
+              style={{ alignSelf: 'stretch', marginTop: Spacing.md }}
             />
           )}
         </Animated.View>
@@ -195,14 +307,17 @@ export default function SubscriptionScreen() {
 
       <SubscriptionPayModal
         visible={payVisible}
-        amount={renewal?.amountDue ?? 0}
-        currency={renewal?.currency ?? 'KES'}
-        billingCycle={renewal?.billingCycle ?? 'monthly'}
-        planSlug={renewal?.planSlug}
+        amount={payAmount}
+        currency={payCurrency}
+        billingCycle={effectiveCycle}
+        planSlug={effectivePlanSlug ?? undefined}
         defaultPhone={user?.shop?.phone}
         onClose={() => setPayVisible(false)}
         onSuccess={() => {
           setPayVisible(false);
+          setShowPlanPicker(false);
+          setSelectedPlanSlug(null);
+          setSelectedCycle(null);
           invalidate();
         }}
       />
@@ -317,5 +432,100 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
+  },
+  changePlanLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.sm,
+  },
+  changePlanText: {
+    color: Colors.primary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  planPicker: {
+    backgroundColor: Colors.background,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  cycleToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 3,
+    marginBottom: Spacing.sm,
+  },
+  cycleToggleBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 9,
+  },
+  cycleToggleBtnActive: {
+    backgroundColor: Colors.primarySubtle,
+  },
+  cycleToggleText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  cycleToggleTextActive: { color: Colors.primaryDark },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    padding: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  planRowSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primarySubtle,
+  },
+  planRowRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planRowRadioInner: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: Colors.primary,
+  },
+  planRowName: {
+    color: Colors.textPrimary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilyBold,
+  },
+  planRowTagline: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    marginTop: 1,
+  },
+  planRowPrice: {
+    color: Colors.textPrimary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilyBold,
+  },
+  planRowUnit: {
+    color: Colors.textTertiary,
+    fontSize: 10,
+    fontFamily: Typography.fontFamily,
   },
 });

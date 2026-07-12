@@ -216,6 +216,12 @@ function AppResumeHandler() {
   return null;
 }
 
+// Free-form pushes (admin campaigns, and any type without a specific screen
+// of its own — daily_sales_anomaly, subscription_reminder, etc.) land on the
+// role-appropriate Notifications inbox rather than a hardcoded owner screen.
+const notificationsRouteForRole = () =>
+  useAuthStore.getState().user?.role === 'staff' ? ('/(staff)/notifications' as const) : ('/(owner)/notifications' as const);
+
 // Every push type's in-app destination — shared by the foreground alert's
 // "View" button and by taps on system notifications (background/quit).
 const routeForNotification = (data?: Record<string, string>) => {
@@ -232,7 +238,7 @@ const routeForNotification = (data?: Record<string, string>) => {
     case 'depletion_alert':
       return '/(owner)/inventory' as const;
     default:
-      return '/(owner)/reports' as const;
+      return notificationsRouteForRole();
   }
 };
 

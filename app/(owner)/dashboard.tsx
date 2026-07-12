@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { router } from 'expo-router';
 import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +12,7 @@ import { Shimmer } from '@/components/ui/Shimmer';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { getOwnerDashboard } from '@/services/dashboard';
 import { useOwnerAttention } from '@/hooks/useAttention';
+import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { TodayCard } from '@/components/dashboard/TodayCard';
 import { DailyBrief } from '@/components/dashboard/DailyBrief';
@@ -101,13 +103,7 @@ export default function OwnerDashboard() {
 
   const dashboard = data?.data;
   const attentionItems = useOwnerAttention(dashboard);
-
-  // Bell press scrolls to the attention zone rather than leaving the screen.
-  const scrollRef = useRef<ScrollView>(null);
-  const attentionY = useRef(0);
-  const scrollToAttention = useCallback(() => {
-    scrollRef.current?.scrollTo({ y: Math.max(attentionY.current - 12, 0), animated: true });
-  }, []);
+  const unreadCount = useUnreadNotificationsCount();
 
   if (isLoading) {
     return (
@@ -139,7 +135,6 @@ export default function OwnerDashboard() {
       <StatusBar style="dark" />
       <ScreenFade style={styles.flex}>
         <ScrollView
-          ref={scrollRef}
           style={styles.container}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl }}
@@ -159,8 +154,8 @@ export default function OwnerDashboard() {
             shopName={user?.shop?.name ?? 'Smart Duka'}
             formattedDate={timeContext.formattedDate}
             shopInitials={shopInitials}
-            attentionCount={attentionItems.length}
-            onBellPress={scrollToAttention}
+            unreadCount={unreadCount}
+            onBellPress={() => router.push('/(owner)/notifications')}
             profileRoute="/(owner)/profile"
             insetsTop={insets.top}
           />
@@ -185,10 +180,8 @@ export default function OwnerDashboard() {
           <QuickActions primaryRoute="/(owner)/sales" tiles={ACTION_TILES} />
 
           {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
-          <View onLayout={(e) => { attentionY.current = e.nativeEvent.layout.y; }}>
-            <TrialBanner />
-            <NeedsAttention items={attentionItems} />
-          </View>
+          <TrialBanner />
+          <NeedsAttention items={attentionItems} />
 
           {/* 6 · Pulse check on the till */}
           <RecentActivity

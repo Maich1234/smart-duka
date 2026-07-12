@@ -239,6 +239,20 @@ export default function OwnerProfile() {
     else await unregisterDeviceFromNotifications();
   };
 
+  const handleGrantMediaAccess = async () => {
+    const [camera, media] = await Promise.all([
+      ImagePicker.requestCameraPermissionsAsync(),
+      ImagePicker.requestMediaLibraryPermissionsAsync(),
+    ]);
+    const granted = camera.granted && media.granted;
+    toast({
+      type: granted ? 'success' : 'warning',
+      message: granted
+        ? 'Camera and photo access granted'
+        : 'Some access wasn\'t granted — you can allow it from your device Settings.',
+    });
+  };
+
   const shiftManagementEnabled = shopConfigData?.data?.shiftManagementEnabled ?? false;
   const handleToggleShiftManagement = async (enabled: boolean) => {
     setTogglingShifts(true);
@@ -491,6 +505,24 @@ export default function OwnerProfile() {
                 thumbColor={notificationsEnabled ? Colors.primary : Colors.textTertiary}
               />
             </View>
+
+            <View style={styles.prefDivider} />
+
+            <AnimatedPressable
+              style={styles.prefRow}
+              onPress={handleGrantMediaAccess}
+              accessibilityRole="button"
+              accessibilityLabel="Allow camera and photo access"
+            >
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
+                <Ionicons name="camera-outline" size={17} color={Colors.primary} />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Photo & Camera Access</Text>
+                <Text style={styles.prefSub}>Needed to set your business logo</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+            </AnimatedPressable>
 
             <View style={styles.prefDivider} />
 

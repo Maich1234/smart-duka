@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
 
@@ -32,7 +32,26 @@ const loadMessaging = async () => {
   }
 };
 
+/**
+ * @react-native-firebase/messaging's `requestPermission()` is a hardcoded
+ * no-op on Android (always resolves AUTHORIZED without showing a dialog or
+ * touching POST_NOTIFICATIONS) — it only does real work on iOS. Android 13+
+ * needs its own explicit runtime request for that permission.
+ */
+const requestAndroidPermission = async (): Promise<boolean> => {
+  if (Number(Platform.Version) < 33) return true; // no runtime permission needed pre-Android 13
+  try {
+    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  } catch (e) {
+    console.warn('POST_NOTIFICATIONS permission request failed', e);
+    return false;
+  }
+};
+
 export const requestNotificationPermission = async (): Promise<boolean> => {
+  if (Platform.OS === 'android') return requestAndroidPermission();
+
   const messaging = await loadMessaging();
   if (!messaging) return false;
   try {
