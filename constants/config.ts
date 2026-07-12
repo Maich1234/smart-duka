@@ -5,7 +5,7 @@ import { Shadows } from './Shadows';
 
 export { Colors, Spacing, Typography, Shadows };
 
-export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
+export const API_BASE_URL = 'http://localhost:5000/api/v1';
 
 // Base URL of the deployed public web export — used to build the QR code
 // link on receipts (must point at a host serving the (public) route group).

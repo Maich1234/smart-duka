@@ -138,7 +138,7 @@ export default function ForgotPasswordScreen() {
     setFormError('');
     haptics.success();
     try {
-      await api.post('/auth/reset-password', { email, newPassword: data.newPassword });
+      await api.post('/auth/reset-password', { email, otp, newPassword: data.newPassword });
       setStep('success');
     } catch (error: any) {
       setFormError(error.response?.data?.message || 'Could not reset password. Try again.');

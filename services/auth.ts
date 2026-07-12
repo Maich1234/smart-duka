@@ -132,8 +132,8 @@ export const verifyOtp = async (email: string, otp: string) => {
 /**
  * Reset password after OTP verification
  */
-export const resetPassword = async (email: string, newPassword: string) => {
-  const response = await api.post('/auth/reset-password', { email, newPassword });
+export const resetPassword = async (email: string, otp: string, newPassword: string) => {
+  const response = await api.post('/auth/reset-password', { email, otp, newPassword });
   return response.data;
 };
 
