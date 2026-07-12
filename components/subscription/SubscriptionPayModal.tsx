@@ -22,9 +22,12 @@ import { randomUUID } from '@/utils/uuid';
 import {
   initiateSubscriptionPayment,
   getSubscriptionPaymentStatus,
+  recheckSubscriptionPayment,
+  reconcileSubscriptionByMessage,
   previewPricing,
   validatePromo,
   type BillingCycle,
+  type PaymentStatus,
 } from '@/services/subscription';
 
 type Stage = 'input' | 'initiating' | 'pending' | 'success' | 'failed' | 'cancelled' | 'timeout';
@@ -72,6 +75,12 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
   const [promoError, setPromoError] = useState<string | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; title: string; description: string } | null>(null);
   const [discountedAmount, setDiscountedAmount] = useState<number | null>(null);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState(false);
+  const [showPasteSheet, setShowPasteSheet] = useState(false);
+  const [pastedMessage, setPastedMessage] = useState('');
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [verifyingPaste, setVerifyingPaste] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
 
@@ -96,6 +105,12 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
     setPromoError(null);
     setAppliedPromo(null);
     setDiscountedAmount(null);
+    setPaymentId(null);
+    setRechecking(false);
+    setShowPasteSheet(false);
+    setPastedMessage('');
+    setPasteError(null);
+    setVerifyingPaste(false);
   };
   const handleClose = () => {
     reset();
@@ -178,6 +193,7 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
         { phoneNumber: `+254${digits}`, billingCycle, planSlug, promoCode: appliedPromo?.code ?? promoCode },
         randomUUID()
       );
+      setPaymentId(res.data.paymentId);
       if (res.data.status === 'pending') {
         setStage('pending');
         startPolling(res.data.paymentId);
@@ -188,6 +204,51 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
     } catch (err: any) {
       setStage('failed');
       setErrorMessage(err?.response?.data?.message ?? 'Could not start the payment. Check your connection and try again.');
+    }
+  };
+
+  const applyResult = (result: { status: PaymentStatus; receipt: string | null; errorMessage: string | null }) => {
+    if (result.status === 'pending') return false;
+    setReceipt(result.receipt);
+    setErrorMessage(result.errorMessage);
+    setStage(result.status);
+    return result.status === 'success';
+  };
+
+  /** "I definitely paid, check again" — re-verifies this exact attempt directly with M-PESA. */
+  const handleRecheck = async () => {
+    if (!paymentId || rechecking) return;
+    haptics.light();
+    setRechecking(true);
+    try {
+      const res = await recheckSubscriptionPayment(paymentId);
+      const becameSuccess = applyResult(res.data);
+      if (!becameSuccess) {
+        setErrorMessage(res.data.errorMessage ?? "We checked with M-PESA but this payment isn't confirmed yet. Try again in a minute.");
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.response?.data?.message ?? 'Could not recheck the payment. Try again shortly.');
+    } finally {
+      setRechecking(false);
+    }
+  };
+
+  /** Recovery path when there's no live paymentId to recheck (e.g. reopened after closing the app). */
+  const handleVerifyPastedMessage = async () => {
+    const text = pastedMessage.trim();
+    if (!text || verifyingPaste) return;
+    haptics.light();
+    setVerifyingPaste(true);
+    setPasteError(null);
+    try {
+      const res = await reconcileSubscriptionByMessage(text);
+      setShowPasteSheet(false);
+      const becameSuccess = applyResult(res.data);
+      if (!becameSuccess) setErrorMessage(res.message);
+    } catch (err: any) {
+      setPasteError(err?.response?.data?.message ?? "Couldn't verify that message. Check it's the full M-PESA SMS and try again.");
+    } finally {
+      setVerifyingPaste(false);
     }
   };
 
@@ -350,7 +411,51 @@ export const SubscriptionPayModal: React.FC<SubscriptionPayModalProps> = ({
                     ? 'The M-PESA prompt was dismissed.'
                     : 'The payment did not go through. No money was taken.')}
               </Text>
-              <Button title="Try again" onPress={() => setStage('input')} style={{ alignSelf: 'stretch' }} />
+
+              {paymentId && (
+                <Button
+                  title="I already paid — recheck"
+                  onPress={handleRecheck}
+                  loading={rechecking}
+                  style={{ alignSelf: 'stretch', marginBottom: Spacing.sm }}
+                />
+              )}
+
+              {showPasteSheet ? (
+                <View style={styles.pasteSheet}>
+                  <Text style={styles.pasteLabel}>Paste the M-PESA confirmation SMS</Text>
+                  <TextInput
+                    style={styles.pasteInput}
+                    value={pastedMessage}
+                    onChangeText={(t) => {
+                      setPastedMessage(t);
+                      if (pasteError) setPasteError(null);
+                    }}
+                    placeholder="QGH7XXXXX Confirmed. Ksh500.00 sent to..."
+                    placeholderTextColor={Colors.textTertiary}
+                    multiline
+                    numberOfLines={3}
+                    accessibilityLabel="M-PESA confirmation message"
+                  />
+                  {!!pasteError && <Text style={styles.promoErrorText}>{pasteError}</Text>}
+                  <Button
+                    title="Verify payment"
+                    onPress={handleVerifyPastedMessage}
+                    loading={verifyingPaste}
+                    disabled={!pastedMessage.trim()}
+                    style={{ alignSelf: 'stretch' }}
+                  />
+                </View>
+              ) : (
+                <AnimatedPressable onPress={() => setShowPasteSheet(true)} style={styles.pasteLink} accessibilityRole="button">
+                  <Ionicons name="chatbox-ellipses-outline" size={14} color={Colors.primary} />
+                  <Text style={styles.promoLinkText}>Paste M-PESA message instead</Text>
+                </AnimatedPressable>
+              )}
+
+              <AnimatedPressable onPress={() => setStage('input')} style={styles.cancelLink} accessibilityRole="button">
+                <Text style={styles.cancelLinkText}>Try a new payment</Text>
+              </AnimatedPressable>
               <AnimatedPressable onPress={handleClose} style={styles.cancelLink} accessibilityRole="button">
                 <Text style={styles.cancelLinkText}>Close</Text>
               </AnimatedPressable>
@@ -534,5 +639,36 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,
     marginTop: 1,
+  },
+  pasteLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
+  },
+  pasteSheet: {
+    alignSelf: 'stretch',
+    marginBottom: Spacing.md,
+  },
+  pasteLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    marginBottom: Spacing.xs,
+  },
+  pasteInput: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    color: Colors.textPrimary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    textAlignVertical: 'top',
+    minHeight: 72,
+    marginBottom: Spacing.sm,
   },
 });

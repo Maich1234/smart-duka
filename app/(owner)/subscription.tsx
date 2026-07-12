@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import {
   cancelSubscription,
   getPlans,
   previewPricing,
+  reconcileSubscriptionByMessage,
   type BillingCycle,
   type SubscriptionPlan,
 } from '@/services/subscription';
@@ -100,6 +101,35 @@ export default function SubscriptionScreen() {
     }
   };
 
+  const [showPasteSheet, setShowPasteSheet] = useState(false);
+  const [pastedMessage, setPastedMessage] = useState('');
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [verifyingPaste, setVerifyingPaste] = useState(false);
+
+  const handleVerifyPastedMessage = async () => {
+    const text = pastedMessage.trim();
+    if (!text || verifyingPaste) return;
+    haptics.light();
+    setVerifyingPaste(true);
+    setPasteError(null);
+    try {
+      const res = await reconcileSubscriptionByMessage(text);
+      if (res.data.status === 'success') {
+        haptics.success();
+        toast({ type: 'success', message: res.message });
+        setShowPasteSheet(false);
+        setPastedMessage('');
+        invalidate();
+      } else {
+        setPasteError(res.message);
+      }
+    } catch (err: any) {
+      setPasteError(err?.response?.data?.message ?? "Couldn't verify that message. Check it's the full M-PESA SMS and try again.");
+    } finally {
+      setVerifyingPaste(false);
+    }
+  };
+
   const confirmCancel = () => {
     alert({
       type: 'confirm',
@@ -151,6 +181,57 @@ export default function SubscriptionScreen() {
                 up right where you left off — all your data is safe.
               </Text>
             </View>
+          </Animated.View>
+        )}
+
+        {(state === 'locked' || state === 'grace') && (
+          <Animated.View entering={FadeInUp.duration(360).delay(30)} style={styles.recoveryCard}>
+            {showPasteSheet ? (
+              <>
+                <Text style={styles.recoveryTitle}>Paste your M-PESA confirmation SMS</Text>
+                <Text style={styles.recoverySub}>
+                  Already paid but still seeing this? We'll check it directly with M-PESA.
+                </Text>
+                <TextInput
+                  style={styles.pasteInput}
+                  value={pastedMessage}
+                  onChangeText={(t) => {
+                    setPastedMessage(t);
+                    if (pasteError) setPasteError(null);
+                  }}
+                  placeholder="QGH7XXXXX Confirmed. Ksh500.00 sent to..."
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
+                  numberOfLines={3}
+                  accessibilityLabel="M-PESA confirmation message"
+                />
+                {!!pasteError && <Text style={styles.recoveryError}>{pasteError}</Text>}
+                <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                  <Button
+                    title="Cancel"
+                    variant="secondary"
+                    onPress={() => { setShowPasteSheet(false); setPasteError(null); }}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Verify"
+                    onPress={handleVerifyPastedMessage}
+                    loading={verifyingPaste}
+                    disabled={!pastedMessage.trim()}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </>
+            ) : (
+              <AnimatedPressable
+                onPress={() => { haptics.light(); setShowPasteSheet(true); }}
+                style={styles.recoveryLink}
+                accessibilityRole="button"
+              >
+                <Ionicons name="chatbox-ellipses-outline" size={16} color={Colors.primary} />
+                <Text style={styles.recoveryLinkText}>Already paid? Paste your M-PESA message</Text>
+              </AnimatedPressable>
+            )}
           </Animated.View>
         )}
 
@@ -356,6 +437,58 @@ const styles = StyleSheet.create({
     lineHeight: Typography.lineHeight.caption,
     fontFamily: Typography.fontFamily,
     marginTop: 2,
+  },
+  recoveryCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  recoveryLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  recoveryLinkText: {
+    color: Colors.primary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  recoveryTitle: {
+    color: Colors.textPrimary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilyBold,
+    marginBottom: 2,
+  },
+  recoverySub: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.caption,
+    lineHeight: Typography.lineHeight.caption,
+    fontFamily: Typography.fontFamily,
+    marginBottom: Spacing.sm,
+  },
+  pasteInput: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    color: Colors.textPrimary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    textAlignVertical: 'top',
+    minHeight: 72,
+    marginBottom: Spacing.sm,
+  },
+  recoveryError: {
+    color: Colors.danger,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    marginBottom: Spacing.sm,
   },
   card: {
     backgroundColor: Colors.surface,

@@ -171,6 +171,22 @@ export async function getSubscriptionPaymentStatus(
   return res.data;
 }
 
+/** Re-verifies a specific payment directly against M-PESA — "I definitely paid, check again." */
+export async function recheckSubscriptionPayment(
+  paymentId: string
+): Promise<{ success: boolean; data: SubscriptionPaymentState }> {
+  const res = await api.post(`/subscriptions/pay/${paymentId}/recheck`);
+  return res.data;
+}
+
+/** Recovery path: the owner pastes their M-PESA confirmation SMS to unblock a payment that never activated. */
+export async function reconcileSubscriptionByMessage(
+  message: string
+): Promise<{ success: boolean; data: SubscriptionPaymentState; message: string }> {
+  const res = await api.post('/subscriptions/reconcile', { message });
+  return res.data;
+}
+
 export async function cancelSubscription(): Promise<{ success: boolean; data: { subscription: Subscription }; message: string }> {
   const res = await api.post('/subscriptions/cancel');
   return res.data;
