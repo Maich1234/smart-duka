@@ -119,7 +119,7 @@ export default function OnboardingSignup() {
           <View style={styles.shopText}>
             <Text style={styles.shopName}>{draft.shopName || 'My Smart Shop'}</Text>
             <Text style={styles.shopMeta}>
-              {[draft.location, draft.currency].filter(Boolean).join(' · ')}
+              {[draft.county, draft.currency].filter(Boolean).join(' · ')}
             </Text>
           </View>
           <AnimatedPressable onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8 }}>

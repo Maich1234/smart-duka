@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Image } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,12 +8,15 @@ import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Input } from '@/components/ui/Input';
 import { JourneyProgress } from '@/components/onboarding/JourneyProgress';
 import { ChoiceCard } from '@/components/onboarding/ChoiceCard';
+import { SearchablePicker, type PickerOption } from '@/components/onboarding/SearchablePicker';
 import { useOnboardingStore } from '@/store/onboardingStore';
+import { getCounties, getSubcounties } from '@/services/locations';
 import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -26,7 +29,6 @@ const setupSchema = z.object({
   shopName: z.string().min(2, 'Give your shop a name — 2 characters or more'),
   ownerName: z.string().min(2, 'Your name helps your team know who’s boss'),
   phone: z.string(),
-  location: z.string(),
 });
 
 type SetupForm = z.infer<typeof setupSchema>;
@@ -38,37 +40,68 @@ const CURRENCIES = [
   { value: 'USD', label: 'US Dollar', subtitle: '$' },
 ];
 
-/** One question per screenful: which form field (if any) each step validates. */
+// East African Community countries this app actively supports today —
+// matches constants/presets.js's COUNTRIES on the backend.
+const COUNTRIES = [
+  { code: 'KE', name: 'Kenya', flag: '🇰🇪' },
+  { code: 'UG', name: 'Uganda', flag: '🇺🇬' },
+  { code: 'TZ', name: 'Tanzania', flag: '🇹🇿' },
+  { code: 'RW', name: 'Rwanda', flag: '🇷🇼' },
+  { code: 'BI', name: 'Burundi', flag: '🇧🇮' },
+  { code: 'SS', name: 'South Sudan', flag: '🇸🇸' },
+];
+
+type StepKind = 'field' | 'country' | 'county' | 'subCounty' | 'currency' | 'founder';
+
+/** One question per screenful. `field` only applies to `kind: 'field'` steps —
+ *  everything else (country/county/sub-county/currency/founder) is plain
+ *  local state, same pattern the currency step already used. */
 const STEPS: {
+  kind: StepKind;
   field?: keyof SetupForm;
   title: string;
   subtitle: string;
 }[] = [
   {
+    kind: 'field',
     field: 'shopName',
     title: 'What’s your shop called?',
     subtitle: 'This goes on your receipts and reports.',
   },
   {
+    kind: 'field',
     field: 'ownerName',
     title: 'And your name?',
     subtitle: 'You’ll be the owner of this shop.',
   },
   {
+    kind: 'field',
     field: 'phone',
     title: 'Your business phone?',
     subtitle: 'For M-PESA payment notifications. You can skip this.',
   },
   {
-    field: 'location',
-    title: 'Where do you operate?',
-    subtitle: 'Town or area — it appears on receipts. Optional.',
+    kind: 'country',
+    title: 'Which country do you operate in?',
+    subtitle: 'Sets your defaults — you can change this any time.',
   },
   {
+    kind: 'county',
+    title: 'Which county?',
+    subtitle: 'Helps us tailor tips and offers to your area. Optional.',
+  },
+  {
+    kind: 'subCounty',
+    title: 'Which sub-county?',
+    subtitle: 'Narrows it down even further. Optional.',
+  },
+  {
+    kind: 'currency',
     title: 'Which currency do you sell in?',
     subtitle: 'You can change this any time in settings.',
   },
   {
+    kind: 'founder',
     title: 'A note from our founder',
     subtitle: '',
   },
@@ -78,6 +111,12 @@ export default function BusinessSetup() {
   const [step, setStep] = useState(0);
   const { draft, setDraft } = useOnboardingStore();
   const [currency, setCurrency] = useState(draft.currency || 'KES');
+  const [country, setCountry] = useState(draft.country || 'KE');
+  const [countyId, setCountyId] = useState<string | null>(null);
+  const [countyName, setCountyName] = useState(draft.county || '');
+  const [subCountyName, setSubCountyName] = useState(draft.subCounty || '');
+  const [showCountyPicker, setShowCountyPicker] = useState(false);
+  const [showSubCountyPicker, setShowSubCountyPicker] = useState(false);
 
   const { control, trigger, getValues } = useForm<SetupForm>({
     resolver: zodResolver(setupSchema),
@@ -86,15 +125,34 @@ export default function BusinessSetup() {
       shopName: draft.shopName,
       ownerName: draft.ownerName,
       phone: draft.phone,
-      location: draft.location,
     },
   });
 
-  const current = STEPS[step];
-  const isFounderNote = step === STEPS.length - 1;
+  const { data: countiesData, isFetching: countiesLoading } = useQuery({
+    queryKey: ['onboardingCounties', country],
+    queryFn: () => getCounties(country),
+  });
+  const countyOptions: PickerOption[] = (countiesData?.data ?? []).map((c) => ({ id: c._id, name: c.name }));
+
+  const { data: subcountiesData, isFetching: subcountiesLoading } = useQuery({
+    queryKey: ['onboardingSubcounties', countyId],
+    queryFn: () => getSubcounties(countyId as string),
+    enabled: !!countyId,
+  });
+  const subCountyOptions: PickerOption[] = (subcountiesData?.data ?? []).map((s) => ({ id: s._id, name: s.name }));
+
+  // The sub-county step only exists when the chosen county actually has data
+  // for it — every country but Kenya today. Recomputed as county changes.
+  const visibleSteps = useMemo(
+    () => STEPS.filter((s) => s.kind !== 'subCounty' || subCountyOptions.length > 0),
+    [subCountyOptions.length]
+  );
+
+  const current = visibleSteps[step];
+  const isFounderNote = current.kind === 'founder';
 
   const goNext = async () => {
-    if (current.field) {
+    if (current.kind === 'field' && current.field) {
       const valid = await trigger(current.field);
       if (!valid) {
         haptics.error();
@@ -107,10 +165,12 @@ export default function BusinessSetup() {
       shopName: values.shopName.trim(),
       ownerName: values.ownerName.trim(),
       phone: values.phone.trim(),
-      location: values.location.trim(),
+      country,
+      county: countyName,
+      subCounty: subCountyName,
       currency,
     });
-    if (step < STEPS.length - 1) {
+    if (step < visibleSteps.length - 1) {
       setStep((s) => s + 1);
     } else {
       router.push('/(onboarding)/permissions');
@@ -122,7 +182,10 @@ export default function BusinessSetup() {
     else router.back();
   };
 
-  const optionalStep = current.field === 'phone' || current.field === 'location';
+  const optionalStep =
+    (current.kind === 'field' && current.field === 'phone') ||
+    current.kind === 'county' ||
+    current.kind === 'subCounty';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -133,7 +196,7 @@ export default function BusinessSetup() {
       >
         <JourneyProgress
           step={step + 1}
-          total={STEPS.length}
+          total={visibleSteps.length}
           onBack={goBack}
           right={
             optionalStep ? (
@@ -172,7 +235,7 @@ export default function BusinessSetup() {
               </>
             ) : null}
 
-            {current.field === 'shopName' ? (
+            {current.kind === 'field' && current.field === 'shopName' ? (
               <Controller
                 control={control}
                 name="shopName"
@@ -192,7 +255,7 @@ export default function BusinessSetup() {
               />
             ) : null}
 
-            {current.field === 'ownerName' ? (
+            {current.kind === 'field' && current.field === 'ownerName' ? (
               <Controller
                 control={control}
                 name="ownerName"
@@ -212,7 +275,7 @@ export default function BusinessSetup() {
               />
             ) : null}
 
-            {current.field === 'phone' ? (
+            {current.kind === 'field' && current.field === 'phone' ? (
               <Controller
                 control={control}
                 name="phone"
@@ -231,26 +294,80 @@ export default function BusinessSetup() {
               />
             ) : null}
 
-            {current.field === 'location' ? (
-              <Controller
-                control={control}
-                name="location"
-                render={({ field }) => (
-                  <Input
-                    placeholder="Nairobi"
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    autoCapitalize="words"
-                    autoFocus
-                    leftIcon="location-outline"
-                    returnKeyType="next"
-                    onSubmitEditing={goNext}
+            {current.kind === 'country' ? (
+              <Animated.View entering={FadeInRight.duration(320).delay(100)} style={styles.currencyList}>
+                {COUNTRIES.map((c) => (
+                  <ChoiceCard
+                    key={c.code}
+                    label={`${c.flag}  ${c.name}`}
+                    selected={country === c.code}
+                    onPress={() => {
+                      setCountry(c.code);
+                      setCountyId(null);
+                      setCountyName('');
+                      setSubCountyName('');
+                    }}
                   />
-                )}
-              />
+                ))}
+              </Animated.View>
             ) : null}
 
-            {step === 4 ? (
+            {current.kind === 'county' ? (
+              <Animated.View entering={FadeInRight.duration(320).delay(100)}>
+                <AnimatedPressable
+                  style={styles.pickerField}
+                  onPress={() => setShowCountyPicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose county"
+                >
+                  <Ionicons name="location-outline" size={18} color={Colors.textTertiary} />
+                  <Text style={[styles.pickerFieldText, !countyName && styles.pickerFieldPlaceholder]}>
+                    {countyName || 'Select a county'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
+                </AnimatedPressable>
+                <SearchablePicker
+                  visible={showCountyPicker}
+                  title="Select county"
+                  options={countyOptions}
+                  loading={countiesLoading}
+                  selectedId={countyId}
+                  onSelect={(o) => {
+                    setCountyId(o.id);
+                    setCountyName(o.name);
+                    setSubCountyName('');
+                  }}
+                  onClose={() => setShowCountyPicker(false)}
+                />
+              </Animated.View>
+            ) : null}
+
+            {current.kind === 'subCounty' ? (
+              <Animated.View entering={FadeInRight.duration(320).delay(100)}>
+                <AnimatedPressable
+                  style={styles.pickerField}
+                  onPress={() => setShowSubCountyPicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose sub-county"
+                >
+                  <Ionicons name="pin-outline" size={18} color={Colors.textTertiary} />
+                  <Text style={[styles.pickerFieldText, !subCountyName && styles.pickerFieldPlaceholder]}>
+                    {subCountyName || 'Select a sub-county'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
+                </AnimatedPressable>
+                <SearchablePicker
+                  visible={showSubCountyPicker}
+                  title="Select sub-county"
+                  options={subCountyOptions}
+                  loading={subcountiesLoading}
+                  onSelect={(o) => setSubCountyName(o.name)}
+                  onClose={() => setShowSubCountyPicker(false)}
+                />
+              </Animated.View>
+            ) : null}
+
+            {current.kind === 'currency' ? (
               <Animated.View
                 entering={FadeInRight.duration(320).delay(100)}
                 style={styles.currencyList}
@@ -291,7 +408,7 @@ export default function BusinessSetup() {
           <View style={styles.footer}>
             <AnimatedPressable onPress={goNext} style={styles.nextBtn} accessibilityRole="button">
               <Text style={styles.nextBtnText}>
-                {isFounderNote ? 'Continue' : step === 4 ? 'Looks right' : 'Next'}
+                {isFounderNote ? 'Continue' : current.kind === 'currency' ? 'Looks right' : 'Next'}
               </Text>
               <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </AnimatedPressable>
@@ -331,6 +448,24 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   currencyList: { gap: Spacing.sm },
+  pickerField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+  },
+  pickerFieldText: {
+    flex: 1,
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textPrimary,
+  },
+  pickerFieldPlaceholder: { color: Colors.textTertiary },
   founderCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.sheet,

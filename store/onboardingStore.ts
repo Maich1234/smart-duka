@@ -29,7 +29,9 @@ export interface BusinessDraft {
   ownerName: string;
   shopName: string;
   phone: string;
-  location: string;
+  country: string;
+  county: string;
+  subCounty: string;
   currency: string;
 }
 
@@ -44,7 +46,9 @@ const emptyDraft: BusinessDraft = {
   ownerName: '',
   shopName: '',
   phone: '',
-  location: '',
+  country: 'KE',
+  county: '',
+  subCounty: '',
   currency: 'KES',
 };
 

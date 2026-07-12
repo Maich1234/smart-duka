@@ -72,9 +72,11 @@ export default function Celebrate() {
   // location land in the shop config without another form.
   useEffect(() => {
     if (!user || user.role !== 'owner') return;
-    const patch: { currency?: string; address?: string } = {};
+    const patch: { currency?: string; country?: string; county?: string; subCounty?: string } = {};
     if (draft.currency) patch.currency = draft.currency;
-    if (draft.location) patch.address = draft.location;
+    if (draft.country) patch.country = draft.country;
+    if (draft.county) patch.county = draft.county;
+    if (draft.subCounty) patch.subCounty = draft.subCounty;
     if (Object.keys(patch).length === 0) return;
     updateShopConfig(patch)
       .then(() => queryClient.invalidateQueries({ queryKey: ['shopConfig'] }))
