@@ -1,37 +1,27 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import {
-  View,
-  Text,
-  StyleSheet,
-  RefreshControl,
-  Dimensions,
-} from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { ScreenFade, CrossfadeCircle } from '@/components/ui/motion';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { ScreenFade } from '@/components/ui/motion';
+import { Shimmer } from '@/components/ui/Shimmer';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { getOwnerDashboard } from '@/services/dashboard';
-import { SalesSummaryCard } from '@/components/dashboard/SalesSummaryCard';
+import { useOwnerAttention } from '@/hooks/useAttention';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { TodayCard } from '@/components/dashboard/TodayCard';
+import { DailyBrief } from '@/components/dashboard/DailyBrief';
+import { QuickActions, type QuickActionTile } from '@/components/dashboard/QuickActions';
+import { NeedsAttention } from '@/components/dashboard/NeedsAttention';
+import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { GettingStartedChecklist } from '@/components/onboarding/GettingStartedChecklist';
 import { TrialBanner } from '@/components/subscription/TrialBanner';
-import { StatsRow } from '@/components/dashboard/StatsRow';
-import { LowStockList } from '@/components/dashboard/LowStockList';
-import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
-import { QuickActions, type QuickAction } from '@/components/dashboard/QuickActions';
-import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
-import { Shimmer } from '@/components/ui/Shimmer';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Colors } from '@/constants/Colors';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -42,9 +32,9 @@ const getGreeting = () => {
 
 const getFormattedDate = () =>
   new Date().toLocaleDateString('en-KE', {
-    weekday: 'long',
+    weekday: 'short',
     day: 'numeric',
-    month: 'long',
+    month: 'short',
   });
 
 const getShopInitials = (name: string) =>
@@ -55,61 +45,26 @@ const getShopInitials = (name: string) =>
     .join('')
     .toUpperCase();
 
-interface QuickAction {
-  id: string;
-  title: string;
-  subtitle: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  colors: readonly [string, string];
-  route: string;
-}
-
-const QUICK_ACTIONS: QuickAction[] = [
-  {
-    id: 'sale',
-    title: 'New Sale',
-    subtitle: 'Record transaction',
-    icon: 'cart',
-    colors: [Colors.primary, Colors.primaryLight],
-    route: '/(owner)/sales',
-  },
-  {
-    id: 'product',
-    title: 'Add Product',
-    subtitle: 'Expand inventory',
-    icon: 'cube',
-    colors: [Colors.accentDark, Colors.accent],
-    route: '/(owner)/inventory/new',
-  },
-  {
-    id: 'expense',
-    title: 'Log Expense',
-    subtitle: 'Track spending',
-    icon: 'receipt',
-    colors: ['#9F1239', Colors.danger], // Danger gradient
-    route: '/(owner)/expenses',
-  },
-  {
-    id: 'report',
-    title: 'Reports',
-    subtitle: 'View analytics',
-    icon: 'bar-chart',
-    colors: ['#1D4ED8', Colors.info], // Info gradient
-    route: '/(owner)/reports',
-  },
+// Ranked by daily usage: expenses get logged every day, products get added
+// weekly, reports get opened when there's a question to answer.
+const ACTION_TILES: QuickActionTile[] = [
+  { id: 'expense', title: 'Log Expense', icon: 'receipt-outline', tint: Colors.danger, tintBg: Colors.dangerSubtle, route: '/(owner)/expenses' },
+  { id: 'product', title: 'Add Product', icon: 'cube-outline', tint: Colors.accentDark, tintBg: Colors.accentSubtle, route: '/(owner)/inventory/new' },
+  { id: 'reports', title: 'Reports', icon: 'bar-chart-outline', tint: Colors.info, tintBg: '#DBEAFE', route: '/(owner)/reports' },
 ];
 
 const DashboardSkeleton = () => (
   <View style={styles.skeletonContainer}>
     <View style={styles.skeletonHeader}>
-      <Shimmer height={14} borderRadius={7} style={{ width: '50%' }} />
-      <Shimmer height={22} borderRadius={6} style={{ width: '70%', marginTop: 6 }} />
-      <Shimmer height={12} borderRadius={6} style={{ width: '35%', marginTop: 6 }} />
+      <Shimmer height={12} borderRadius={6} style={{ width: '45%' }} />
+      <Shimmer height={22} borderRadius={6} style={{ width: '65%', marginTop: 8 }} />
     </View>
-    <Shimmer height={180} borderRadius={24} style={styles.skeletonCard} />
-    <View style={styles.skeletonGrid}>
-      {[0, 1, 2, 3].map((i) => (
-        <Shimmer key={i} height={110} borderRadius={20} style={styles.skeletonAction} />
+    <Shimmer height={190} borderRadius={20} />
+    <Shimmer height={150} borderRadius={16} />
+    <Shimmer height={56} borderRadius={16} />
+    <View style={styles.skeletonTileRow}>
+      {[0, 1, 2].map((i) => (
+        <Shimmer key={i} height={76} borderRadius={16} style={styles.skeletonTile} />
       ))}
     </View>
   </View>
@@ -130,7 +85,11 @@ export default function OwnerDashboard() {
   });
   useEffect(() => {
     const id = setInterval(() => {
-      setTimeContext({ greeting: getGreeting(), formattedDate: getFormattedDate() });
+      const next = { greeting: getGreeting(), formattedDate: getFormattedDate() };
+      // Only re-render when the minute tick actually crossed a boundary.
+      setTimeContext((prev) =>
+        prev.greeting === next.greeting && prev.formattedDate === next.formattedDate ? prev : next,
+      );
     }, 60_000);
     return () => clearInterval(id);
   }, []);
@@ -140,6 +99,16 @@ export default function OwnerDashboard() {
     [user?.shop?.name],
   );
 
+  const dashboard = data?.data;
+  const attentionItems = useOwnerAttention(dashboard);
+
+  // Bell press scrolls to the attention zone rather than leaving the screen.
+  const scrollRef = useRef<ScrollView>(null);
+  const attentionY = useRef(0);
+  const scrollToAttention = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(attentionY.current - 12, 0), animated: true });
+  }, []);
+
   if (isLoading) {
     return (
       <ScreenFade rise={0} style={styles.container}>
@@ -148,7 +117,10 @@ export default function OwnerDashboard() {
     );
   }
 
-  if (isError) {
+  // Full-screen error only when there is nothing to show. With cached data
+  // (offline relaunch, flaky network) the dashboard renders the last synced
+  // day and pull-to-refresh stays available — never block on connectivity.
+  if (isError && !dashboard) {
     return (
       <ScreenFade rise={0} style={[styles.container, styles.errorCenter]}>
         <Ionicons name="cloud-offline-outline" size={48} color={Colors.textTertiary} />
@@ -162,75 +134,73 @@ export default function OwnerDashboard() {
     );
   }
 
-  const dashboard = data?.data;
-
   return (
     <>
       <StatusBar style="dark" />
       <ScreenFade style={styles.flex}>
-      <Animated.ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl }}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
-            progressViewOffset={insets.top}
+        <ScrollView
+          ref={scrollRef}
+          style={styles.container}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+              progressViewOffset={insets.top}
+            />
+          }
+        >
+          {/* 1 · Who and when */}
+          <DashboardHeader
+            greeting={timeContext.greeting}
+            shopName={user?.shop?.name ?? 'Smart Duka'}
+            formattedDate={timeContext.formattedDate}
+            shopInitials={shopInitials}
+            attentionCount={attentionItems.length}
+            onBellPress={scrollToAttention}
+            profileRoute="/(owner)/profile"
+            insetsTop={insets.top}
           />
-        }
-      >
-        {/* ── Premium header ──────────────────────────────────────────── */}
-        <DashboardHeader
-          greeting={timeContext.greeting}
-          shopName={user?.shop?.name ?? 'Smart Duka'}
-          formattedDate={timeContext.formattedDate}
-          shopInitials={shopInitials}
-          lowStockCount={dashboard?.lowStockItems?.length ?? 0}
-          insetsTop={insets.top}
-        />
 
-      {/* ── Hero performance card ────────────────────────────────────── */}
-      <SalesSummaryCard
-        total={dashboard?.todaySalesTotal ?? 0}
-        cash={dashboard?.cashSalesTotal ?? 0}
-        mpesa={dashboard?.mpesaSalesTotal ?? 0}
-        transactions={dashboard?.transactionsToday ?? 0}
-      />
+          {/* 2 · How is my business today? */}
+          <TodayCard
+            total={dashboard?.todaySalesTotal ?? 0}
+            cash={dashboard?.cashSalesTotal ?? 0}
+            mpesa={dashboard?.mpesaSalesTotal ?? 0}
+            transactions={dashboard?.transactionsToday ?? 0}
+            profit={dashboard?.todayProfit}
+            yesterdayTotal={dashboard?.yesterdaySalesTotal}
+          />
 
-      {/* ── Subscription nudge (trial ending / grace period / not activated) ── */}
-      <TrialBanner />
+          {/* 3 · What does it mean? */}
+          <DailyBrief data={dashboard} />
 
-      {/* ── First-week checklist (self-retires once the shop is running) ── */}
-      <GettingStartedChecklist />
+          {/* First-week checklist — self-retires once the shop is running */}
+          <GettingStartedChecklist />
 
-      {/* ── Quick actions grid ───────────────────────────────────────── */}
-      <QuickActions actions={QUICK_ACTIONS} />
+          {/* 4 · What should I do next? */}
+          <QuickActions primaryRoute="/(owner)/sales" tiles={ACTION_TILES} />
 
-      {/* ── Insight cards ────────────────────────────────────────────── */}
-      <StatsRow
-        products={dashboard?.totalProducts ?? 0}
-        stockValue={dashboard?.currentStockValue ?? 0}
-        lowStockCount={dashboard?.lowStockItems?.length ?? 0}
-      />
+          {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
+          <View onLayout={(e) => { attentionY.current = e.nativeEvent.layout.y; }}>
+            <TrialBanner />
+            <NeedsAttention items={attentionItems} />
+          </View>
 
-      {/* ── Smart alerts ─────────────────────────────────────────────── */}
-      <LowStockList items={dashboard?.lowStockItems ?? []} />
-
-      {/* ── Recent transactions ──────────────────────────────────────── */}
-      <RecentTransactions
-        transactions={dashboard?.recentTransactions ?? []}
-        showStaff
-      />
-      </Animated.ScrollView>
+          {/* 6 · Pulse check on the till */}
+          <RecentActivity
+            transactions={dashboard?.recentTransactions ?? []}
+            viewAllRoute="/(owner)/sales"
+            showStaff
+          />
+        </ScrollView>
       </ScreenFade>
     </>
   );
 }
-
-const ACTION_CARD_WIDTH = (SCREEN_WIDTH - Spacing.lg * 2 - 12) / 2;
 
 const styles = StyleSheet.create({
   flex: {
@@ -238,12 +208,10 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
   },
 
-
-
-  // ── Error state ─────────────────────────────────────────────────────────
+  // ── Error state ──────────────────────────────────────────────────────
   errorCenter: {
     flex: 1,
     alignItems: 'center',
@@ -280,23 +248,20 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  // ── Skeleton ─────────────────────────────────────────────────────────
+  // ── Skeleton — mirrors the real layout so load doesn't reflow ────────
   skeletonContainer: {
-    padding: Spacing.lg,
-    gap: Spacing.lg,
+    padding: Spacing.md,
+    gap: Spacing.md,
   },
   skeletonHeader: {
+    paddingTop: Spacing.xl,
     gap: 4,
   },
-  skeletonCard: {
-    marginTop: 4,
-  },
-  skeletonGrid: {
+  skeletonTileRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
-  skeletonAction: {
-    width: ACTION_CARD_WIDTH,
+  skeletonTile: {
+    flex: 1,
   },
 });

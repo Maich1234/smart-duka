@@ -1,98 +1,163 @@
-import React from 'react';
-import { View, Text, StyleSheet, RefreshControl } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useQuery } from '@tanstack/react-query';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { ScrollView } from 'react-native-gesture-handler';
 import { ScreenFade } from '@/components/ui/motion';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
-import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getStaffDashboard } from '@/services/dashboard';
-import { SalesSummaryCard } from '@/components/dashboard/SalesSummaryCard';
-import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
-import { ListRow } from '@/components/ui/ListRow';
+import { useStaffAttention } from '@/hooks/useAttention';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { TodayCard } from '@/components/dashboard/TodayCard';
+import { QuickActions, type QuickActionTile } from '@/components/dashboard/QuickActions';
+import { NeedsAttention } from '@/components/dashboard/NeedsAttention';
+import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const getFormattedDate = () =>
+  new Date().toLocaleDateString('en-KE', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+
+const getInitials = (name: string) =>
+  name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
 export default function StaffDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
   const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const canManageExpenses = usePermission('manage_expenses');
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['staffDashboard'],
     queryFn: getStaffDashboard,
   });
 
+  const [timeContext, setTimeContext] = useState({
+    greeting: getGreeting(),
+    formattedDate: getFormattedDate(),
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const next = { greeting: getGreeting(), formattedDate: getFormattedDate() };
+      setTimeContext((prev) =>
+        prev.greeting === next.greeting && prev.formattedDate === next.formattedDate ? prev : next,
+      );
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const attentionItems = useStaffAttention();
+  const initials = useMemo(() => getInitials(user?.name ?? 'S'), [user?.name]);
+
+  const tiles = useMemo<QuickActionTile[]>(() => {
+    const list: QuickActionTile[] = [
+      { id: 'inventory', title: 'Stock', icon: 'cube-outline', tint: Colors.accentDark, tintBg: Colors.accentSubtle, route: '/(staff)/inventory' },
+    ];
+    if (canManageExpenses) {
+      list.unshift({ id: 'expense', title: 'Log Expense', icon: 'receipt-outline', tint: Colors.danger, tintBg: Colors.dangerSubtle, route: '/(staff)/expenses' });
+    }
+    return list;
+  }, [canManageExpenses]);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const attentionY = useRef(0);
+  const scrollToAttention = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(attentionY.current - 12, 0), animated: true });
+  }, []);
+
   if (isLoading) {
     return <ListSkeleton rows={4} heroHeight={180} />;
   }
 
-  if (isError) {
+  const dashboard = data?.data;
+
+  // Only block on error when there's no cached day to show.
+  if (isError && !dashboard) {
     return (
       <ScreenFade rise={0} style={styles.errorCenter}>
-        <Ionicons name="cloud-offline-outline" size={48} color="#94A3B8" />
+        <Ionicons name="cloud-offline-outline" size={48} color={Colors.textTertiary} />
         <Text style={styles.errorTitle}>Could not load dashboard</Text>
         <Text style={styles.errorSub}>Check your connection and try again.</Text>
         <AnimatedPressable onPress={() => refetch()} style={styles.retryBtn}>
-          <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
+          <Ionicons name="refresh-outline" size={16} color={Colors.white} />
           <Text style={styles.retryBtnText}>Retry</Text>
         </AnimatedPressable>
       </ScreenFade>
     );
   }
 
-  const dashboard = data?.data;
-
   return (
-    <ScreenFade style={styles.container}>
-    <ScrollView
-      style={styles.flex}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
-      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
-    >
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Welcome,</Text>
-        <Text style={styles.name}>{user?.name}</Text>
-      </View>
-
-      <SalesSummaryCard
-        total={dashboard?.todaySalesTotal || 0}
-        cash={dashboard?.cashSalesTotal || 0}
-        mpesa={dashboard?.mpesaSalesTotal || 0}
-        transactions={dashboard?.transactionsToday || 0}
-      />
-
-      {canManageExpenses && (
-        <View style={styles.navSection}>
-          <ListRow
-            title="Expenses"
-            subtitle="Track rent, supplies & more"
-            icon="cash-outline"
-            chevron
-            isLast
-            onPress={() => router.push('/(staff)/expenses')}
+    <>
+      <StatusBar style="dark" />
+      <ScreenFade style={styles.container}>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.flex}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} colors={[Colors.primary]} progressViewOffset={insets.top} />
+          }
+        >
+          <DashboardHeader
+            greeting={timeContext.greeting}
+            shopName={user?.name ?? 'Staff'}
+            formattedDate={timeContext.formattedDate}
+            shopInitials={initials}
+            attentionCount={attentionItems.length}
+            onBellPress={scrollToAttention}
+            profileRoute="/(staff)/profile"
+            insetsTop={insets.top}
           />
-        </View>
-      )}
 
-      <RecentTransactions transactions={dashboard?.recentSales || []} showStaff={false} />
-    </ScrollView>
-    </ScreenFade>
+          <TodayCard
+            total={dashboard?.todaySalesTotal ?? 0}
+            cash={dashboard?.cashSalesTotal ?? 0}
+            mpesa={dashboard?.mpesaSalesTotal ?? 0}
+            transactions={dashboard?.transactionsToday ?? 0}
+            yesterdayTotal={dashboard?.yesterdaySalesTotal}
+          />
+
+          <QuickActions primaryRoute="/(staff)/sales" tiles={tiles} />
+
+          <View onLayout={(e) => { attentionY.current = e.nativeEvent.layout.y; }}>
+            <NeedsAttention items={attentionItems} />
+          </View>
+
+          <RecentActivity
+            transactions={dashboard?.recentSales ?? []}
+            viewAllRoute="/(staff)/sales"
+          />
+        </ScrollView>
+      </ScreenFade>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   flex: { flex: 1 },
-  header: { padding: Spacing.lg, paddingBottom: Spacing.sm },
-  greeting: { fontSize: Typography.size.body, color: Colors.textSecondary },
-  name: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
-  navSection: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg },
   errorCenter: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -127,6 +192,6 @@ const styles = StyleSheet.create({
   retryBtnText: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
-    color: '#FFFFFF',
+    color: Colors.white,
   },
 });

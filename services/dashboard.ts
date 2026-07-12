@@ -1,10 +1,23 @@
 import api from './api';
 
+export interface TopProduct {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
 export interface OwnerDashboardData {
   todaySalesTotal: number;
   cashSalesTotal: number;
   mpesaSalesTotal: number;
   transactionsToday: number;
+  // Optional — added July 2026; older deployed backends won't return these,
+  // so every consumer must degrade gracefully when they're undefined.
+  yesterdaySalesTotal?: number;
+  todayProfit?: number;
+  todayExpensesTotal?: number;
+  topProduct?: TopProduct | null;
+  openShiftsCount?: number;
   totalProducts: number;
   currentStockValue: number;
   lowStockItems: {
@@ -32,6 +45,8 @@ export interface StaffDashboardData {
   cashSalesTotal: number;
   mpesaSalesTotal: number;
   transactionsToday: number;
+  /** Optional — older deployed backends won't return this. */
+  yesterdaySalesTotal?: number;
   recentSales: {
     _id: string;
     invoiceNumber: string;

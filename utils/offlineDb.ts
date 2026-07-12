@@ -45,6 +45,20 @@ export const initOfflineDb = (): void => {
       );
       CREATE INDEX IF NOT EXISTS idx_queue_ready
         ON offline_queue(status, next_attempt_at);
+
+      CREATE TABLE IF NOT EXISTS ai_insight_cache (
+        shop_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        priority TEXT NOT NULL,
+        actions TEXT NOT NULL,
+        health INTEGER NOT NULL,
+        snapshot TEXT NOT NULL,
+        cached_at INTEGER NOT NULL,
+        PRIMARY KEY (shop_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_insight_shop_date
+        ON ai_insight_cache(shop_id, date);
     `);
   } catch (err) {
     _available = false;

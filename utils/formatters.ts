@@ -36,6 +36,28 @@ export const formatDateTime = (dateString: string | Date): string => {
 };
 
 /**
+ * Compact relative timestamp for activity feeds. Recent events read as time
+ * elapsed ("Just now", "12 min ago", "2 hrs ago"); older same-day events show
+ * the clock time; anything before today shows the short date.
+ */
+export const formatRelativeTime = (dateString: string | Date, now: Date = new Date()): string => {
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin} min ago`;
+
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) {
+    const diffHrs = Math.floor(diffMin / 60);
+    if (diffHrs < 4) return `${diffHrs} hr${diffHrs === 1 ? '' : 's'} ago`;
+    return date.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+  }
+  return date.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
+};
+
+/**
  * Format phone number in local notation (e.g., 254712345678 → 0712 345 678)
  */
 export const formatPhoneNumber = (phone: string): string => {

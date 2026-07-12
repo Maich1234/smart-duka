@@ -260,6 +260,14 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="insights"
+        options={{
+          title: 'Insights',
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="expenses"
         options={{
           title: 'Expenses',
