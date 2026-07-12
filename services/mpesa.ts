@@ -23,7 +23,6 @@ export interface InitiateSTKPushResponse {
   };
   message: string;
 }
-
 export interface MpesaTransaction {
   _id: string;
   shop: string;
