@@ -13,6 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '@/context/AuthContext';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
@@ -51,8 +52,11 @@ export default function LoginScreen() {
     const result = await login(data.email, data.password);
     setLoading(false);
     if (result.success) {
+      // Any sign-in means this device is no longer "new" — cold starts should
+      // go to login, not the welcome journey.
+      useOnboardingStore.getState().markCompleted();
       if (verified === '1' && result.role === 'owner') {
-        router.replace('/(auth)/onboarding');
+        router.replace('/(onboarding)/celebrate');
       } else {
         router.replace(
           result.role === 'owner' ? '/(owner)/dashboard' : '/(staff)/dashboard'
@@ -103,6 +107,8 @@ export default function LoginScreen() {
               keyboardType="email-address"
               leftIcon="mail-outline"
               returnKeyType="next"
+              autoComplete="email"
+              textContentType="username"
             />
           )}
         />
@@ -120,6 +126,8 @@ export default function LoginScreen() {
               error={errors.password?.message}
               returnKeyType="done"
               onSubmitEditing={handleSubmit(onSubmit)}
+              autoComplete="current-password"
+              textContentType="password"
             />
           )}
         />

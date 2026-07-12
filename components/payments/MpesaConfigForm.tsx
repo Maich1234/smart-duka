@@ -17,6 +17,8 @@ interface Props {
     consumerKey?: string;
     consumerSecret?: string;
     passkey?: string;
+    initiatorName?: string;
+    securityCredential?: string;
   }) => Promise<void>;
   loading?: boolean;
   onCancel?: () => void;
@@ -24,6 +26,7 @@ interface Props {
     environment: 'sandbox' | 'production';
     businessName: string;
     shortcode: string;
+    initiatorName?: string;
   };
   isEditing?: boolean;
 }
@@ -43,6 +46,8 @@ export const MpesaConfigForm: React.FC<Props> = ({
   const [consumerKey, setConsumerKey] = useState('');
   const [consumerSecret, setConsumerSecret] = useState('');
   const [passkey, setPasskey] = useState('');
+  const [initiatorName, setInitiatorName] = useState(initialValues?.initiatorName ?? '');
+  const [securityCredential, setSecurityCredential] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
@@ -58,6 +63,10 @@ export const MpesaConfigForm: React.FC<Props> = ({
       if (consumerSecret.trim() && consumerSecret.trim().length < 10) e.consumerSecret = 'Consumer secret must be at least 10 characters';
       if (passkey.trim() && passkey.trim().length < 10) e.passkey = 'Passkey must be at least 10 characters';
     }
+    // Refund credentials are optional, but a security credential is useless
+    // without the matching initiator name (and too short means a paste error).
+    if (securityCredential.trim() && securityCredential.trim().length < 10) e.securityCredential = 'Security credential must be at least 10 characters';
+    if (securityCredential.trim() && !initiatorName.trim()) e.initiatorName = 'Initiator name is required with a security credential';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -72,6 +81,9 @@ export const MpesaConfigForm: React.FC<Props> = ({
     if (consumerKey.trim()) payload.consumerKey = consumerKey.trim();
     if (consumerSecret.trim()) payload.consumerSecret = consumerSecret.trim();
     if (passkey.trim()) payload.passkey = passkey.trim();
+    // Send initiatorName whenever it differs from the stored value (empty clears it)
+    if (initiatorName.trim() !== (initialValues?.initiatorName ?? '')) payload.initiatorName = initiatorName.trim();
+    if (securityCredential.trim()) payload.securityCredential = securityCredential.trim();
     await onSave(payload);
   };
 
@@ -193,6 +205,36 @@ export const MpesaConfigForm: React.FC<Props> = ({
         autoCapitalize="none"
         autoCorrect={false}
         error={errors.passkey}
+      />
+
+      {/* Refund credentials (optional) */}
+      <Text style={styles.sectionTitle}>Refund Credentials (Optional)</Text>
+      <Text style={styles.credentialNote}>
+        Needed only to send M-Pesa refunds back to customers (Transaction Reversal). Create an API
+        operator on the <Text style={styles.credentialLink}>Daraja portal</Text>, then paste the
+        Initiator Name and the generated Security Credential here.
+      </Text>
+
+      <Input
+        label="Initiator Name"
+        value={initiatorName}
+        onChangeText={(t) => { setInitiatorName(t); setErrors((p) => ({ ...p, initiatorName: '' })); }}
+        leftIcon="person-outline"
+        placeholder="e.g. testapi"
+        autoCapitalize="none"
+        autoCorrect={false}
+        error={errors.initiatorName}
+      />
+      <Input
+        label="Security Credential"
+        value={securityCredential}
+        onChangeText={(t) => { setSecurityCredential(t); setErrors((p) => ({ ...p, securityCredential: '' })); }}
+        leftIcon="shield-checkmark-outline"
+        placeholder={isEditing ? '••••  Leave blank to keep existing' : 'Generated on the Daraja portal'}
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        error={errors.securityCredential}
       />
 
       <View style={styles.actionRow}>

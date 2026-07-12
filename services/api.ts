@@ -3,6 +3,7 @@ import { API_BASE_URL } from '@/constants/config';
 import { useAuthStore } from '@/store/authStore';
 import { enqueueOperation } from '@/utils/offlineQueue';
 import { refreshAuthToken } from '@/utils/tokenRefresh';
+import { randomUUID } from '@/utils/uuid';
 import NetInfo from '@react-native-community/netinfo';
 
 const api = axios.create({
@@ -16,10 +17,21 @@ const api = axios.create({
 // Endpoints that require live connectivity — never queue these offline.
 // M-Pesa STK push must reach Safaricom in real time; queuing it later
 // would push a payment prompt to the customer hours after they left the shop.
-const REALTIME_ONLY = ['/mpesa/initiate', '/mpesa/verify-receipt'];
+// Refunds move money out of the till — they must never fire silently later.
+// Subscription actions (trial, pay, cancel) are billing events — replaying
+// them from a queue hours later could charge the owner unexpectedly.
+const REALTIME_ONLY = ['/mpesa/initiate', '/mpesa/verify-receipt', '/refund', '/subscriptions/'];
+
+// Auth requests carry credentials and only make sense interactively — never
+// write them (and the password inside) to the offline outbox. Fail fast with
+// a connection error instead of "saved offline".
+const NEVER_QUEUE = ['/auth/'];
 
 const isRealtimeOnly = (url: string) =>
   REALTIME_ONLY.some(p => url.includes(p));
+
+const isNeverQueued = (url: string) =>
+  isRealtimeOnly(url) || NEVER_QUEUE.some(p => url.includes(p));
 
 // True for errors that mean the request never reached (or never returned from)
 // the server — safe to queue and retry.
@@ -77,7 +89,7 @@ api.interceptors.request.use(async (config) => {
     // Generate ONE stable key per request attempt. Stored on the config so the
     // response interceptor can use it if the request fails mid-flight, and
     // reused when the same config is replayed after a token refresh.
-    const idempotencyKey = (config as any)._idempotencyKey ?? crypto.randomUUID();
+    const idempotencyKey = (config as any)._idempotencyKey ?? randomUUID();
     (config as any)._idempotencyKey = idempotencyKey;
     // Forward to server so it can deduplicate on its end.
     config.headers['X-Idempotency-Key'] = idempotencyKey;
@@ -87,12 +99,19 @@ api.interceptors.request.use(async (config) => {
       if (isRealtimeOnly(config.url ?? '')) {
         throw new Error('OFFLINE_REALTIME');
       }
-      return queueAndReject(
-        config.method,
-        config.url ?? '',
-        config.data,
-        idempotencyKey,
-      ) as any;
+      // NEVER_QUEUE (auth) is exempt from the pre-flight block: NetInfo can
+      // report a false "offline" (stale native module, emulator quirks), and
+      // rejecting here would brick login while the network is actually fine.
+      // Attempt the request anyway — a real outage rejects below and is
+      // mapped to a connection error in the response interceptor.
+      if (!isNeverQueued(config.url ?? '')) {
+        return queueAndReject(
+          config.method,
+          config.url ?? '',
+          config.data,
+          idempotencyKey,
+        ) as any;
+      }
     }
   }
 
@@ -122,22 +141,25 @@ api.interceptors.response.use(
         message: 'M-Pesa requires an internet connection. Please connect and try again.',
       });
     }
-
     // Network failure mid-flight: request was dispatched but never completed.
     // Queue it so the mutation isn't lost — this is the "forever loading" fix.
     const config = error.config;
-    if (
-      isNetworkFailure(error) &&
-      config?.method &&
-      config.method.toLowerCase() !== 'get' &&
-      !isRealtimeOnly(config?.url ?? '')
-    ) {
-      // Re-use the key generated in the request interceptor so the idempotency
-      // table deduplicates this if it was already queued by a fast pre-flight.
-      const key =
-        (config as any)._idempotencyKey ??
-        `net-fail:${config.method}:${config.url}:${crypto.randomUUID()}`;
-      return queueAndReject(config.method, config.url ?? '', config.data, key);
+    if (isNetworkFailure(error) && config?.method && config.method.toLowerCase() !== 'get') {
+      if (!isNeverQueued(config?.url ?? '')) {
+        // Re-use the key generated in the request interceptor so the idempotency
+        // table deduplicates this if it was already queued by a fast pre-flight.
+        const key =
+          (config as any)._idempotencyKey ??
+          `net-fail:${config.method}:${config.url}:${randomUUID()}`;
+        return queueAndReject(config.method, config.url ?? '', config.data, key);
+      }
+      if (!isRealtimeOnly(config?.url ?? '')) {
+        // Auth request that genuinely couldn't reach the server — never
+        // queued, so surface a connection error the UI can show verbatim.
+        return Promise.reject({
+          message: 'No internet connection. Please check your network and try again.',
+        });
+      }
     }
 
     if (error.response?.status === 401) {

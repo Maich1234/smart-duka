@@ -32,21 +32,31 @@ export interface Sale {
   // M-Pesa fields (populated for mpesa payment method)
   mpesaTransactionId?: string;
   mpesaReceiptNumber?: string;
-  /** 'voided' sales stay in history but are excluded from all revenue stats */
-  status?: 'completed' | 'voided';
+  /** 'voided'/'refunded' sales stay in history but are excluded from all revenue stats */
+  status?: 'completed' | 'voided' | 'refund_pending' | 'refunded';
   voidedAt?: string;
   voidReason?: string;
+  /** Refund lifecycle — set once a refund has been requested for this sale */
+  refund?: {
+    amount?: number;
+    method?: 'cash' | 'mpesa';
+    reason?: string;
+    requestedAt?: string;
+    completedAt?: string;
+    /** Why the last M-Pesa reversal attempt failed (sale returns to 'completed') */
+    failureReason?: string;
+  };
 }
 
 export interface CreateSaleData {
-  items: Array<{
+  items: {
     productId: string;
     quantity: number;
     /** Override for 'variable'/'service' (price-override-enabled) products */
     unitPrice?: number;
     /** Required for 'configurable' products */
     variantId?: string;
-  }>;
+  }[];
   paymentMethod: 'cash' | 'mpesa' | 'card';
   /** Normal M-Pesa flow: links the confirmed STK Push transaction */
   mpesaTransactionId?: string;
@@ -124,6 +134,24 @@ export const getSales = async (params?: {
  */
 export const voidSale = async (id: string, reason?: string): Promise<SaleResponse> => {
   const response = await api.post(`/sales/${id}/void`, reason ? { reason } : {});
+  return response.data;
+};
+
+/**
+ * Refund a sale: returns the customer's money and restores stock.
+ * M-Pesa sales are reversed through Safaricom (async — the sale sits in
+ * 'refund_pending' until the reversal completes); pass method 'cash' to hand
+ * the money back over the counter instead. Owner, or staff with
+ * 'refund_own_sales' (own sales) / 'refund_all_sales' (any sale).
+ */
+export const refundSale = async (
+  id: string,
+  opts?: { reason?: string; method?: 'cash' }
+): Promise<SaleResponse> => {
+  const response = await api.post(`/sales/${id}/refund`, {
+    ...(opts?.reason ? { reason: opts.reason } : {}),
+    ...(opts?.method ? { method: opts.method } : {}),
+  });
   return response.data;
 };
 

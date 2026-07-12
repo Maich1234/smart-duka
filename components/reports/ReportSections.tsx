@@ -317,6 +317,22 @@ const ins = StyleSheet.create({
 
 const SHORTCUTS = [
   {
+    id: 'daily-summary',
+    label: 'Daily Summary',
+    sub: 'End-of-day report',
+    icon: 'sunny-outline' as const,
+    colors: ['#0D3B2E', '#0F766E'] as [string, string],
+    route: '/(owner)/summary',
+  },
+  {
+    id: 'shifts',
+    label: 'Shifts',
+    sub: 'Till sessions',
+    icon: 'time-outline' as const,
+    colors: ['#9F1239', '#E11D48'] as [string, string],
+    route: '/(owner)/shifts',
+  },
+  {
     id: 'expenses',
     label: 'Expenses',
     sub: 'Track costs',

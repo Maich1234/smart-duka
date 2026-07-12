@@ -24,10 +24,6 @@ export default function AuthLayout() {
         name="verify-email"
         options={{ gestureEnabled: false }}
       />
-      <Stack.Screen
-        name="onboarding"
-        options={{ gestureEnabled: false }}
-      />
     </Stack>
   );
 }

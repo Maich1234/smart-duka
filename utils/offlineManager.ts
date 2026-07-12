@@ -32,7 +32,10 @@ export const setupOfflineListener = () => {
   // Wire React Query's online state to NetInfo and flush the queue on reconnect.
   onlineManager.setEventListener((setOnline) => {
     return NetInfo.addEventListener(state => {
-      const connected = !!state.isConnected;
+      // isConnected is null while NetInfo hasn't produced a reading yet —
+      // only an explicit false means offline. Treating "unknown" as offline
+      // pauses React Query and strands the queue (matches api.ts policy).
+      const connected = state.isConnected !== false;
       setOnline(connected);
       if (connected) {
         processQueue();
@@ -50,7 +53,7 @@ export const setupOfflineListener = () => {
   AppState.addEventListener('change', (nextState: AppStateStatus) => {
     if (nextState === 'active') {
       NetInfo.fetch().then(state => {
-        if (state.isConnected && getPendingCount() > 0) {
+        if (state.isConnected !== false && getPendingCount() > 0) {
           processQueue();
           startPeriodicRetry();
         }
@@ -63,5 +66,7 @@ export const setupOfflineListener = () => {
 
 export const isOnline = async (): Promise<boolean> => {
   const netInfo = await NetInfo.fetch();
-  return netInfo.isConnected ?? false;
+  // null (unknown) counts as online — an attempted request that fails gets
+  // queued/backed off anyway, whereas assuming offline blocks it entirely.
+  return netInfo.isConnected !== false;
 };

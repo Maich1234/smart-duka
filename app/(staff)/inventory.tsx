@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, RefreshControl, StyleSheet, Text } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
@@ -11,7 +12,6 @@ import { useSearch, localFilter } from '@/hooks/useSearch';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { usePermission } from '@/utils/permissions';
-import { useMemo } from 'react';
 
 export default function StaffInventory() {
   const tabBarHeight = useBottomTabBarHeight();
@@ -70,9 +70,10 @@ export default function StaffInventory() {
         showAddButton={false}
         productCount={allProducts.length}
       />
-      <FlatList
+      <FlashList
         showsVerticalScrollIndicator={false}
         data={products}
+        estimatedItemSize={120}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <ProductCard product={item} showCostPrice={false} showActions={false} />

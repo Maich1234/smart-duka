@@ -169,6 +169,7 @@ APP_SCHEME    = 'smartduka'                        // deep-link scheme
 | `AT_USERNAME` | Africa's Talking username (`sandbox` for testing) |
 | `AT_API_KEY` | Africa's Talking API key |
 | `MPESA_CALLBACK_URL` | Public HTTPS URL Safaricom POSTs STK Push results to |
+| `MPESA_REVERSAL_RESULT_URL` | (Optional) Public HTTPS URL for Transaction Reversal (refund) results — defaults to `MPESA_CALLBACK_URL` with `/callback` replaced by `/reversal-result` |
 
 ---
 
@@ -251,6 +252,7 @@ Historical sales ledger for the whole shop.
 - Paginated `SalesList` with `SaleCard` rows
 - Tap any sale → `SaleDetailsModal` with full line-item breakdown
 - Receipt re-print from the detail modal (HTML receipt via `expo-print`)
+- Void and Refund actions in the detail modal. Refunding an M-Pesa sale sends the money back to the customer via Safaricom's Transaction Reversal API (needs the Initiator Name + Security Credential saved under Profile → Payments → Refund Credentials); any sale can alternatively be refunded in cash. Refunded sales stay in history with a badge and drop out of all revenue stats, and their stock is restored once the refund completes.
 
 ---
 
@@ -321,6 +323,8 @@ Track business running costs.
 #### Overview
 
 Each Smart Duka business connects their own **Lipa Na M-Pesa Business** account. Customers pay via STK Push (prompt on their phone) directly from the staff checkout screen. No shared Safaricom credentials — every shop owns their keys.
+
+**Refunds (Transaction Reversal):** the config form has an optional "Refund Credentials" section — the **Initiator Name** (Daraja API operator username) and **Security Credential** (the RSA-encrypted initiator password generated on the Daraja portal). With these saved, M-Pesa sales can be refunded straight back to the customer's phone from the sale detail modal. Without them, refunds fall back to cash-over-the-counter. Both are stored encrypted like the other credentials.
 
 #### Payments Section (Shop Settings)
 
@@ -465,6 +469,7 @@ Point-of-sale interface:
 - `SalesList` filtered to the staff member's own sales (or all sales if `view_all_sales` permission is granted)
 - Date range filter, payment method filter
 - `SaleDetailsModal` with full breakdown
+- Staff with `refund_own_sales` can refund their own sales; `refund_all_sales` extends this to every sale in the shop (and auto-grants `view_all_sales`). M-Pesa sales offer "Refund via M-Pesa" (Safaricom reversal) or "Refund in Cash"
 
 **Special product type handling:**
 
@@ -584,6 +589,8 @@ All protected endpoints require: `Authorization: Bearer <jwt_token>`
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | POST | `/sales` | Bearer | Record a sale (atomic, stock deduction) |
+| POST | `/sales/:id/void` | Bearer | Void a mis-recorded sale — owner or `void_sale` staff; restores stock |
+| POST | `/sales/:id/refund` | Bearer | Refund a sale — owner or `refund_own_sales`/`refund_all_sales` staff. M-Pesa sales are reversed via Safaricom (async: sale sits in `refund_pending` until the result webhook settles it); body `{ method: 'cash' }` refunds over the counter instead. Restores stock once the money is back |
 | GET | `/sales` | Bearer | List sales (date range, staff, payment method, page) |
 | GET | `/sales/me` | Bearer | Personal sales (staff) |
 | GET | `/sales/:id` | Bearer | Get sale by ID (includes receiptToken) |
@@ -668,6 +675,8 @@ Rate-limited: 3 requests / 10 min; 10 verifications / 10 min.
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | POST | `/mpesa/callback` | **Public** | Safaricom STK Push result webhook |
+| POST | `/mpesa/reversal-result` | **Public** | Safaricom Transaction Reversal (refund) result webhook |
+| POST | `/mpesa/reversal-result-timeout` | **Public** | Safaricom reversal queue-timeout webhook |
 | POST | `/mpesa/initiate` | Staff or Owner | Initiate STK Push (returns transactionId) |
 | GET | `/mpesa/status/:transactionId` | Staff or Owner | Poll transaction status |
 | GET | `/mpesa/transactions` | Owner | List M-Pesa transactions (search, status, page) |
@@ -712,6 +721,9 @@ Full permission list:
 | `view_sales` | Sales | View own sales |
 | `record_sale` | Sales | Create a sale |
 | `view_all_sales` | Sales | View all shop sales (not just own) |
+| `void_sale` | Sales | Void mis-recorded sales (restores stock) |
+| `refund_own_sales` | Sales | Refund sales the staff member recorded themselves |
+| `refund_all_sales` | Sales | Refund any sale in the shop — granting this automatically grants `view_all_sales` (you can't refund what you can't see) |
 | `manage_expenses` | Expenses | Create, edit, delete expenses |
 | `manage_staff` | Staff | Reserved — owner only |
 | `edit_shop_settings` | Settings | Reserved — owner only |

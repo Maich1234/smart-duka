@@ -1,0 +1,64 @@
+/home/maich/Documents/smart-duka/.expo/static-tmp/_error.js import/no-unresolved
+/home/maich/Documents/smart-duka/.expo/types/router.d.ts 
+/home/maich/Documents/smart-duka/app/(auth)/forgot-password.tsx react-hooks/incompatible-library
+/home/maich/Documents/smart-duka/app/(auth)/register.tsx react-hooks/incompatible-library
+/home/maich/Documents/smart-duka/app/(auth)/verify-email.tsx react/no-unescaped-entities, react/no-unescaped-entities
+/home/maich/Documents/smart-duka/app/(onboarding)/celebrate.tsx react-hooks/exhaustive-deps, react-hooks/exhaustive-deps, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/app/(onboarding)/demo.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/app/(onboarding)/preparing.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/app/(onboarding)/setup.tsx import/no-duplicates, import/no-duplicates
+/home/maich/Documents/smart-duka/app/(onboarding)/signup.tsx react-hooks/incompatible-library
+/home/maich/Documents/smart-duka/app/(owner)/_layout.tsx @typescript-eslint/no-unused-vars, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unused-vars, @typescript-eslint/no-unused-vars, @typescript-eslint/array-type
+/home/maich/Documents/smart-duka/app/(owner)/inventory/[id]/edit.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/app/(owner)/inventory/index.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/app/(owner)/payments.tsx @typescript-eslint/array-type, @typescript-eslint/no-unused-vars
+/home/maich/Documents/smart-duka/app/(owner)/sales.tsx @typescript-eslint/no-unused-vars, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/app/(owner)/staff/[id]/edit.tsx react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/app/(owner)/staff/[id]/index.tsx @typescript-eslint/no-unused-vars, @typescript-eslint/no-unused-vars
+/home/maich/Documents/smart-duka/app/(owner)/staff/index.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/app/(owner)/staff/new.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/app/(staff)/_layout.tsx @typescript-eslint/array-type
+/home/maich/Documents/smart-duka/app/(staff)/inventory.tsx import/no-duplicates, import/no-duplicates
+/home/maich/Documents/smart-duka/app/(staff)/sales.tsx @typescript-eslint/no-unused-vars, react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/app/_layout.tsx @typescript-eslint/array-type, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/app/splash.tsx react-hooks/exhaustive-deps, react-hooks/exhaustive-deps, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/auth/PasswordStrength.tsx react-hooks/exhaustive-deps, react-hooks/refs, react-hooks/refs
+/home/maich/Documents/smart-duka/components/dashboard/LowStockList.tsx @typescript-eslint/no-unused-vars
+/home/maich/Documents/smart-duka/components/dashboard/RecentTransactions.tsx @typescript-eslint/no-unused-vars
+/home/maich/Documents/smart-duka/components/dashboard/SalesSummaryCard.tsx react-hooks/set-state-in-effect, react/no-unescaped-entities
+/home/maich/Documents/smart-duka/components/expenses/ExpenseFormSheet.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/components/expenses/ExpensesScreen.tsx react/no-unescaped-entities, react/no-unescaped-entities
+/home/maich/Documents/smart-duka/components/inventory/InventoryStatsRow.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/components/inventory/ProductForm.tsx react/no-unescaped-entities
+/home/maich/Documents/smart-duka/components/inventory/StockUpdateModal.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/components/onboarding/Confetti.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/onboarding/GettingStartedChecklist.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/onboarding/HeroDashboard.tsx react-hooks/exhaustive-deps, react-hooks/exhaustive-deps, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/onboarding/JourneyProgress.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/onboarding/ProgressRing.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/payments/MpesaConfigForm.tsx @typescript-eslint/no-unused-vars
+/home/maich/Documents/smart-duka/components/payments/MpesaPaymentModal.tsx @typescript-eslint/no-unused-vars, import/no-duplicates, import/no-duplicates, react-hooks/exhaustive-deps, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/payments/PaymentsSection.tsx react-hooks/immutability
+/home/maich/Documents/smart-duka/components/payments/VerificationModal.tsx react-hooks/immutability, react-hooks/immutability, react-hooks/immutability, react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/components/reports/HeroRevenueCard.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/components/reports/PeriodSegmentControl.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/sales/QuantityModal.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/components/sales/SalesFilters.tsx @typescript-eslint/no-unused-vars
+/home/maich/Documents/smart-duka/components/sales/VariantPickerModal.tsx react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/components/shifts/ShiftGate.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/ui/AlertSystem/AlertModal.tsx @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, react-hooks/exhaustive-deps, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/ui/AlertSystem/LoadingOverlay.tsx react-hooks/exhaustive-deps, react-hooks/exhaustive-deps, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/ui/AlertSystem/ToastContainer.tsx react-hooks/immutability, react-hooks/exhaustive-deps, react-hooks/immutability, react-hooks/immutability, react-hooks/immutability, react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/ui/ContextualSearchBar.tsx react-hooks/immutability, react-hooks/immutability
+/home/maich/Documents/smart-duka/components/ui/EmptyState.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/ui/ErrorState.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/ui/Input.tsx react-hooks/refs, react-hooks/refs, react-hooks/refs, react-hooks/refs
+/home/maich/Documents/smart-duka/components/ui/LoadingState.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/components/ui/OfflineIndicator.tsx @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, react-hooks/set-state-in-effect, react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/context/AuthContext.tsx react-hooks/exhaustive-deps
+/home/maich/Documents/smart-duka/hooks/useSearch.ts react-hooks/set-state-in-effect
+/home/maich/Documents/smart-duka/services/api.ts import/no-named-as-default-member
+/home/maich/Documents/smart-duka/services/dashboard.ts @typescript-eslint/array-type, @typescript-eslint/array-type, @typescript-eslint/array-type
+/home/maich/Documents/smart-duka/services/ratings.ts @typescript-eslint/array-type, @typescript-eslint/array-type
+/home/maich/Documents/smart-duka/services/sales.ts @typescript-eslint/array-type
+/home/maich/Documents/smart-duka/services/staff.ts @typescript-eslint/array-type

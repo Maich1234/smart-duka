@@ -3,11 +3,11 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
-  FlatList,
   ScrollView,
   RefreshControl,
   StyleSheet,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -298,9 +298,10 @@ export default function OwnerInventory() {
       </View>
 
       {/* ── Product list ──────────────────────────────────────────────────── */}
-      <FlatList
+      <FlashList
         showsVerticalScrollIndicator={false}
         data={filteredProducts}
+        estimatedItemSize={120}
         keyExtractor={(item) => item._id}
         renderItem={({ item, index }) => (
           <ProductCard

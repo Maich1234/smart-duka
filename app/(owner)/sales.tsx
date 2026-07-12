@@ -11,7 +11,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { getSales, getSalesStats, voidSale, type Sale, type SalesResponse } from '@/services/sales';
+import { getSales, getSalesStats, voidSale, refundSale, type Sale, type SalesResponse } from '@/services/sales';
 import { useAlert } from '@/context/AlertContext';
 import { isOfflineQueued } from '@/utils/errors';
 import { getShopConfig } from '@/services/shop';
@@ -153,6 +153,46 @@ export default function OwnerSales() {
     });
   };
 
+  const refundMutation = useMutation({
+    mutationFn: ({ saleId, method }: { saleId: string; method?: 'cash' }) => refundSale(saleId, { method }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['salesStats'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // stock restored (cash refunds)
+      setModalVisible(false);
+      toast({ type: 'success', message: res.message || 'Refund processed.' });
+    },
+    onError: (error: any) => {
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not refund this sale.' });
+    },
+  });
+
+  const handleRefund = (sale: Sale) => {
+    const amount = formatCurrency(sale.totalAmount, currency);
+    if (sale.paymentMethod === 'mpesa') {
+      alert({
+        type: 'confirm',
+        title: 'Refund This Sale?',
+        message: `${amount} will be returned to the customer for ${sale.invoiceNumber}. Send it back through M-Pesa, or hand over cash?`,
+        buttons: [
+          { label: 'Cancel', variant: 'ghost' },
+          { label: 'Refund in Cash', onPress: () => refundMutation.mutate({ saleId: sale._id, method: 'cash' }) },
+          { label: 'Refund via M-Pesa', variant: 'danger', onPress: () => refundMutation.mutate({ saleId: sale._id }) },
+        ],
+      });
+      return;
+    }
+    alert({
+      type: 'confirm',
+      title: 'Refund This Sale?',
+      message: `Hand ${amount} back to the customer for ${sale.invoiceNumber}. The sale is removed from your totals and its stock restored. This cannot be undone.`,
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
+        { label: 'Refund Sale', variant: 'danger', onPress: () => refundMutation.mutate({ saleId: sale._id, method: 'cash' }) },
+      ],
+    });
+  };
+
   const stats = statsData?.data;
   const totalSales = stats?.totalSales ?? 0;
   const pctChange = stats?.percentageChange ?? 0;
@@ -185,7 +225,7 @@ export default function OwnerSales() {
       {/* ── Hero card ─────────────────────────────────────────────── */}
       <Animated.View entering={FadeInDown.duration(480).delay(60)} style={styles.heroWrapper}>
         <LinearGradient
-          colors={['#0A2318', '#0D4A38', '#0F766E']}
+          colors={[Colors.primaryDark, Colors.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}
@@ -203,13 +243,13 @@ export default function OwnerSales() {
               </View>
               <Text style={styles.heroAmount}>{formatCurrency(totalSales, currency)}</Text>
               {!isDateFiltered && (
-                <View style={[styles.changeBadge, { backgroundColor: pctChange >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(239,68,68,0.18)' }]}>
+                <View style={[styles.changeBadge, { backgroundColor: pctChange >= 0 ? Colors.successSubtle : Colors.dangerSubtle }]}>
                   <Ionicons
                     name={pctChange >= 0 ? 'arrow-up' : 'arrow-down'}
                     size={11}
-                    color={pctChange >= 0 ? '#4ADE80' : '#F87171'}
+                    color={pctChange >= 0 ? Colors.success : Colors.danger}
                   />
-                  <Text style={[styles.changeText, { color: pctChange >= 0 ? '#4ADE80' : '#F87171' }]}>
+                  <Text style={[styles.changeText, { color: pctChange >= 0 ? Colors.success : Colors.danger }]}>
                     {Math.abs(pctChange)}% vs last month
                   </Text>
                 </View>
@@ -234,16 +274,16 @@ export default function OwnerSales() {
           label="Cash Sales"
           amount={formatCurrency(cashTotal, currency)}
           pct={cashTotal > 0 ? `${cashPct}%` : undefined}
-          iconColor="#0F766E"
-          iconBg="#CCFBF1"
+          iconColor={Colors.primary}
+          iconBg={Colors.primarySubtle}
         />
         <PaymentStatCard
           icon="phone-portrait-outline"
           label="M-Pesa Sales"
           amount={formatCurrency(mpesaTotal, currency)}
           pct={mpesaTotal > 0 ? `${mpesaPct}%` : undefined}
-          iconColor="#0F766E"
-          iconBg="#CCFBF1"
+          iconColor={Colors.primary}
+          iconBg={Colors.primarySubtle}
           onPress={() => router.push('/(owner)/payments' as any)}
         />
         <PaymentStatCard
@@ -251,15 +291,15 @@ export default function OwnerSales() {
           label="Card Sales"
           amount={formatCurrency(cardTotal, currency)}
           pct={cardTotal > 0 ? `${cardPct}%` : undefined}
-          iconColor="#7C3AED"
+          iconColor={Colors.info}
           iconBg="#EDE9FE"
         />
         <PaymentStatCard
           icon="receipt-outline"
           label="Avg. Sale"
           amount={formatCurrency(avgSale, currency)}
-          iconColor="#92400E"
-          iconBg="#FEF3C7"
+          iconColor={Colors.warning}
+          iconBg={Colors.warningSubtle}
         />
       </Animated.View>
 
@@ -413,6 +453,9 @@ export default function OwnerSales() {
         canVoid
         onVoid={handleVoid}
         voiding={voidMutation.isPending}
+        canRefund
+        onRefund={handleRefund}
+        refunding={refundMutation.isPending}
       />
     </View>
   );
@@ -573,7 +616,7 @@ const styles = StyleSheet.create({
   heroAmount: {
     fontSize: 30,
     fontFamily: Typography.fontFamilyBold,
-    color: '#FFFFFF',
+    color: Colors.white,
     letterSpacing: -0.5,
   },
   changeBadge: {
@@ -611,7 +654,7 @@ const styles = StyleSheet.create({
   txCount: {
     fontSize: Typography.size.h3,
     fontFamily: Typography.fontFamilyBold,
-    color: '#FFFFFF',
+    color: Colors.white,
   },
 
   // ── Payment stat cards
@@ -690,7 +733,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   filterTabTextActive: {
-    color: '#FFFFFF',
+    color: Colors.white,
   },
 
   // ── Section header

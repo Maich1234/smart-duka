@@ -92,6 +92,30 @@ export const onForegroundMessage = (handler: (message: { notification?: { title?
   return () => unsubscribe();
 };
 
+/**
+ * Fires when the user TAPS a notification — either while the app was
+ * backgrounded (onNotificationOpenedApp) or fully quit (getInitialNotification)
+ * — so pushes can deep-link straight into the relevant screen.
+ */
+export const onNotificationOpened = (
+  handler: (data: Record<string, string>) => void
+): (() => void) => {
+  let unsubscribe = () => {};
+  loadMessaging().then((messaging) => {
+    if (!messaging) return;
+    unsubscribe = messaging().onNotificationOpenedApp((msg) => {
+      if (msg?.data) handler(msg.data as Record<string, string>);
+    });
+    messaging()
+      .getInitialNotification()
+      .then((msg) => {
+        if (msg?.data) handler(msg.data as Record<string, string>);
+      })
+      .catch(() => {});
+  });
+  return () => unsubscribe();
+};
+
 /** Keeps the backend's copy of the device token in sync when Firebase rotates it. */
 export const onTokenRefresh = (): (() => void) => {
   let unsubscribe = () => {};

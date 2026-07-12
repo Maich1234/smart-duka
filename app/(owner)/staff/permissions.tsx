@@ -29,10 +29,17 @@ export default function StaffPermissionsScreen() {
     return acc;
   }, {} as Record<string, Permission[]>);
 
+  // Refunding other staff members' sales requires seeing those sales, so the
+  // two permissions move together (the backend enforces the same rule).
   const toggle = (value: string) => {
-    setPermissions(
-      selected.includes(value) ? selected.filter((p) => p !== value) : [...selected, value]
-    );
+    if (selected.includes(value)) {
+      const next = selected.filter((p) => p !== value);
+      setPermissions(value === 'view_all_sales' ? next.filter((p) => p !== 'refund_all_sales') : next);
+      return;
+    }
+    const next = [...selected, value];
+    if (value === 'refund_all_sales' && !next.includes('view_all_sales')) next.push('view_all_sales');
+    setPermissions(next);
   };
 
   if (isLoading) {
@@ -65,7 +72,12 @@ export default function StaffPermissionsScreen() {
                     size={22}
                     color={isSelected ? Colors.primary : Colors.textSecondary}
                   />
-                  <Text style={styles.permissionLabel}>{perm.label}</Text>
+                  <View style={styles.permissionTextWrap}>
+                    <Text style={styles.permissionLabel}>{perm.label}</Text>
+                    {perm.value === 'refund_all_sales' && (
+                      <Text style={styles.permissionHint}>Also enables “View All Sales”</Text>
+                    )}
+                  </View>
                 </AnimatedPressable>
               );
             })}
@@ -108,6 +120,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
-  permissionLabel: { fontSize: Typography.size.body, color: Colors.textPrimary, flex: 1 },
+  permissionTextWrap: { flex: 1 },
+  permissionLabel: { fontSize: Typography.size.body, color: Colors.textPrimary },
+  permissionHint: { fontSize: Typography.size.caption, color: Colors.textTertiary, marginTop: 1 },
   footer: { padding: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.surface },
 });

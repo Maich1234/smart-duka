@@ -24,8 +24,8 @@ export interface RatingsResponse {
 export interface RatingsSummary {
   avgStars: number;
   totalRatings: number;
-  distribution: Array<{ stars: number; count: number }>;
-  byStaff: Array<{ staffId: string; staffName: string; avgStars: number; totalRatings: number }>;
+  distribution: { stars: number; count: number }[];
+  byStaff: { staffId: string; staffName: string; avgStars: number; totalRatings: number }[];
 }
 
 export interface RatingsSummaryResponse {

@@ -30,9 +30,9 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Button } from '@/components/ui/Button';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency , formatKenyanPhone } from '@/utils/formatters';
+import { randomUUID } from '@/utils/uuid';
 import { initiateSTKPush, getTransactionStatus, verifyByReceiptNumber, type MpesaTransactionStatus } from '@/services/mpesa';
-import { formatKenyanPhone } from '@/utils/formatters';
 
 interface Props {
   visible: boolean;
@@ -49,17 +49,6 @@ type ModalStatus = 'initiating' | 'pending' | 'success' | 'failed' | 'cancelled'
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_DURATION_MS = 120000; // 120 seconds
 const MAX_CONSECUTIVE_ERRORS = 5;
-
-/** UUID v4 generator — uses crypto.randomUUID when available (Hermes/modern), falls back gracefully. */
-function generateIdempotencyKey(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
 
 export const MpesaPaymentModal: React.FC<Props> = ({
   visible,
@@ -255,7 +244,7 @@ export const MpesaPaymentModal: React.FC<Props> = ({
     setCountdown(0);
     consecutiveErrorsRef.current = 0;
     // New payment intent → new idempotency key
-    idempotencyKeyRef.current = generateIdempotencyKey();
+    idempotencyKeyRef.current = randomUUID();
     sendSTKPush(idempotencyKeyRef.current);
 
     return () => {

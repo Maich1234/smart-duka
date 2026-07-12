@@ -34,6 +34,8 @@ import { ShopSettingsForm } from '@/components/profile/ShopSettingsForm';
 import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { openHelp } from '@/utils/openHelp';
+import { router } from 'expo-router';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -194,6 +196,8 @@ export default function OwnerProfile() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [togglingShifts, setTogglingShifts] = useState(false);
+  const restartOnboarding = useOnboardingStore((s) => s.restart);
 
   const { data: shopConfigData, isLoading: loadingShop } = useQuery({
     queryKey: ['shopConfig'],
@@ -233,6 +237,31 @@ export default function OwnerProfile() {
     await setNotificationsPreference(enabled);
     if (enabled) await registerDeviceForNotifications();
     else await unregisterDeviceFromNotifications();
+  };
+
+  const shiftManagementEnabled = shopConfigData?.data?.shiftManagementEnabled ?? false;
+  const handleToggleShiftManagement = async (enabled: boolean) => {
+    setTogglingShifts(true);
+    try {
+      await updateShopConfig({ shiftManagementEnabled: enabled });
+      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
+      queryClient.invalidateQueries({ queryKey: ['activeShift'] });
+      toast({
+        type: 'success',
+        message: enabled
+          ? 'Shift management is on — staff clock in before selling'
+          : 'Shift management is off',
+      });
+    } catch (error: any) {
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
+    } finally {
+      setTogglingShifts(false);
+    }
+  };
+
+  const handleReplayOnboarding = () => {
+    restartOnboarding();
+    router.push('/(onboarding)');
   };
 
   const handleShopUpdate = async () => {
@@ -462,6 +491,61 @@ export default function OwnerProfile() {
                 thumbColor={notificationsEnabled ? Colors.primary : Colors.textTertiary}
               />
             </View>
+
+            <View style={styles.prefDivider} />
+
+            <View style={styles.prefRow}>
+              <View style={[styles.prefIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="time-outline" size={17} color="#B91C1C" />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Shift Management</Text>
+                <Text style={styles.prefSub}>Staff clock in & reconcile the till; daily summary at close</Text>
+              </View>
+              <Switch
+                value={shiftManagementEnabled}
+                onValueChange={handleToggleShiftManagement}
+                disabled={togglingShifts || loadingShop}
+                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+                thumbColor={shiftManagementEnabled ? Colors.primary : Colors.textTertiary}
+              />
+            </View>
+
+            <View style={styles.prefDivider} />
+
+            <AnimatedPressable
+              style={styles.prefRow}
+              onPress={handleReplayOnboarding}
+              accessibilityRole="button"
+              accessibilityLabel="Replay the welcome tour"
+            >
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.accentSubtle }]}>
+                <Ionicons name="play-outline" size={17} color={Colors.accentDark} />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Replay the Tour</Text>
+                <Text style={styles.prefSub}>See the welcome experience again</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+            </AnimatedPressable>
+
+            <View style={styles.prefDivider} />
+
+            <AnimatedPressable
+              style={styles.prefRow}
+              onPress={() => router.push('/(owner)/subscription')}
+              accessibilityRole="button"
+              accessibilityLabel="Manage subscription"
+            >
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
+                <Ionicons name="shield-checkmark-outline" size={17} color={Colors.primaryDark} />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Subscription</Text>
+                <Text style={styles.prefSub}>Plan, free trial & M-PESA payments</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+            </AnimatedPressable>
           </View>
         </Animated.View>
 
@@ -696,6 +780,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   prefRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  prefDivider: { height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
   prefIconWrap: {
     width: 38,
     height: 38,

@@ -1,4 +1,5 @@
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 let _db: SQLiteDatabase | null = null;
 let _available = true;
@@ -6,6 +7,9 @@ let _available = true;
 export const getDb = (): SQLiteDatabase => {
   if (!_available) throw new Error('Offline storage unavailable');
   if (!_db) {
+    if (Platform.OS === 'web' && typeof window === 'undefined') {
+      throw new Error('SQLite cannot run during SSR');
+    }
     _db = openDatabaseSync('smart-duka-offline.db');
   }
   return _db;
@@ -20,6 +24,10 @@ export const getDb = (): SQLiteDatabase => {
 export const isOfflineDbAvailable = (): boolean => _available;
 
 export const initOfflineDb = (): void => {
+  if (Platform.OS === 'web' && typeof window === 'undefined') {
+    _available = false;
+    return;
+  }
   try {
     const db = getDb();
     db.execSync(`

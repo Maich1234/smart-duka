@@ -7,6 +7,7 @@ import {
   FlatList,
   RefreshControl,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -21,7 +22,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { getMpesaTransactions, type MpesaTransaction, type MpesaTransactionStatus } from '@/services/mpesa';
 import { formatCurrency, formatDateTime, formatKenyanPhone } from '@/utils/formatters';
 
-const STATUS_FILTERS: Array<{ label: string; value: MpesaTransactionStatus | 'all' }> = [
+const STATUS_FILTERS: { label: string; value: MpesaTransactionStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Success', value: 'success' },
   { label: 'Pending', value: 'pending' },
@@ -79,8 +80,9 @@ export default function PaymentsScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <FlashList
         data={allTransactions}
+        estimatedItemSize={80}
         keyExtractor={(item) => item._id}
         showsVerticalScrollIndicator={false}
         onEndReached={() => hasNextPage && fetchNextPage()}

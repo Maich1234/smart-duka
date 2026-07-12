@@ -42,13 +42,13 @@ export interface UpdateStaffData {
 
 export interface StaffSalesResponse {
   success: boolean;
-  data: Array<{
+  data: {
     _id: string;
     invoiceNumber: string;
     totalAmount: number;
     paymentMethod: string;
     createdAt: string;
-  }>;
+  }[];
   pagination: {
     page: number;
     limit: number;

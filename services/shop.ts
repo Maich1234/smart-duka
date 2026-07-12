@@ -13,6 +13,8 @@ export interface Shop {
   receiptThankYouNote?: string;
   logoUrl?: string;
   motto?: string;
+  /** Owner feature flag: staff must clock in before selling. */
+  shiftManagementEnabled?: boolean;
 }
 
 export interface ShopConfigResponse {
@@ -31,6 +33,7 @@ export interface UpdateShopConfigData {
   receiptThankYouNote?: string;
   logoUrl?: string;
   motto?: string;
+  shiftManagementEnabled?: boolean;
 }
 
 export const getShopConfig = async (): Promise<ShopConfigResponse> => {

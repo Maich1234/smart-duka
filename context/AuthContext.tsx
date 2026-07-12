@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { login as loginApi, getProfile } from '@/services/auth';
 import { API_BASE_URL } from '@/constants/config';
 import { clearAll } from '@/utils/storage';
+import { waitForHydration } from '@/utils/hydration';
 import {
   registerDeviceForNotifications,
   unregisterDeviceFromNotifications,
@@ -39,6 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // SecureStore hydration is async — reading the store before it lands
+        // sees a null user, skips the profile/FCM refresh, and flips
+        // isLoading off while a real session is still on its way in.
+        await waitForHydration(useAuthStore);
         const storedUser = useAuthStore.getState().user;
         if (storedUser) {
           await getProfile();
@@ -83,7 +88,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { success: false, message: response.message };
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Login failed';
+      if (__DEV__) console.error('[login] raw error:', error);
+      // error.message carries the reason for failures without an HTTP
+      // response (connection errors, interceptor rejections) — without it
+      // every such failure masquerades as bad credentials.
+      const message = error.response?.data?.message || error.message || 'Login failed';
       const needsVerification = error.response?.status === 401 && /verify your email/i.test(message);
       return { success: false, message, needsVerification };
     }

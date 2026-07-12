@@ -89,14 +89,16 @@ export const OfflineIndicator: React.FC = () => {
     // Seed the ref so the "queue just drained" logic works on the very first sync
     prevPendingRef.current = initial;
 
-    const unsubNet   = NetInfo.addEventListener(s => setOnline(!!s.isConnected));
+    // Only an explicit false means offline — null is "no reading yet" and
+    // must not flash the offline banner (matches api.ts/offlineManager policy).
+    const unsubNet   = NetInfo.addEventListener(s => setOnline(s.isConnected !== false));
     const unsubCount = onQueueCountChange(count => {
       setPendingCount(count);
       prevPendingRef.current = count;
     });
     const unsubSync  = onSyncStateChange(setSyncing);
 
-    NetInfo.fetch().then(s => setOnline(!!s.isConnected));
+    NetInfo.fetch().then(s => setOnline(s.isConnected !== false));
 
     return () => { unsubNet(); unsubCount(); unsubSync(); };
   }, []);

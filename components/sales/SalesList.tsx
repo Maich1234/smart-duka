@@ -1,5 +1,6 @@
 import React from 'react';
-import { FlatList, RefreshControl } from 'react-native';
+import { RefreshControl } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { SaleCard } from './SaleCard';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -36,9 +37,10 @@ export const SalesList: React.FC<SalesListProps> = ({
   }
 
   return (
-    <FlatList
+    <FlashList
       showsVerticalScrollIndicator={false}
       data={sales}
+      estimatedItemSize={100}
       keyExtractor={(item) => item._id}
       renderItem={({ item }) => (
         <SaleCard

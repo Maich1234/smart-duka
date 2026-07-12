@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
-import { createSale, getMySales, voidSale, type Sale } from '@/services/sales';
+import { createSale, getMySales, voidSale, refundSale, type Sale } from '@/services/sales';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { ProductCard } from '@/components/inventory/ProductCard';
@@ -22,6 +22,7 @@ import { SaleCard } from '@/components/sales/SaleCard';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
 import { ReceiptModal } from '@/components/sales/ReceiptModal';
 import { MpesaPaymentModal } from '@/components/payments/MpesaPaymentModal';
+import { ShiftGate, ActiveShiftBar } from '@/components/shifts/ShiftGate';
 import { applyBestPromotion } from '@/utils/promotions';
 import { isOfflineQueued } from '@/utils/errors';
 import { Colors } from '@/constants/Colors';
@@ -37,6 +38,10 @@ export default function StaffSales() {
   const canRecordSale = usePermission('record_sale');
   const canViewSales = usePermission('view_sales');
   const canVoidSale = usePermission('void_sale');
+  // This screen only lists the viewer's own sales, so either refund grant works
+  const canRefundOwn = usePermission('refund_own_sales');
+  const canRefundAll = usePermission('refund_all_sales');
+  const canRefundSale = canRefundOwn || canRefundAll;
   const { toast, alert } = useAlert();
 
   const {
@@ -134,11 +139,23 @@ export default function StaffSales() {
     }, [cart.length, alert, clearCart])
   );
 
-  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useQuery({
+  const { data: productsData, refetch: refetchProducts } = useQuery({
     queryKey: ['products', searchQuery, productsPage],
     queryFn: () => getProducts({ search: searchQuery, page: productsPage, limit: 10 }),
     enabled: canRecordSale,
   });
+
+  // Manual pull state (not isLoading/isRefetching) so the spinner never
+  // appears for query-key changes or background invalidation refetches.
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const onPullRefresh = async () => {
+    setPullRefreshing(true);
+    try {
+      await refetchProducts();
+    } finally {
+      setPullRefreshing(false);
+    }
+  };
 
   const { data: mySalesData } = useQuery({
     queryKey: ['mySales', salesPage],
@@ -210,6 +227,44 @@ export default function StaffSales() {
       buttons: [
         { label: 'Keep Sale', variant: 'ghost' },
         { label: 'Void Sale', variant: 'danger', onPress: () => voidMutation.mutate(sale._id) },
+      ],
+    });
+  };
+
+  const refundMutation = useMutation({
+    mutationFn: ({ saleId, method }: { saleId: string; method?: 'cash' }) => refundSale(saleId, { method }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['mySales'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // stock restored (cash refunds)
+      setDetailsModalVisible(false);
+      toast({ type: 'success', message: res.message || 'Refund processed.' });
+    },
+    onError: (error: any) => {
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not refund this sale.' });
+    },
+  });
+
+  const handleRefund = (sale: Sale) => {
+    if (sale.paymentMethod === 'mpesa') {
+      alert({
+        type: 'confirm',
+        title: 'Refund This Sale?',
+        message: `The money for ${sale.invoiceNumber} will be returned to the customer. Send it back through M-Pesa, or hand over cash?`,
+        buttons: [
+          { label: 'Cancel', variant: 'ghost' },
+          { label: 'Refund in Cash', onPress: () => refundMutation.mutate({ saleId: sale._id, method: 'cash' }) },
+          { label: 'Refund via M-Pesa', variant: 'danger', onPress: () => refundMutation.mutate({ saleId: sale._id }) },
+        ],
+      });
+      return;
+    }
+    alert({
+      type: 'confirm',
+      title: 'Refund This Sale?',
+      message: `Hand the money for ${sale.invoiceNumber} back to the customer. The sale is removed from totals and its stock restored. This cannot be undone.`,
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
+        { label: 'Refund Sale', variant: 'danger', onPress: () => refundMutation.mutate({ saleId: sale._id, method: 'cash' }) },
       ],
     });
   };
@@ -395,14 +450,19 @@ export default function StaffSales() {
           canVoid={canVoidSale}
           onVoid={handleVoid}
           voiding={voidMutation.isPending}
+          canRefund={canRefundSale}
+          onRefund={handleRefund}
+          refunding={refundMutation.isPending}
         />
       </View>
     );
   }
 
   return (
+    <ShiftGate>
     <View style={styles.container}>
       <Text style={styles.title}>Record Sale</Text>
+      <ActiveShiftBar />
       <ContextualSearchBar
         value={search}
         onChangeText={setSearch}
@@ -428,7 +488,7 @@ export default function StaffSales() {
           />
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
-        refreshControl={<RefreshControl refreshing={productsLoading} onRefresh={refetchProducts} />}
+        refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={onPullRefresh} tintColor={Colors.primary} />}
         ListHeaderComponent={
           <View>
             {cart.length > 0 && (
@@ -599,6 +659,9 @@ export default function StaffSales() {
         canVoid={canVoidSale}
         onVoid={handleVoid}
         voiding={voidMutation.isPending}
+        canRefund={canRefundSale}
+        onRefund={handleRefund}
+        refunding={refundMutation.isPending}
       />
 
       <ReceiptModal
@@ -624,6 +687,7 @@ export default function StaffSales() {
         onCancel={() => setMpesaModalVisible(false)}
       />
     </View>
+    </ShiftGate>
   );
 }
 

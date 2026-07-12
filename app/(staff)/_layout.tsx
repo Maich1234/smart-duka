@@ -103,7 +103,7 @@ const badgeStyles = StyleSheet.create({
 
 interface PremiumTabBarProps {
   state: {
-    routes: Array<{ key: string; name: string }>;
+    routes: { key: string; name: string }[];
     index: number;
   };
   descriptors: Record<string, { options: { title?: string; href?: null } }>;

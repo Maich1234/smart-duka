@@ -15,7 +15,7 @@ interface SaleCardProps {
     paymentMethod: 'cash' | 'mpesa' | 'card';
     createdAt: string;
     staff?: { name: string };
-    status?: 'completed' | 'voided';
+    status?: 'completed' | 'voided' | 'refund_pending' | 'refunded';
   };
   currency?: string;
   showStaff?: boolean;
@@ -65,8 +65,14 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
   const initials = getInitials(staffName);
   const [avatarText, avatarBg] = getAvatarColors(staffName);
   const isVoided = sale.status === 'voided';
+  const isRefunded = sale.status === 'refunded';
+  const isRefundPending = sale.status === 'refund_pending';
   const payment = isVoided
     ? { label: 'VOIDED', color: '#B91C1C', bg: '#FEE2E2' }
+    : isRefunded
+    ? { label: 'REFUNDED', color: '#BE185D', bg: '#FCE7F3' }
+    : isRefundPending
+    ? { label: 'REFUNDING…', color: '#B45309', bg: '#FEF3C7' }
     : PAYMENT_CONFIG[sale.paymentMethod] ?? PAYMENT_CONFIG.cash;
 
   return (
@@ -88,7 +94,7 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
         <View style={[styles.badge, { backgroundColor: payment.bg }]}>
           <Text style={[styles.badgeText, { color: payment.color }]}>{payment.label}</Text>
         </View>
-        <Text style={[styles.amount, isVoided && styles.amountVoided]}>
+        <Text style={[styles.amount, (isVoided || isRefunded) && styles.amountVoided]}>
           {formatCurrency(sale.totalAmount, currency)}
         </Text>
       </View>

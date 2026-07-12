@@ -99,9 +99,14 @@ export const Button: React.FC<ButtonProps> = ({
         {
           backgroundColor: getBackgroundColor(),
           borderColor: getBorderColor(),
-          borderWidth: variant === 'outline' ? 1 : 0,
+          borderWidth: variant === 'outline' ? 1.5 : 0,
           paddingVertical: paddingVertical[size],
           paddingHorizontal: paddingHorizontal[size],
+          shadowColor: variant === 'primary' ? Colors.primary : '#000',
+          shadowOffset: variant === 'primary' ? { width: 0, height: 4 } : { width: 0, height: 0 },
+          shadowOpacity: variant === 'primary' ? 0.25 : 0,
+          shadowRadius: variant === 'primary' ? 8 : 0,
+          elevation: variant === 'primary' ? 4 : 0,
         },
         style,
       ]}
@@ -138,13 +143,14 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.xl || 14,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
   },
   text: {
-    fontFamily: Typography.fontFamilySemiBold,
+    fontFamily: Typography.fontFamilyBold,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
 });

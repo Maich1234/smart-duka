@@ -4,6 +4,7 @@ import { API_BASE_URL } from '@/constants/config';
 import { useAuthStore } from '@/store/authStore';
 import { refreshAuthToken } from './tokenRefresh';
 import { getDb, isOfflineDbAvailable } from './offlineDb';
+import { randomUUID } from './uuid';
 
 // --- Exponential backoff (max 32 s) ---
 const MAX_BACKOFF_MS = 32_000;
@@ -71,7 +72,7 @@ export const enqueueOperation = (
        (id, idempotency_key, method, url, body, next_attempt_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      crypto.randomUUID(),
+      randomUUID(),
       idempotencyKey,
       op.method.toUpperCase(),
       op.url,

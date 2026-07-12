@@ -9,7 +9,7 @@ export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
 
 // Base URL of the deployed public web export — used to build the QR code
 // link on receipts (must point at a host serving the (public) route group).
-export const PUBLIC_WEB_URL = 'https://smart-duka.vercel.app';
+export const PUBLIC_WEB_URL = 'https://smart-duka--01nm282g2e.expo.app/';
 
 // Base URL of the deployed web export that serves the Help & Learning
 // Center (app/help/*.web.tsx — web-only, excluded from native builds).
@@ -20,6 +20,13 @@ export const HELP_CENTER_URL = 'https://smart-duka--01nm282g2e.expo.app/';
 // page into the native app when it's installed (falls back to the web page
 // itself, which is already loaded, if it isn't).
 export const APP_SCHEME = 'smartduka';
+
+// Founder's handwritten e-signature (transparent PNG) — shown under the
+// founder's note at the end of onboarding. The w_280,q_auto Cloudinary
+// transform serves a ~10 KB render-sized copy (2× the 140pt display width)
+// instead of the 120 KB original.
+export const CEO_SIGN_IMG_URL =
+  'https://res.cloudinary.com/dwdhxgvsl/image/upload/w_280,q_auto/v1783716945/e-sign-removebg-preview_lvulz8.png';
 
 export const APP_NAME = 'Smart Duka';
 export const APP_VERSION = '1.0.0';

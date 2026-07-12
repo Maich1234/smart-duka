@@ -16,7 +16,9 @@ import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Typography } from '@/constants/Typography';
-import { useAuthStore, type AuthState } from '@/store/authStore';
+import { useAuthStore } from '@/store/authStore';
+import { useOnboardingStore } from '@/store/onboardingStore';
+import { waitForHydration } from '@/utils/hydration';
 
 const { height } = Dimensions.get('window');
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -157,7 +159,6 @@ function Letter({
 }
 
 export default function SplashScreen() {
-  const user = useAuthStore((s: AuthState) => s.user);
   const [titleWidth, setTitleWidth] = useState(220);
 
   const bgOpacity = useSharedValue(0);
@@ -203,15 +204,28 @@ export default function SplashScreen() {
       withTiming(0, { duration: FOOTER_DURATION, easing: Easing.out(Easing.cubic) })
     );
 
-    const timeout = setTimeout(() => {
+    // Routing must read the stores at fire time AND after hydration — the
+    // initial defaults (no user, onboarding not completed) would otherwise
+    // send an already-signed-in device back to the welcome journey whenever
+    // SecureStore/AsyncStorage is slow to hydrate.
+    let cancelled = false;
+    const timeout = setTimeout(async () => {
+      await waitForHydration(useAuthStore, useOnboardingStore);
+      if (cancelled) return;
+      const { user } = useAuthStore.getState();
       if (user) {
         router.replace(user.role === 'owner' ? '/(owner)/dashboard' : '/(staff)/dashboard');
       } else {
-        router.replace('/(auth)/login');
+        // Fresh devices get the guided journey exactly once.
+        const { completed } = useOnboardingStore.getState();
+        router.replace(completed ? '/(auth)/login' : '/(onboarding)');
       }
     }, NAVIGATE_AT);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [titleWidth]);
 
   const backgroundStyle = useAnimatedStyle(() => ({ opacity: bgOpacity.value }));

@@ -203,6 +203,7 @@ export const PaymentsSection: React.FC = () => {
             environment: config.environment,
             businessName: config.businessName,
             shortcode: config.shortcode,
+            initiatorName: config.initiatorName,
           } : undefined}
           isEditing={!!config?.consumerKeySet}
         />
@@ -247,6 +248,24 @@ export const PaymentsSection: React.FC = () => {
           isSet={config?.passkeySet ?? false}
           maskedValue={config?.passkeyMasked ?? null}
         />
+      </View>
+
+      {/* Refund (reversal) credentials */}
+      <View style={styles.credentialGroup}>
+        <Text style={styles.credGroupLabel}>REFUND CREDENTIALS</Text>
+        {config?.initiatorName ? (
+          <InfoRow icon="person-outline" label="Initiator Name" value={config.initiatorName} />
+        ) : null}
+        <CredentialRow
+          label="Security Credential"
+          isSet={config?.securityCredentialSet ?? false}
+          maskedValue={config?.securityCredentialMasked ?? null}
+        />
+        {!(config?.initiatorName && config?.securityCredentialSet) && (
+          <Text style={styles.refundHint}>
+            Add these to refund M-Pesa payments back to customers. Until then, refunds can only be given in cash.
+          </Text>
+        )}
       </View>
 
       {config?.configuredAt && (
@@ -513,6 +532,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+  },
+  refundHint: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textTertiary,
+    lineHeight: 15,
+    padding: 10,
   },
   credRow: {
     paddingHorizontal: 10,

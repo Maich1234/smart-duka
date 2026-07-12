@@ -6,6 +6,8 @@ export interface MpesaConfigStatus {
   businessName: string | null;
   shortcode: string | null;
   isConfigured: boolean;
+  /** True when the initiator credentials needed for M-Pesa refunds are set */
+  refundsConfigured?: boolean;
 }
 
 export interface MpesaConfigDetails {
@@ -19,6 +21,10 @@ export interface MpesaConfigDetails {
   consumerKeyMasked: string | null;
   consumerSecretMasked: string | null;
   passkeyMasked: string | null;
+  /** Refund (Transaction Reversal) credentials */
+  initiatorName?: string;
+  securityCredentialSet?: boolean;
+  securityCredentialMasked?: string | null;
   configuredAt: string | null;
 }
 
@@ -29,6 +35,10 @@ export interface SaveMpesaConfigPayload {
   consumerKey?: string;
   consumerSecret?: string;
   passkey?: string;
+  /** Daraja API operator username — required for M-Pesa refunds */
+  initiatorName?: string;
+  /** RSA-encrypted initiator password generated on the Daraja portal */
+  securityCredential?: string;
 }
 
 /** Fetches M-Pesa enabled/disabled status — safe for all authenticated users, no credentials. */

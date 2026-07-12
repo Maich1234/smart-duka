@@ -20,10 +20,11 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AlertProvider, useAlert } from '@/context/AlertContext';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { useAuthStore, type AuthState } from '@/store/authStore';
-import { onForegroundMessage, onTokenRefresh } from '@/services/notifications';
+import { onForegroundMessage, onNotificationOpened, onTokenRefresh } from '@/services/notifications';
 import { initOfflineDb } from '@/utils/offlineDb';
 import { setupOfflineListener } from '@/utils/offlineManager';
 import { enqueueOperation } from '@/utils/offlineQueue';
+import { randomUUID } from '@/utils/uuid';
 import { getProducts } from '@/services/products';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
@@ -40,12 +41,12 @@ async function migrateAsyncStorageQueue() {
   try {
     const raw = await AsyncStorage.getItem('offline_mutations');
     if (!raw) return;
-    const items: Array<{ method?: string; url?: string; data?: Record<string, unknown> }> =
+    const items: { method?: string; url?: string; data?: Record<string, unknown> }[] =
       JSON.parse(raw);
     for (const item of items) {
       enqueueOperation(
         { method: item.method ?? 'POST', url: item.url ?? '', body: item.data ?? null },
-        `migrate:${crypto.randomUUID()}`
+        `migrate:${randomUUID()}`
       );
     }
     await AsyncStorage.removeItem('offline_mutations');
@@ -104,11 +105,13 @@ function CriticalDataPrefetch() {
 
   const prefetch = useCallback(async () => {
     if (!user) return;
-    // Products: first page only (30 items) — enough for the POS catalogue on
-    // a typical small shop. Capped to protect low-storage devices.
+    // Products: first page. Must fetch exactly what the sales/inventory
+    // screens fetch — this shares their ['products', '', 1] cache key, so a
+    // different limit here makes the visible list flip sizes (and the page
+    // count jump) every time a prefetch lands.
     queryClient.prefetchQuery({
       queryKey: ['products', '', 1],
-      queryFn: () => getProducts({ page: 1, limit: 30 }),
+      queryFn: () => getProducts({ search: '', page: 1, limit: 10 }),
       staleTime: 1000 * 60 * 2,
     });
     // Shop config: receipt header, logo, motto, thank-you note.
@@ -170,10 +173,19 @@ function SessionExpiredHandler() {
   return null;
 }
 
-// Re-shows the splash animation whenever the app returns from the background.
-// Uses a pathname ref so we never interrupt a splash already in progress.
+// Re-shows the splash animation when the app returns from a long stay in the
+// background. Two guards keep it from destroying in-progress state:
+//  - Signed-out users are never redirected — on Android, the Google Password
+//    Manager sheet and system permission dialogs briefly background the app,
+//    and replaying the splash from there wiped the login/onboarding forms and
+//    bounced people back to the start of the welcome journey.
+//  - Short background stints (quick app switches, those same system dialogs
+//    for signed-in users) don't count; only a genuinely stale session replays
+//    the splash and re-routes to the dashboard.
+const RESUME_SPLASH_AFTER_MS = 5 * 60 * 1000;
+
 function AppResumeHandler() {
-  const appStateRef = useRef(AppState.currentState);
+  const backgroundedAtRef = useRef<number | null>(null);
   const pathnameRef = useRef('');
   const pathname = usePathname();
 
@@ -183,9 +195,18 @@ function AppResumeHandler() {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
-      const wasBackground = appStateRef.current === 'background';
-      appStateRef.current = nextState;
-      if (wasBackground && nextState === 'active' && pathnameRef.current !== '/splash') {
+      if (nextState === 'background') {
+        backgroundedAtRef.current ??= Date.now();
+        return;
+      }
+      // iOS can resume via background → inactive → active, so a recorded
+      // background timestamp (not the previous state) is what marks a resume.
+      if (nextState !== 'active') return;
+      const backgroundedAt = backgroundedAtRef.current;
+      backgroundedAtRef.current = null;
+      if (backgroundedAt === null || Date.now() - backgroundedAt < RESUME_SPLASH_AFTER_MS) return;
+      if (!useAuthStore.getState().user) return;
+      if (pathnameRef.current !== '/splash') {
         router.replace('/splash');
       }
     });
@@ -194,6 +215,26 @@ function AppResumeHandler() {
 
   return null;
 }
+
+// Every push type's in-app destination — shared by the foreground alert's
+// "View" button and by taps on system notifications (background/quit).
+const routeForNotification = (data?: Record<string, string>) => {
+  switch (data?.type) {
+    case 'shift_closed':
+      return data.shiftId
+        ? (`/(owner)/shifts/${data.shiftId}` as const)
+        : ('/(owner)/shifts' as const);
+    case 'daily_summary':
+      return {
+        pathname: '/(owner)/summary',
+        params: data.date ? { date: data.date } : {},
+      } as const;
+    case 'depletion_alert':
+      return '/(owner)/inventory' as const;
+    default:
+      return '/(owner)/reports' as const;
+  }
+};
 
 // Handles FCM foreground messages using the custom alert system.
 // Must live inside AlertProvider so useAlert is available.
@@ -212,18 +253,22 @@ function NotificationListener() {
           {
             label: 'View',
             variant: 'primary',
-            onPress: () =>
-              router.push(
-                data?.type === 'depletion_alert'
-                  ? '/(owner)/inventory'
-                  : '/(owner)/reports'
-              ),
+            onPress: () => router.push(routeForNotification(data) as never),
           },
         ],
       });
     });
     return unsubscribe;
   }, [alert]);
+
+  // Taps on system notifications (app backgrounded or quit) deep-link
+  // straight to the report the push was about.
+  useEffect(() => {
+    const unsubscribe = onNotificationOpened((data) => {
+      router.push(routeForNotification(data) as never);
+    });
+    return unsubscribe;
+  }, []);
 
   return null;
 }
@@ -278,6 +323,7 @@ export default function RootLayout() {
                 <ErrorBoundary>
                   <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="splash" />
+                    <Stack.Screen name="(onboarding)" />
                     <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(owner)" />
                     <Stack.Screen name="(staff)" />

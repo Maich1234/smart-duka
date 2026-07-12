@@ -8,7 +8,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, usePathname } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Typography } from '@/constants/Typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -80,7 +81,7 @@ const AnimatedTabIcon: React.FC<AnimatedTabIconProps> = ({ config, isFocused }) 
 
 interface PremiumTabBarProps {
   state: {
-    routes: Array<{ key: string; name: string }>;
+    routes: { key: string; name: string }[];
     index: number;
   };
   descriptors: Record<string, { options: { title?: string; href?: null } }>;
@@ -191,9 +192,19 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
 
 export default function OwnerLayout() {
   const { user, isLoading } = useAuth();
+  const { access } = useSubscription();
+  const pathname = usePathname();
 
   if (!isLoading && (!user || user.role !== 'owner')) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  // Subscription + grace period exhausted → every owner screen funnels to
+  // the paywall until an M-PESA payment lands. Derived server-side; while
+  // offline the last-known (persisted) state applies, so a paid-up shop is
+  // never locked by a network blip.
+  if (access?.state === 'locked' && !pathname.includes('subscription')) {
+    return <Redirect href="/(owner)/subscription" />;
   }
 
   return (
@@ -259,6 +270,28 @@ export default function OwnerLayout() {
         name="payments"
         options={{
           title: 'M-Pesa Transactions',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="shifts"
+        options={{
+          title: 'Shifts',
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="summary"
+        options={{
+          title: 'Daily Summary',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="subscription"
+        options={{
+          title: 'Subscription',
           href: null,
         }}
       />

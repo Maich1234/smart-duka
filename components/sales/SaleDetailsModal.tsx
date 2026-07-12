@@ -26,6 +26,11 @@ interface SaleDetailsModalProps {
   /** Called when the user confirms voiding. Parent owns the mutation. */
   onVoid?: (sale: Sale) => void;
   voiding?: boolean;
+  /** Show the "Refund" action (owner, or staff with 'refund_own_sales'/'refund_all_sales'). */
+  canRefund?: boolean;
+  /** Called when the user taps Refund. Parent owns the confirm + mutation. */
+  onRefund?: (sale: Sale) => void;
+  refunding?: boolean;
 }
 
 export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
@@ -41,6 +46,9 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   canVoid = false,
   onVoid,
   voiding = false,
+  canRefund = false,
+  onRefund,
+  refunding = false,
 }) => {
   const [printing, setPrinting] = useState(false);
 
@@ -60,6 +68,9 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   if (!sale) return null;
 
   const isVoided = sale.status === 'voided';
+  const isRefunded = sale.status === 'refunded';
+  const isRefundPending = sale.status === 'refund_pending';
+  const isSettled = isVoided || isRefunded || isRefundPending;
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
@@ -75,6 +86,34 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           </View>
         )}
 
+        {isRefunded && (
+          <View style={styles.refundedBanner}>
+            <Ionicons name="checkmark-circle-outline" size={14} color="#15803D" />
+            <Text style={styles.refundedBannerText}>
+              Refunded {sale.refund?.method === 'mpesa' ? 'via M-Pesa' : 'in cash'}
+              {sale.refund?.reason ? ` — ${sale.refund.reason}` : ''}. Stock was restored and it is excluded from totals.
+            </Text>
+          </View>
+        )}
+
+        {isRefundPending && (
+          <View style={styles.pendingBanner}>
+            <Ionicons name="time-outline" size={14} color="#B45309" />
+            <Text style={styles.pendingBannerText}>
+              M-Pesa is returning the money to the customer. Stock is restored once the refund completes.
+            </Text>
+          </View>
+        )}
+
+        {!isSettled && sale.refund?.failureReason && (
+          <View style={styles.voidedBanner}>
+            <Ionicons name="alert-circle-outline" size={14} color="#B91C1C" />
+            <Text style={styles.voidedBannerText}>
+              Last refund attempt failed: {sale.refund.failureReason}
+            </Text>
+          </View>
+        )}
+
         <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} thankYouNote={thankYouNote} logoUrl={logoUrl} motto={motto} />
 
         <View style={styles.buttonRow}>
@@ -82,7 +121,17 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           <Button title="Print Receipt" onPress={handlePrint} loading={printing} style={styles.flexBtn} />
         </View>
 
-        {canVoid && !isVoided && onVoid && (
+        {canRefund && !isSettled && onRefund && (
+          <Button
+            title={sale.paymentMethod === 'mpesa' ? 'Refund Customer (M-Pesa)' : 'Refund Customer'}
+            variant="outline"
+            loading={refunding}
+            onPress={() => onRefund(sale)}
+            style={styles.voidBtn}
+          />
+        )}
+
+        {canVoid && !isSettled && onVoid && (
           <Button
             title="Void Sale"
             variant="danger"
@@ -122,6 +171,40 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,
     color: '#B91C1C',
+    lineHeight: 16,
+  },
+  refundedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 10,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  refundedBannerText: {
+    flex: 1,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: '#15803D',
+    lineHeight: 16,
+  },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  pendingBannerText: {
+    flex: 1,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: '#B45309',
     lineHeight: 16,
   },
 });

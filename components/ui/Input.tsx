@@ -164,9 +164,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 14,
-    minHeight: 52,
+    borderRadius: BorderRadius.lg || 12,
+    paddingHorizontal: 16,
+    minHeight: 56,
   },
   input: {
     flex: 1,

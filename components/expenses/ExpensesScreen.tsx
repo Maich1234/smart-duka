@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import { View, RefreshControl, StyleSheet, Text } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -204,9 +205,10 @@ export const ExpensesScreen: React.FC = () => {
         style={styles.searchBar}
       />
 
-      <FlatList
+      <FlashList
         showsVerticalScrollIndicator={false}
         data={expenses}
+        estimatedItemSize={70}
         keyExtractor={(item) => item._id}
         renderItem={({ item, index }) => (
           <ListRow

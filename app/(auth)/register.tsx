@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -49,6 +50,8 @@ function SectionLabel({ title, icon }: { title: string; icon: keyof typeof Ionic
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const { toast } = useAlert();
+  // Anything already told to the onboarding journey shouldn't be asked twice.
+  const draft = useOnboardingStore((s) => s.draft);
   const {
     control,
     handleSubmit,
@@ -56,6 +59,16 @@ export default function RegisterScreen() {
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    // Every field needs a string default — a missing one surfaces Zod's raw
+    // "Required" error and flips the input uncontrolled→controlled.
+    defaultValues: {
+      name: draft.ownerName || '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      shopName: draft.shopName || '',
+      phone: draft.phone || '',
+    },
   });
 
   const password = watch('password') || '';
@@ -76,9 +89,11 @@ export default function RegisterScreen() {
         toast({ type: 'error', message: res.message || 'Registration failed. Please try again.' });
       }
     } catch (error: any) {
+      if (__DEV__) console.error('[register] raw error:', error);
       toast({
         type: 'error',
-        message: error.response?.data?.message || 'Something went wrong. Please try again.',
+        message:
+          error.response?.data?.message || error.message || 'Something went wrong. Please try again.',
       });
     } finally {
       setLoading(false);
@@ -110,6 +125,8 @@ export default function RegisterScreen() {
             error={errors.name?.message}
             autoCapitalize="words"
             returnKeyType="next"
+            autoComplete="name"
+            textContentType="name"
           />
         )}
       />
@@ -126,6 +143,8 @@ export default function RegisterScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             returnKeyType="next"
+            autoComplete="email"
+            textContentType="username"
           />
         )}
       />
@@ -147,6 +166,8 @@ export default function RegisterScreen() {
             secureTextEntry
             error={errors.password?.message}
             returnKeyType="next"
+            autoComplete="new-password"
+            textContentType="newPassword"
           />
         )}
       />
@@ -164,6 +185,8 @@ export default function RegisterScreen() {
             secureTextEntry
             error={errors.confirmPassword?.message}
             returnKeyType="next"
+            autoComplete="new-password"
+            textContentType="newPassword"
           />
         )}
       />

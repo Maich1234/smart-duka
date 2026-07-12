@@ -7,20 +7,20 @@ export interface OwnerDashboardData {
   transactionsToday: number;
   totalProducts: number;
   currentStockValue: number;
-  lowStockItems: Array<{
+  lowStockItems: {
     _id: string;
     name: string;
     quantity: number;
     lowStockAlert: number;
-  }>;
-  recentTransactions: Array<{
+  }[];
+  recentTransactions: {
     _id: string;
     invoiceNumber: string;
     totalAmount: number;
     paymentMethod: string;
     createdAt: string;
     staff: { name: string };
-  }>;
+  }[];
   ratingSummary: {
     avgStars: number;
     totalRatings: number;
@@ -32,13 +32,13 @@ export interface StaffDashboardData {
   cashSalesTotal: number;
   mpesaSalesTotal: number;
   transactionsToday: number;
-  recentSales: Array<{
+  recentSales: {
     _id: string;
     invoiceNumber: string;
     totalAmount: number;
     paymentMethod: string;
     createdAt: string;
-  }>;
+  }[];
 }
 
 interface ApiResponse<T> {

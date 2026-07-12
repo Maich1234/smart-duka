@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, RefreshControl, StyleSheet, Text } from 'react-native';
+import { View, RefreshControl, StyleSheet, Text } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { CrossfadeCircle } from '@/components/ui/motion';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -176,9 +177,10 @@ export default function OwnerStaffList() {
         style={styles.searchBar}
       />
 
-      <FlatList
+      <FlashList
         showsVerticalScrollIndicator={false}
         data={staffList}
+        estimatedItemSize={80}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <StaffCard
