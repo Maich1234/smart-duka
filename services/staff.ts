@@ -30,6 +30,16 @@ export interface CreateStaffData {
   email: string;
   password: string;
   phone?: string;
+  /** Set once the owner has accepted the seat-price-increase confirmation. */
+  priceConfirmed?: boolean;
+}
+
+/** Shape of the 409 the backend returns when adding a seat raises the bill and priceConfirmed wasn't sent. */
+export interface SeatPriceConfirmation {
+  currentAmount: number;
+  projectedAmount: number;
+  currency: string;
+  billingCycle: 'monthly' | 'yearly';
 }
 
 export interface UpdateStaffData {

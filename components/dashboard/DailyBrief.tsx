@@ -32,8 +32,9 @@ interface DailyBriefProps {
 export const DailyBrief: React.FC<DailyBriefProps> = React.memo(({ data, insightsRoute = '/(owner)/insights' }) => {
   const bullets = useMemo(() => buildDailyBrief(data), [data]);
 
-  if (bullets.length === 0) return null;
-
+  // Even on a quiet day with nothing to flag, this card is the dashboard's
+  // only entry point into the AI-powered Insights screen (the Insights tab
+  // itself has no tab-bar icon) — it must never fully disappear.
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -45,19 +46,23 @@ export const DailyBrief: React.FC<DailyBriefProps> = React.memo(({ data, insight
         </View>
       </View>
 
-      <View style={styles.bullets}>
-        {bullets.map((bullet) => {
-          const tone = TONE_STYLE[bullet.tone];
-          return (
-            <View key={bullet.id} style={styles.bulletRow}>
-              <View style={[styles.bulletIcon, { backgroundColor: tone.bg }]}>
-                <Ionicons name={bullet.icon} size={13} color={tone.fg} />
+      {bullets.length > 0 ? (
+        <View style={styles.bullets}>
+          {bullets.map((bullet) => {
+            const tone = TONE_STYLE[bullet.tone];
+            return (
+              <View key={bullet.id} style={styles.bulletRow}>
+                <View style={[styles.bulletIcon, { backgroundColor: tone.bg }]}>
+                  <Ionicons name={bullet.icon} size={13} color={tone.fg} />
+                </View>
+                <Text style={styles.bulletText}>{bullet.text}</Text>
               </View>
-              <Text style={styles.bulletText}>{bullet.text}</Text>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
+      ) : (
+        <Text style={styles.emptyText}>Nothing urgent today. See the full AI analysis of your business.</Text>
+      )}
 
       <AnimatedPressable
         onPress={() => {
@@ -112,6 +117,12 @@ const styles = StyleSheet.create({
   },
   bullets: {
     gap: 10,
+  },
+  emptyText: {
+    fontSize: Typography.size.small,
+    lineHeight: 20,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
   },
   bulletRow: {
     flexDirection: 'row',

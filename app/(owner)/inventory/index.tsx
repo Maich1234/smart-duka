@@ -229,6 +229,7 @@ export default function OwnerInventory() {
         onClearRecent={clearRecent}
         productCount={data?.pagination?.total ?? allProducts.length}
         alertCount={alertCount}
+        onBellPress={() => router.push('/(owner)/notifications')}
       />
 
       {/* ── Fixed filter chips ────────────────────────────────────────────── */}

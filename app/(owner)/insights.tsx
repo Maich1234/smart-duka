@@ -33,9 +33,10 @@ export default function OwnerInsights() {
   const currency = user?.shop?.currency;
   const shopId = user?.shop?._id;
 
-  const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
-  const hasAiInsights =
-    typeof subscription?.plan === 'object' && !!subscription.plan?.features?.includes('ai_insights');
+  const { access, isLoading: isSubscriptionLoading } = useSubscription();
+  // AI insights are available to any active subscription (trial, paid, or
+  // grace) — no plan-tier gate. Matches the backend's requireActiveSubscription.
+  const hasAiInsights = access?.state === 'trialing' || access?.state === 'active' || access?.state === 'grace';
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['aiInsight'],

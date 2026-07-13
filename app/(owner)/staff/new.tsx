@@ -6,7 +6,8 @@ import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { createStaff, updateStaffPermissions } from '@/services/staff';
+import { createStaff, updateStaffPermissions, type SeatPriceConfirmation } from '@/services/staff';
+import { formatCurrency } from '@/utils/formatters';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useStaffDraftStore } from '@/store/staffDraftStore';
@@ -22,7 +23,7 @@ export default function NewStaffScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { permissions, setPermissions, reset } = useStaffDraftStore();
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
-  const { toast } = useAlert();
+  const { toast, alert } = useAlert();
 
   useEffect(() => {
     setPermissions(DEFAULT_STAFF_PERMISSIONS);
@@ -30,12 +31,13 @@ export default function NewStaffScreen() {
   }, []);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (priceConfirmed?: boolean) => {
       const created = await createStaff({
         name: form.name,
         email: form.email,
         password: form.password,
         phone: form.phone || undefined,
+        priceConfirmed,
       });
       const staffId = created.data._id;
       await updateStaffPermissions(staffId, permissions);
@@ -43,10 +45,28 @@ export default function NewStaffScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
       router.back();
     },
     onError: (error: any) => {
-      toast({ type: 'error', message: error.response?.data?.message || 'Failed to add staff' });
+      const data = error.response?.data;
+      // Adding this seat raises the bill — block until the owner confirms
+      // the new price, instead of silently changing what they're charged.
+      if (error.response?.status === 409 && data?.code === 'SEAT_PRICE_CONFIRMATION_REQUIRED') {
+        const impact: SeatPriceConfirmation = data.data;
+        const cycleLabel = impact.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+        alert({
+          type: 'confirm',
+          title: 'This raises your bill',
+          message: `Adding ${form.name || 'this team member'} increases your ${cycleLabel} subscription from ${formatCurrency(impact.currentAmount, impact.currency)} to ${formatCurrency(impact.projectedAmount, impact.currency)}. Continue?`,
+          buttons: [
+            { label: 'Cancel', variant: 'secondary' },
+            { label: 'Confirm & add', onPress: () => saveMutation.mutate(true) },
+          ],
+        });
+        return;
+      }
+      toast({ type: 'error', message: data?.message || 'Failed to add staff' });
     },
   });
 
@@ -57,7 +77,7 @@ export default function NewStaffScreen() {
     if (!form.password || form.password.length < 6) {
       return toast({ type: 'error', message: 'Password must be at least 6 characters' });
     }
-    saveMutation.mutate();
+    saveMutation.mutate(false);
   };
 
   return (

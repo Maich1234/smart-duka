@@ -21,6 +21,7 @@ interface InventoryHeaderProps {
   showAddButton?: boolean;
   productCount?: number;
   alertCount?: number;
+  onBellPress?: () => void;
 }
 
 export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
@@ -35,6 +36,7 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
   showAddButton = true,
   productCount,
   alertCount = 0,
+  onBellPress,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -55,14 +57,19 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
 
         <View style={styles.titleActions}>
           {alertCount > 0 && (
-            <View style={styles.notifButton}>
+            <AnimatedPressable
+              onPress={onBellPress}
+              style={styles.notifButton}
+              accessibilityLabel="View notifications"
+              accessibilityRole="button"
+            >
               <Ionicons name="notifications-outline" size={20} color={Colors.textPrimary} />
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>
                   {alertCount > 9 ? '9+' : String(alertCount)}
                 </Text>
               </View>
-            </View>
+            </AnimatedPressable>
           )}
 
           {showAddButton && (

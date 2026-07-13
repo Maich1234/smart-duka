@@ -34,7 +34,13 @@ export const refreshAuthToken = (): Promise<string | null> => {
       );
       const data = res.data?.data;
       if (!data?.token || !data?.refreshToken) return null;
-      useAuthStore.getState().setTokens(data.token, data.refreshToken);
+      // Await the durable write: the old refresh token is already revoked
+      // server-side by the time this resolves (rotation is atomic), so if
+      // the app backgrounds/dies before the new one reaches disk, the next
+      // launch replays the stale token, trips the backend's reuse-detection,
+      // and force-logs-out the whole session — the "prompted to log back in"
+      // bug. Awaiting closes that window.
+      await useAuthStore.getState().setTokens(data.token, data.refreshToken);
       return data.token as string;
     } catch (err: any) {
       if (err?.response) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -21,6 +21,11 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { Shadows } from '@/constants/Shadows';
+
+// Lets ActiveShiftBar (rendered deep inside ShiftGate's `children`) ask
+// ShiftGate to open the end-shift sheet, which ShiftGate keeps mounted
+// itself — see the comment on EndShiftSheet's render below for why.
+const ShiftEndContext = createContext<{ requestEnd: () => void } | null>(null);
 
 const useShiftClock = (startedAt?: string) => {
   const [elapsed, setElapsed] = useState('');
@@ -45,8 +50,8 @@ const useShiftClock = (startedAt?: string) => {
 /** Slim status strip shown above the till while a shift is running. */
 export const ActiveShiftBar: React.FC = () => {
   const { enabled, shift } = useShift();
-  const [ending, setEnding] = useState(false);
   const elapsed = useShiftClock(shift?.startedAt);
+  const endCtx = useContext(ShiftEndContext);
 
   const pulse = useSharedValue(1);
   useEffect(() => {
@@ -63,26 +68,23 @@ export const ActiveShiftBar: React.FC = () => {
   if (!enabled || !shift) return null;
 
   return (
-    <>
-      <Animated.View entering={FadeInDown.duration(300)} style={styles.bar}>
-        <Animated.View style={[styles.dot, dotStyle]} />
-        <Text style={styles.barText}>
-          On shift{elapsed ? ` · ${elapsed}` : ''} · float {formatCurrency(shift.openingFloat)}
-        </Text>
-        <AnimatedPressable
-          onPress={() => {
-            haptics.light();
-            setEnding(true);
-          }}
-          style={styles.endBtn}
-          accessibilityRole="button"
-          accessibilityLabel="End shift"
-        >
-          <Text style={styles.endBtnText}>End shift</Text>
-        </AnimatedPressable>
-      </Animated.View>
-      <EndShiftSheet visible={ending} shift={shift} onClose={() => setEnding(false)} />
-    </>
+    <Animated.View entering={FadeInDown.duration(300)} style={styles.bar}>
+      <Animated.View style={[styles.dot, dotStyle]} />
+      <Text style={styles.barText}>
+        On shift{elapsed ? ` · ${elapsed}` : ''} · float {formatCurrency(shift.openingFloat)}
+      </Text>
+      <AnimatedPressable
+        onPress={() => {
+          haptics.light();
+          endCtx?.requestEnd();
+        }}
+        style={styles.endBtn}
+        accessibilityRole="button"
+        accessibilityLabel="End shift"
+      >
+        <Text style={styles.endBtnText}>End shift</Text>
+      </AnimatedPressable>
+    </Animated.View>
   );
 };
 
@@ -101,38 +103,53 @@ interface ShiftGateProps {
 export const ShiftGate: React.FC<ShiftGateProps> = ({ children }) => {
   const { enabled, shift } = useShift();
   const [starting, setStarting] = useState(false);
+  const [ending, setEnding] = useState(false);
 
-  if (!enabled || shift) return <>{children}</>;
+  if (!enabled) return <>{children}</>;
 
   return (
-    <View style={styles.gate}>
-      <Animated.View entering={FadeInDown.duration(450)} style={styles.gateIcon}>
-        <Ionicons name="storefront-outline" size={40} color={Colors.primary} />
-      </Animated.View>
-      <Animated.Text entering={FadeInDown.duration(450).delay(80)} style={styles.gateTitle}>
-        Ready to sell?
-      </Animated.Text>
-      <Animated.Text entering={FadeInDown.duration(450).delay(160)} style={styles.gateSub}>
-        Start your shift to unlock the till. Count the drawer, clock in, and every sale you make
-        will reconcile automatically when you clock out.
-      </Animated.Text>
-      <Animated.View entering={FadeInDown.duration(450).delay(240)} style={styles.gateCtaWrap}>
-        <AnimatedPressable
-          onPress={() => {
-            haptics.medium();
-            setStarting(true);
-          }}
-          style={styles.gateCta}
-          accessibilityRole="button"
-          accessibilityLabel="Start shift"
-        >
-          <Ionicons name="play" size={18} color="#FFFFFF" />
-          <Text style={styles.gateCtaText}>Start Shift</Text>
-        </AnimatedPressable>
-      </Animated.View>
+    <ShiftEndContext.Provider value={{ requestEnd: () => setEnding(true) }}>
+      {shift ? (
+        children
+      ) : (
+        <View style={styles.gate}>
+          <Animated.View entering={FadeInDown.duration(450)} style={styles.gateIcon}>
+            <Ionicons name="storefront-outline" size={40} color={Colors.primary} />
+          </Animated.View>
+          <Animated.Text entering={FadeInDown.duration(450).delay(80)} style={styles.gateTitle}>
+            Ready to sell?
+          </Animated.Text>
+          <Animated.Text entering={FadeInDown.duration(450).delay(160)} style={styles.gateSub}>
+            Start your shift to unlock the till. Count the drawer, clock in, and every sale you make
+            will reconcile automatically when you clock out.
+          </Animated.Text>
+          <Animated.View entering={FadeInDown.duration(450).delay(240)} style={styles.gateCtaWrap}>
+            <AnimatedPressable
+              onPress={() => {
+                haptics.medium();
+                setStarting(true);
+              }}
+              style={styles.gateCta}
+              accessibilityRole="button"
+              accessibilityLabel="Start shift"
+            >
+              <Ionicons name="play" size={18} color="#FFFFFF" />
+              <Text style={styles.gateCtaText}>Start Shift</Text>
+            </AnimatedPressable>
+          </Animated.View>
 
-      <StartShiftSheet visible={starting} onClose={() => setStarting(false)} />
-    </View>
+          <StartShiftSheet visible={starting} onClose={() => setStarting(false)} />
+        </View>
+      )}
+
+      {/* Hoisted above the shift/no-shift branch above (rather than owned by
+          ActiveShiftBar, deeper in `children`) so it stays mounted through
+          its own "Done" verdict screen even after `shift` goes null —
+          ending a shift invalidates the shift query, which used to flip
+          this whole gate over to the "Ready to sell?" screen and unmount
+          the confirmation out from under the staff member mid-read. */}
+      <EndShiftSheet visible={ending} shift={shift} onClose={() => setEnding(false)} />
+    </ShiftEndContext.Provider>
   );
 };
 

@@ -281,17 +281,17 @@ export function UpsellCard() {
       }}
       style={[uc.card, Shadows.sm]}
       accessibilityRole="button"
-      accessibilityLabel="Upgrade to unlock AI insights"
+      accessibilityLabel="Activate your subscription to unlock AI insights"
     >
       <View style={uc.iconWrap}>
         <Ionicons name="sparkles" size={22} color={Colors.accentDark} />
       </View>
       <Text style={uc.title}>Unlock AI Insights</Text>
       <Text style={uc.body}>
-        Get a daily business health score and a plain-language explanation of what changed and what to do next.
+        Get a daily business health score and a plain-language explanation of what changed and what to do next — included with any active subscription.
       </Text>
       <View style={uc.cta}>
-        <Text style={uc.ctaText}>Upgrade Plan</Text>
+        <Text style={uc.ctaText}>Activate Subscription</Text>
       </View>
     </AnimatedPressable>
   );

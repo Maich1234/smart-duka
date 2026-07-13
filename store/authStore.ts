@@ -31,7 +31,11 @@ export interface AuthState {
    *  out of the axios layer. */
   sessionExpired: boolean;
   setAuth: (user: User, token: string, refreshToken?: string) => void;
-  setTokens: (token: string, refreshToken: string) => void;
+  // zustand's persist middleware wraps `set` to return the underlying
+  // storage write's promise (see setItem() in zustand/middleware persist) —
+  // callers that need the new refresh token durably on disk before
+  // proceeding (see utils/tokenRefresh.ts) must await this.
+  setTokens: (token: string, refreshToken: string) => Promise<void>;
   logout: () => void;
   setLoading: (loading: boolean) => void;
   setSessionExpired: (expired: boolean) => void;
@@ -55,7 +59,10 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
           sessionExpired: false,
         })),
-      setTokens: (token, refreshToken) => set({ token, refreshToken }),
+      // zustand's `set` type here is generic (StoreApi doesn't know about the
+      // persist wrapper), but at runtime persist's `set` returns the storage
+      // write's promise — see the interface comment on setTokens above.
+      setTokens: (token, refreshToken) => set({ token, refreshToken }) as unknown as Promise<void>,
       logout: () => set({ user: null, token: null, refreshToken: null, isLoading: false, sessionExpired: false }),
       setLoading: (loading) => set({ isLoading: loading }),
       setSessionExpired: (expired) => set({ sessionExpired: expired }),
