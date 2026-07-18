@@ -69,12 +69,15 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "notification": {
-      "icon": "./assets/notification-icon/notification_icon_xxxhdpi.png",
-      "color": "#0F766E"
-    },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon/notification_icon_xxxhdpi.png",
+          "color": "#0F766E"
+        }
+      ],
       [
         "expo-splash-screen",
         {
