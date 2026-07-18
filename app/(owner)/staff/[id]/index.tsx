@@ -7,10 +7,12 @@ import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { getStaffById, deleteStaff, resetStaffPassword, getAllPermissions, type Permission } from '@/services/staff';
+import { getStaffById, getStaffCommission, deleteStaff, resetStaffPassword, getAllPermissions, type Permission } from '@/services/staff';
+import { getShopConfig } from '@/services/shop';
 import { Button } from '@/components/ui/Button';
 import { ResetPasswordModal } from '@/components/staff/ResetPasswordModal';
 import { deriveRole } from '@/components/staff/StaffCard';
+import { CommissionCard, getCommissionPeriodRange, type CommissionPeriod } from '@/components/sales/CommissionCard';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -53,6 +55,7 @@ export default function StaffDetailsScreen() {
   const queryClient = useQueryClient();
   const tabBarHeight = useBottomTabBarHeight();
   const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [commissionPeriod, setCommissionPeriod] = useState<CommissionPeriod>('today');
   const { alert, toast } = useAlert();
 
   const { data, isLoading } = useQuery({
@@ -63,6 +66,15 @@ export default function StaffDetailsScreen() {
   const { data: permissionsData } = useQuery({
     queryKey: ['permissions'],
     queryFn: getAllPermissions,
+  });
+
+  const { data: shopData } = useQuery({ queryKey: ['shop'], queryFn: getShopConfig });
+  const currency = shopData?.data?.currency ?? 'KES';
+
+  const { startDate, endDate } = getCommissionPeriodRange(commissionPeriod);
+  const { data: commissionData, isLoading: isCommissionLoading } = useQuery({
+    queryKey: ['staffCommission', id, commissionPeriod],
+    queryFn: () => getStaffCommission(id, { startDate, endDate }),
   });
 
   const deleteMutation = useMutation({
@@ -145,6 +157,23 @@ export default function StaffDetailsScreen() {
           <Ionicons name="trash-outline" size={16} color={Colors.danger} />
           <Text style={[styles.actionBtnText, { color: Colors.danger }]}>Delete</Text>
         </AnimatedPressable>
+      </View>
+
+      {/* Sales & Commission */}
+      <View style={styles.permissionsSection}>
+        <Text style={styles.sectionTitle}>Sales & Commission</Text>
+        <Text style={styles.sectionSubtitle}>Commission earned from variant sales, always visible to you.</Text>
+        <View style={styles.permissionsCard}>
+          <View style={styles.categoryBlock}>
+            <CommissionCard
+              data={commissionData?.data}
+              isLoading={isCommissionLoading}
+              period={commissionPeriod}
+              onPeriodChange={setCommissionPeriod}
+              currency={currency}
+            />
+          </View>
+        </View>
       </View>
 
       {/* Permissions */}

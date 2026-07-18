@@ -66,10 +66,6 @@ export interface OnboardingState {
   setDraft: (patch: Partial<BusinessDraft>) => void;
   markCompleted: () => void;
   dismissChecklist: () => void;
-  /** Reset the questionnaire for an on-demand replay (profile → Replay the
-   *  Tour). Deliberately keeps `completed` — the tour auto-shows only once,
-   *  even if a replay is abandoned halfway. */
-  restart: () => void;
 }
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -84,7 +80,6 @@ export const useOnboardingStore = create<OnboardingState>()(
       setDraft: (patch) => set((state) => ({ draft: { ...state.draft, ...patch } })),
       markCompleted: () => set({ completed: true }),
       dismissChecklist: () => set({ checklistDismissed: true }),
-      restart: () => set({ answers: emptyAnswers }),
     }),
     {
       name: 'onboarding-storage',

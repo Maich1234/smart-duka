@@ -33,7 +33,10 @@ export const refreshAuthToken = (): Promise<string | null> => {
         { timeout: 12000, headers: { 'Content-Type': 'application/json' } }
       );
       const data = res.data?.data;
-      if (!data?.token || !data?.refreshToken) return null;
+      if (!data?.token || !data?.refreshToken) {
+        useAuthStore.getState().setSessionExpired('expired');
+        return null;
+      }
       // Await the durable write: the old refresh token is already revoked
       // server-side by the time this resolves (rotation is atomic), so if
       // the app backgrounds/dies before the new one reaches disk, the next
@@ -45,6 +48,11 @@ export const refreshAuthToken = (): Promise<string | null> => {
     } catch (err: any) {
       if (err?.response) {
         // The server answered and said no — the session is genuinely dead.
+        // SESSION_REVOKED_ELSEWHERE means another device logged into this
+        // staff account and superseded this one (see refreshTokenService.js
+        // on the backend); anything else is a generic expiry/invalidation.
+        const code = err.response.data?.code;
+        useAuthStore.getState().setSessionExpired(code === 'SESSION_REVOKED_ELSEWHERE' ? 'revoked_elsewhere' : 'expired');
         return null;
       }
       // No response = network problem; surface it so callers can retry later.

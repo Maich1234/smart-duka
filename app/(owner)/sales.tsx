@@ -5,12 +5,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { DatePicker } from '@/components/ui/DatePicker';
+import { SalesDateRangeSheet } from '@/components/sales/SalesDateRangeSheet';
 import { getSales, getSalesStats, voidSale, refundSale, type Sale, type SalesResponse } from '@/services/sales';
 import { useAlert } from '@/context/AlertContext';
 import { isOfflineQueued } from '@/utils/errors';
@@ -27,6 +28,15 @@ import { useRouter } from 'expo-router';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 
 type PaymentFilter = 'all' | 'mpesa' | 'cash' | 'card';
+
+/** Extends a selected end date to the last instant of that calendar day, so
+ * a date-range filter includes every sale made on the end date instead of
+ * cutting off at local midnight. */
+function endOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
 
 function formatDateRange(start: Date | null, end: Date | null): string {
   if (!start && !end) {
@@ -61,24 +71,28 @@ export default function OwnerSales() {
     clearRecent,
     clear: clearSearch,
   } = useSearch('sales');
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showDateSheet, setShowDateSheet] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   const isDateFiltered = !!(startDate || endDate);
+  // The picker always returns local-midnight Dates; extend the end date to
+  // the last instant of that day here so the filter is correct at the
+  // source, not just relying on the backend's own end-of-day handling.
+  const normalizedEndDate = endDate ? endOfDay(endDate) : null;
 
   const { data: statsData } = useQuery({
-    queryKey: ['salesStats', startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ['salesStats', startDate?.toISOString(), normalizedEndDate?.toISOString()],
     queryFn: () => getSalesStats({
       startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
+      endDate: normalizedEndDate?.toISOString(),
     }),
   });
 
   const {
     data: salesData,
     isLoading,
+    isFetching,
     refetch,
     fetchNextPage,
     hasNextPage,
@@ -88,7 +102,7 @@ export default function OwnerSales() {
     queryFn: ({ pageParam }) =>
       getSales({
         startDate: startDate?.toISOString(),
-        endDate: endDate?.toISOString(),
+        endDate: normalizedEndDate?.toISOString(),
         staffId: staffId || undefined,
         paymentMethod: paymentFilter !== 'all' ? paymentFilter : undefined,
         // Server-side: matches invoice number and cashier name across the
@@ -102,6 +116,9 @@ export default function OwnerSales() {
       lastPage.pagination.page < lastPage.pagination.pages
         ? lastPage.pagination.page + 1
         : undefined,
+    // Keep showing the previous filter's results while the new one loads,
+    // instead of the list dropping to empty/skeleton on every date change.
+    placeholderData: keepPreviousData,
   });
 
   const { data: shopConfigData } = useQuery({
@@ -111,6 +128,13 @@ export default function OwnerSales() {
   const thankYouNote = shopConfigData?.data.receiptThankYouNote;
   const shopLogoUrl = shopConfigData?.data.logoUrl;
   const shopMotto = shopConfigData?.data.motto;
+  // Bounds for the date-range picker: sales can't predate the shop or land
+  // in the future, so neither is worth letting the user select.
+  const shopCreatedAt = useMemo(
+    () => (shopConfigData?.data.createdAt ? new Date(shopConfigData.data.createdAt) : new Date(0)),
+    [shopConfigData?.data.createdAt]
+  );
+  const today = useMemo(() => new Date(), []);
 
   const allSales = salesData?.pages.flatMap((p) => p.data) ?? [];
   const totalCount = salesData?.pages[0]?.pagination.total ?? 0;
@@ -307,7 +331,7 @@ export default function OwnerSales() {
       <Animated.View entering={FadeInDown.duration(440).delay(160)} style={styles.dateFiltersRow}>
         <AnimatedPressable
           style={[styles.dateRangeBtn, { flex: 1 }]}
-          onPress={() => setShowStartPicker(true)}
+          onPress={() => setShowDateSheet(true)}
           accessibilityRole="button"
           accessibilityLabel={`Date range: ${formatDateRange(startDate, endDate)}. Tap to change.`}
         >
@@ -370,7 +394,12 @@ export default function OwnerSales() {
 
       {/* ── Section header ───────────────────────────────────────── */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Sales History</Text>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Sales History</Text>
+          {isFetching && !isLoading && !isFetchingNextPage && (
+            <ActivityIndicator size="small" color={Colors.textTertiary} style={styles.sectionLoading} />
+          )}
+        </View>
         <AnimatedPressable
           onPress={() => setSortOrder((s) => (s === 'desc' ? 'asc' : 'desc'))}
           style={styles.sortLatestBtn}
@@ -424,21 +453,16 @@ export default function OwnerSales() {
         listHeader={listHeader}
       />
 
-      {showStartPicker && (
-        <DatePicker
-          value={startDate || new Date()}
-          onChange={(date) => {
-            setShowStartPicker(false);
-            if (date) { setStartDate(date); setShowEndPicker(true); }
-          }}
-        />
-      )}
-      {showEndPicker && (
-        <DatePicker
-          value={endDate || new Date()}
-          onChange={(date) => { setShowEndPicker(false); if (date) setEndDate(date); }}
-        />
-      )}
+      <SalesDateRangeSheet
+        visible={showDateSheet}
+        onClose={() => setShowDateSheet(false)}
+        startDate={startDate}
+        endDate={endDate}
+        minDate={shopCreatedAt}
+        maxDate={today}
+        onApply={(start, end) => { setStartDate(start); setEndDate(end); }}
+        onClear={() => { setStartDate(null); setEndDate(null); }}
+      />
 
       <SaleDetailsModal
         visible={modalVisible}
@@ -743,10 +767,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.sm,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
   sectionTitle: {
     fontSize: Typography.size.body,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
+  },
+  sectionLoading: {
+    marginLeft: 2,
   },
   sortLatestBtn: {
     flexDirection: 'row',

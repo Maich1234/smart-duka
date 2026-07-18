@@ -73,7 +73,6 @@ export default function StaffInventory() {
       <FlashList
         showsVerticalScrollIndicator={false}
         data={products}
-        estimatedItemSize={120}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <ProductCard product={item} showCostPrice={false} showActions={false} />

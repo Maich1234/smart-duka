@@ -203,9 +203,9 @@ export const processQueue = async (): Promise<void> => {
           break; // refresh endpoint unreachable — try again next run
         }
         if (!freshToken) {
-          // Server rejected the refresh — session is over. Let the UI log
-          // the user out; the queue resumes after their next sign-in.
-          useAuthStore.getState().setSessionExpired(true);
+          // Server rejected the refresh — refreshAuthToken() already set
+          // sessionExpiredReason. Let the UI log the user out; the queue
+          // resumes after their next sign-in.
           break;
         }
         try {

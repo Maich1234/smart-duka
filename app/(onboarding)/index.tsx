@@ -33,7 +33,6 @@ export default function OnboardingWelcome() {
 
   // "I already have an account" is a clear signal this device isn't new —
   // mark the journey done so cold starts go straight to sign-in from now on.
-  // (Owners can replay it later via the store's restart().)
   const skipToLogin = () => {
     haptics.light();
     useOnboardingStore.getState().markCompleted();

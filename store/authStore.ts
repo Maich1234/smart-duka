@@ -25,11 +25,14 @@ export interface AuthState {
    *  POST /auth/refresh whenever the short-lived access token expires. */
   refreshToken: string | null;
   isLoading: boolean;
-  /** Set to true by the API interceptor when a 401 arrives AND the token
-   *  refresh failed. A React component (SessionExpiredHandler) watches this,
-   *  shows the animated toast, then calls logout() — keeping side-effects
-   *  out of the axios layer. */
-  sessionExpired: boolean;
+  /** Set by the API interceptor when a 401 arrives AND the token refresh
+   *  failed, or by a force-logout push. A React component
+   *  (SessionExpiredHandler) watches this, shows a toast tailored to the
+   *  reason, then calls logout() — keeping side-effects out of the axios
+   *  layer. 'revoked_elsewhere' means another device signed into this staff
+   *  account (server-side single-session enforcement); 'expired' is the
+   *  generic case (refresh token expired/invalid). null = not expired. */
+  sessionExpiredReason: 'expired' | 'revoked_elsewhere' | null;
   setAuth: (user: User, token: string, refreshToken?: string) => void;
   // zustand's persist middleware wraps `set` to return the underlying
   // storage write's promise (see setItem() in zustand/middleware persist) —
@@ -38,7 +41,8 @@ export interface AuthState {
   setTokens: (token: string, refreshToken: string) => Promise<void>;
   logout: () => void;
   setLoading: (loading: boolean) => void;
-  setSessionExpired: (expired: boolean) => void;
+  setSessionExpired: (reason: 'expired' | 'revoked_elsewhere') => void;
+  clearSessionExpired: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -48,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isLoading: true,
-      sessionExpired: false,
+      sessionExpiredReason: null,
       // refreshToken omitted → keep the existing one (refreshUser() re-seeds
       // the profile with the current access token and must not drop it).
       setAuth: (user, token, refreshToken) =>
@@ -57,20 +61,21 @@ export const useAuthStore = create<AuthState>()(
           token,
           refreshToken: refreshToken ?? state.refreshToken,
           isLoading: false,
-          sessionExpired: false,
+          sessionExpiredReason: null,
         })),
       // zustand's `set` type here is generic (StoreApi doesn't know about the
       // persist wrapper), but at runtime persist's `set` returns the storage
       // write's promise — see the interface comment on setTokens above.
       setTokens: (token, refreshToken) => set({ token, refreshToken }) as unknown as Promise<void>,
-      logout: () => set({ user: null, token: null, refreshToken: null, isLoading: false, sessionExpired: false }),
+      logout: () => set({ user: null, token: null, refreshToken: null, isLoading: false, sessionExpiredReason: null }),
       setLoading: (loading) => set({ isLoading: loading }),
-      setSessionExpired: (expired) => set({ sessionExpired: expired }),
+      setSessionExpired: (reason) => set({ sessionExpiredReason: reason }),
+      clearSessionExpired: () => set({ sessionExpiredReason: null }),
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => secureStorage),
-      // sessionExpired is transient — never persist it
+      // sessionExpiredReason is transient — never persist it
       partialize: (state) => ({ user: state.user, token: state.token, refreshToken: state.refreshToken }),
     }
   )

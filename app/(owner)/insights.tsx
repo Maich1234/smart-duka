@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { router } from 'expo-router';
 import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -90,7 +91,16 @@ export default function OwnerInsights() {
           <>
             <HealthScoreCard health={snapshot.health} />
             <View style={s.gap} />
-            <AiNarrativeCard insight={insight} cachedNote={cachedNote} />
+            <AiNarrativeCard
+              insight={insight}
+              cachedNote={cachedNote}
+              onAskWhy={() =>
+                router.push({
+                  pathname: '/(owner)/chat',
+                  params: { seed: "Can you explain today's business summary in more detail and what I should watch out for?" },
+                })
+              }
+            />
             <View style={s.gap} />
             <AlertsList alerts={snapshot.alerts} />
             {snapshot.alerts.length > 0 && <View style={s.gap} />}

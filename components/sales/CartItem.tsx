@@ -25,10 +25,12 @@ interface CartItemProps {
   };
   /** Overrides item.sellingPrice when set — used for variable/service/configurable lines */
   unitPrice?: number;
+  /** Employee's commission per unit for this line, if the shop shows it. */
+  commissionPerUnit?: number;
   onRemove: () => void;
 }
 
-export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove }) => {
+export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionPerUnit, onRemove }) => {
   const price = unitPrice ?? item.sellingPrice;
   const { subtotal, discountAmount, appliedPromotionLabel } = applyBestPromotion(item.promotions, item.quantity, price);
   const isDecimalUnit = !!item.unitOfMeasure && item.unitOfMeasure !== 'unit';
@@ -53,6 +55,11 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, onRemove })
         {discountAmount > 0 && (
           <Text style={styles.promo} numberOfLines={1}>
             {appliedPromotionLabel} applied · saved {formatCurrency(discountAmount)}
+          </Text>
+        )}
+        {!!commissionPerUnit && (
+          <Text style={styles.commission} numberOfLines={1}>
+            You earn {formatCurrency(commissionPerUnit * item.quantity)}
           </Text>
         )}
       </View>
@@ -87,6 +94,7 @@ const styles = StyleSheet.create({
   price: { fontSize: Typography.size.small, color: Colors.textSecondary },
   includes: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
   promo: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2 },
+  commission: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2, fontFamily: Typography.fontFamilySemiBold },
   controls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   quantity: { fontSize: Typography.size.body, color: Colors.textPrimary, minWidth: 40, textAlign: 'center' },
   subtotal: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.success, minWidth: 70, textAlign: 'right' },

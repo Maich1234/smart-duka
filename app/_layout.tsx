@@ -23,8 +23,9 @@ import { useAuthStore, type AuthState } from '@/store/authStore';
 import { onForegroundMessage, onNotificationOpened, onTokenRefresh } from '@/services/notifications';
 import { initOfflineDb } from '@/utils/offlineDb';
 import { setupOfflineListener } from '@/utils/offlineManager';
-import { enqueueOperation } from '@/utils/offlineQueue';
+import { enqueueOperation, processQueue } from '@/utils/offlineQueue';
 import { randomUUID } from '@/utils/uuid';
+import { getDeviceId } from '@/utils/deviceId';
 import { getProducts } from '@/services/products';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
@@ -145,30 +146,52 @@ function CriticalDataPrefetch() {
   return null;
 }
 
-// Watches the sessionExpired flag set by the 401 interceptor.
-// Shows an animated toast explaining why the user is being logged out,
-// then calls logout() after a short delay so they can read the message.
+// A superseded device (another login elsewhere) or a genuinely dead refresh
+// token gets a bounded chance to flush its offline queue before logging out,
+// so any sales made just before the cutover still sync instead of being lost.
+const QUEUE_FLUSH_TIMEOUT_MS = 8000;
+const withTimeout = (p: Promise<unknown>, ms: number) =>
+  Promise.race([p, new Promise((resolve) => setTimeout(resolve, ms))]);
+
+// Watches the sessionExpiredReason flag set by the 401 interceptor (or a
+// force-logout push). Shows a toast tailored to why the user is being
+// logged out, then calls logout() after a short delay so they can read it.
 function SessionExpiredHandler() {
   const { toast } = useAlert();
   const { logout: storeLogout } = useAuth();
-  const sessionExpired = useAuthStore((s: AuthState) => s.sessionExpired);
-  const setSessionExpired = useAuthStore((s: AuthState) => s.setSessionExpired);
+  const sessionExpiredReason = useAuthStore((s: AuthState) => s.sessionExpiredReason);
+  const clearSessionExpired = useAuthStore((s: AuthState) => s.clearSessionExpired);
 
   useEffect(() => {
-    if (!sessionExpired) return;
+    if (!sessionExpiredReason) return;
     // Reset flag first so a double-fire can't trigger twice
-    setSessionExpired(false);
+    clearSessionExpired();
+
+    const revokedElsewhere = sessionExpiredReason === 'revoked_elsewhere';
     toast({
       type: 'warning',
-      message: 'Your session has expired. Please sign in again.',
-      duration: 3000,
+      message: revokedElsewhere
+        ? 'Your account was signed in on another device. Any pending offline transactions have been synchronized. Please sign in again if this wasn’t you.'
+        : 'Your session has expired. Please sign in again.',
+      duration: revokedElsewhere ? 5000 : 3000,
     });
-    // Give the toast a moment to render before navigating away
-    const timer = setTimeout(() => {
-      storeLogout();
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [sessionExpired]);
+
+    let cancelled = false;
+    (async () => {
+      if (revokedElsewhere) {
+        // Best-effort final sync — bounded so a dead connection can't hang
+        // the logout indefinitely.
+        await withTimeout(processQueue(), QUEUE_FLUSH_TIMEOUT_MS).catch(() => {});
+      }
+      // Give the toast a moment to render before navigating away.
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      if (!cancelled) storeLogout();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionExpiredReason]);
 
   return null;
 }
@@ -249,6 +272,17 @@ function NotificationListener() {
 
   useEffect(() => {
     const unsubscribe = onForegroundMessage(({ notification, data }) => {
+      if (data?.type === 'force_logout') {
+        // Broadcast to every FCM token on the account (not device-scoped),
+        // so this can include the new, legitimate device's token too — only
+        // act if the revoked deviceId is actually this device's own.
+        getDeviceId().then((ownId) => {
+          if (data.deviceId === ownId) {
+            useAuthStore.getState().setSessionExpired('revoked_elsewhere');
+          }
+        });
+        return;
+      }
       if (!notification?.title) return;
       alert({
         type: 'info',

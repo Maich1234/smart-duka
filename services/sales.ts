@@ -8,6 +8,8 @@ export interface SaleItem {
   subtotal: number;
   discountAmount?: number;
   appliedPromotionLabel?: string;
+  /** Employee commission earned on this line, snapshotted at sale time. */
+  commissionAmount?: number;
   variantId?: string;
   variantName?: string;
   unitOfMeasure?: string;
@@ -46,6 +48,28 @@ export interface Sale {
     /** Why the last M-Pesa reversal attempt failed (sale returns to 'completed') */
     failureReason?: string;
   };
+}
+
+export interface CommissionBreakdownEntry {
+  productId: string;
+  variantId?: string;
+  productName: string;
+  variantName?: string;
+  commission: number;
+  unitsSold: number;
+}
+
+export interface CommissionSummary {
+  totalCommission: number;
+  totalRevenue: number;
+  salesCount: number;
+  byProduct: CommissionBreakdownEntry[];
+}
+
+export interface CommissionSummaryResponse {
+  success: boolean;
+  data: CommissionSummary;
+  message?: string;
 }
 
 export interface CreateSaleData {
@@ -183,5 +207,19 @@ export const getMySales = async (params?: {
   limit?: number;
 }): Promise<SalesResponse> => {
   const response = await api.get('/sales/me', { params });
+  return response.data;
+};
+
+/**
+ * Get the current user's own commission summary for an optional date range.
+ * For staff, resolves to a 403 if the shop owner hasn't enabled commission
+ * visibility (`Shop.showStaffCommission`) — callers should show an empty
+ * state rather than a generic error toast for that case.
+ */
+export const getMyCommission = async (params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<CommissionSummaryResponse> => {
+  const response = await api.get('/sales/commissions/me', { params });
   return response.data;
 };

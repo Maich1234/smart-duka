@@ -24,6 +24,9 @@ export interface BusinessSnapshot {
   health: {
     score: number;
     components: { revenue: number; profit: number; inventory: number; cashFlow: number; staff: number };
+    confidence: number;
+    sufficient: boolean;
+    requirements: { key: string; label: string; met: boolean; current?: number; target?: number }[];
   };
   alerts: { type: string; severity: 'critical' | 'warning' | 'info'; message: string }[];
   insights: string[];

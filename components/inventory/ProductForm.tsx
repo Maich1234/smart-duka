@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   ScrollView,
@@ -7,12 +7,16 @@ import {
   StyleSheet,
   Switch,
   TextInput,
+  type LayoutChangeEvent,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SelectPicker, type PickerOption } from '../ui/SelectPicker';
 import { HelpLink } from '../help/HelpLink';
+import { VariantCommissionModal, type VariantCommissionValue } from './VariantCommissionModal';
+import { formatCurrency } from '@/utils/formatters';
+import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -31,6 +35,9 @@ export interface VariantForm {
   costPrice: string;
   quantity: string;
   lowStockAlert: string;
+  commissionEnabled: boolean;
+  commissionBasePrice: string;
+  commissionEmployeeSharePercent: string;
 }
 
 export interface PromotionForm {
@@ -100,10 +107,62 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 }) => {
   const update = (patch: Partial<ProductFormData>) => setForm({ ...form, ...patch });
 
+  // ── Field-level validation ──
+  // Tracks each required field's Y offset inside the ScrollView (captured via
+  // onLayout) so a failed save can scroll straight to the first problem
+  // instead of leaving the user to hunt for a generic "fill out all fields"
+  // toast.
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldY = useRef<Record<string, number>>({}).current;
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [commissionModalIndex, setCommissionModalIndex] = useState<number | null>(null);
+  const registerFieldY = (key: string) => (e: LayoutChangeEvent) => {
+    fieldY[key] = e.nativeEvent.layout.y;
+  };
+
+  const validate = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    if (!form.name.trim()) errs.name = 'Product name is required';
+    if (!form.category.trim()) errs.category = 'Category is required';
+    if (!form.sellingPrice.trim()) {
+      errs.sellingPrice = `${form.productType === 'bundle' ? 'Bundle' : form.productType === 'configurable' ? 'Base' : 'Selling'} price is required`;
+    } else if (isNaN(parseFloat(form.sellingPrice)) || parseFloat(form.sellingPrice) < 0) {
+      errs.sellingPrice = 'Enter a valid selling price';
+    }
+    if (!form.costPrice.trim()) {
+      errs.costPrice = 'Cost price is required';
+    } else if (isNaN(parseFloat(form.costPrice)) || parseFloat(form.costPrice) < 0) {
+      errs.costPrice = 'Enter a valid cost price';
+    }
+    if (form.productType === 'bundle' && form.bundleItems.length === 0) {
+      errs.bundleItems = 'Add at least one item to the bundle';
+    }
+    if (form.productType === 'configurable' && form.variants.length === 0) {
+      errs.variants = 'Add at least one variant';
+    }
+    return errs;
+  };
+
+  const handleSavePress = () => {
+    const errs = validate();
+    setErrors(errs);
+    const firstErrorKey = Object.keys(errs)[0];
+    if (firstErrorKey) {
+      haptics.error();
+      const y = fieldY[firstErrorKey];
+      if (y !== undefined) {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - Spacing.lg), animated: true });
+      }
+      return;
+    }
+    onSave();
+  };
+
   const addBundleItem = () => {
     const first = availableProducts[0];
     if (!first) return;
     update({ bundleItems: [...form.bundleItems, { product: first._id, quantity: '1' }] });
+    if (errors.bundleItems) setErrors((e) => ({ ...e, bundleItems: '' }));
   };
   const updateBundleItem = (index: number, patch: Partial<BundleItemForm>) => {
     const next = form.bundleItems.map((b, i) => (i === index ? { ...b, ...patch } : b));
@@ -114,7 +173,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   };
 
   const addVariant = () => {
-    update({ variants: [...form.variants, { name: '', sellingPrice: '', costPrice: '', quantity: '0', lowStockAlert: '5' }] });
+    update({
+      variants: [
+        ...form.variants,
+        {
+          name: '',
+          sellingPrice: '',
+          costPrice: '',
+          quantity: '0',
+          lowStockAlert: '5',
+          commissionEnabled: false,
+          commissionBasePrice: '',
+          commissionEmployeeSharePercent: '100',
+        },
+      ],
+    });
+    if (errors.variants) setErrors((e) => ({ ...e, variants: '' }));
   };
   const updateVariant = (index: number, patch: Partial<VariantForm>) => {
     const next = form.variants.map((v, i) => (i === index ? { ...v, ...patch } : v));
@@ -177,6 +251,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       </View>
 
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
@@ -214,21 +289,23 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
         {/* ── Basic Information ── */}
         <Text style={styles.sectionLabel}>Basic Information</Text>
-        <View style={styles.card}>
+        <View style={styles.card} onLayout={registerFieldY('name')}>
           <Input
             label="Product Name"
             placeholder="e.g. Coca Cola 500ml"
             value={form.name}
-            onChangeText={(t) => update({ name: t })}
+            onChangeText={(t) => { update({ name: t }); if (errors.name) setErrors((e) => ({ ...e, name: '' })); }}
+            error={errors.name}
           />
           <View style={styles.row}>
-            <View style={styles.flexInput}>
+            <View style={styles.flexInput} onLayout={registerFieldY('category')}>
               <Input
                 label="Category"
                 placeholder="Select category"
                 value={form.category}
-                onChangeText={(t) => update({ category: t })}
+                onChangeText={(t) => { update({ category: t }); if (errors.category) setErrors((e) => ({ ...e, category: '' })); }}
                 rightIcon="chevron-down"
+                error={errors.category}
               />
             </View>
             <View style={styles.flexInput}>
@@ -255,42 +332,54 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </View>
           )}
         </View>
-        <View style={styles.card}>
+        <View style={styles.card} onLayout={registerFieldY('sellingPrice')}>
           <View style={styles.priceCardRow}>
             <View style={styles.priceBox}>
-              <Text style={styles.priceLabel}>
+              <Text style={[styles.priceLabel, errors.sellingPrice && styles.priceLabelError]}>
                 {form.productType === 'bundle'
                   ? 'Bundle Price'
                   : form.productType === 'configurable'
                   ? 'Base Price'
                   : 'Selling Price'}
               </Text>
-              <View style={styles.priceInputRow}>
+              <View style={[styles.priceInputRow, errors.sellingPrice && styles.priceInputRowError]}>
                 <Text style={styles.priceCurrency}>{currency}</Text>
                 <TextInput
                   style={styles.priceValue}
                   value={form.sellingPrice}
-                  onChangeText={(t) => update({ sellingPrice: t })}
+                  onChangeText={(t) => { update({ sellingPrice: t }); if (errors.sellingPrice) setErrors((e) => ({ ...e, sellingPrice: '' })); }}
                   keyboardType="numeric"
                   placeholder="0.00"
                   placeholderTextColor={Colors.textTertiary}
                 />
               </View>
+              {errors.sellingPrice && (
+                <View style={styles.priceErrorRow}>
+                  <Ionicons name="alert-circle-outline" size={12} color={Colors.danger} />
+                  <Text style={styles.priceErrorText}>{errors.sellingPrice}</Text>
+                </View>
+              )}
             </View>
             <View style={styles.priceSeparator} />
             <View style={styles.priceBox}>
-              <Text style={styles.priceLabel}>Cost Price</Text>
-              <View style={styles.priceInputRow}>
+              <Text style={[styles.priceLabel, errors.costPrice && styles.priceLabelError]}>Cost Price</Text>
+              <View style={[styles.priceInputRow, errors.costPrice && styles.priceInputRowError]}>
                 <Text style={styles.priceCurrency}>{currency}</Text>
                 <TextInput
                   style={styles.priceValue}
                   value={form.costPrice}
-                  onChangeText={(t) => update({ costPrice: t })}
+                  onChangeText={(t) => { update({ costPrice: t }); if (errors.costPrice) setErrors((e) => ({ ...e, costPrice: '' })); }}
                   keyboardType="numeric"
                   placeholder="0.00"
                   placeholderTextColor={Colors.textTertiary}
                 />
               </View>
+              {errors.costPrice && (
+                <View style={styles.priceErrorRow}>
+                  <Ionicons name="alert-circle-outline" size={12} color={Colors.danger} />
+                  <Text style={styles.priceErrorText}>{errors.costPrice}</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -385,7 +474,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <View style={styles.stepperCard}>
                     <Text style={styles.stepperLabel}>Quantity in Stock</Text>
                     <View style={styles.stepperInner}>
-                      <Text style={styles.stepperValue}>{form.quantity || '0'}</Text>
+                      <TextInput
+                        style={styles.stepperValueInput}
+                        value={form.quantity || '0'}
+                        onChangeText={(t) => update({ quantity: t.replace(/[^0-9]/g, '') })}
+                        keyboardType="number-pad"
+                        selectTextOnFocus
+                        accessibilityLabel="Quantity in stock"
+                      />
                       <View style={styles.stepperBtns}>
                         <AnimatedPressable style={styles.stepperBtn} onPress={() => stepQuantity(1)} hitSlop={HIT_SLOP}>
                           <Ionicons name="chevron-up" size={15} color={Colors.textSecondary} />
@@ -401,7 +497,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <View style={styles.stepperCard}>
                     <Text style={styles.stepperLabel}>Low Stock Alert</Text>
                     <View style={styles.stepperInner}>
-                      <Text style={styles.stepperValue}>{form.lowStockAlert || '5'}</Text>
+                      <TextInput
+                        style={styles.stepperValueInput}
+                        value={form.lowStockAlert || '5'}
+                        onChangeText={(t) => update({ lowStockAlert: t.replace(/[^0-9]/g, '') })}
+                        keyboardType="number-pad"
+                        selectTextOnFocus
+                        accessibilityLabel="Low stock alert threshold"
+                      />
                       <View style={styles.stepperBtns}>
                         <AnimatedPressable style={styles.stepperBtn} onPress={() => stepLowStock(1)} hitSlop={HIT_SLOP}>
                           <Ionicons name="chevron-up" size={15} color={Colors.textSecondary} />
@@ -435,10 +538,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         {/* ── Bundle items ── */}
         {form.productType === 'bundle' && (
           <>
-            <View style={styles.sectionLabelRow}>
+            <View style={styles.sectionLabelRow} onLayout={registerFieldY('bundleItems')}>
               <Text style={styles.sectionLabel}>Includes</Text>
               <HelpLink slug="bundles-recipes" label="How bundles work" />
             </View>
+            {errors.bundleItems && (
+              <View style={styles.priceErrorRow}>
+                <Ionicons name="alert-circle-outline" size={13} color={Colors.danger} />
+                <Text style={styles.priceErrorText}>{errors.bundleItems}</Text>
+              </View>
+            )}
             <View style={styles.card}>
               {form.bundleItems.map((item, i) => (
                 <View key={i} style={styles.bundleRow}>
@@ -495,7 +604,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         {/* ── Configurable variants ── */}
         {form.productType === 'configurable' && (
           <>
-            <Text style={styles.sectionLabel}>Variants</Text>
+            <Text style={styles.sectionLabel} onLayout={registerFieldY('variants')}>Variants</Text>
+            {errors.variants && (
+              <View style={styles.priceErrorRow}>
+                <Ionicons name="alert-circle-outline" size={13} color={Colors.danger} />
+                <Text style={styles.priceErrorText}>{errors.variants}</Text>
+              </View>
+            )}
             <View style={styles.card}>
               {form.variants.map((v, i) => (
                 <View key={i} style={styles.variantCard}>
@@ -507,6 +622,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         onChangeText={(t) => updateVariant(i, { name: t })}
                       />
                     </View>
+                    <AnimatedPressable
+                      onPress={() => setCommissionModalIndex(i)}
+                      style={styles.removeBtn}
+                      hitSlop={HIT_SLOP}
+                      accessibilityLabel="Set employee commission"
+                      accessibilityRole="button"
+                    >
+                      <Ionicons
+                        name={v.commissionEnabled ? 'cash' : 'cash-outline'}
+                        size={18}
+                        color={v.commissionEnabled ? Colors.primary : Colors.textSecondary}
+                      />
+                    </AnimatedPressable>
                     <AnimatedPressable
                       onPress={() => removeVariant(i)}
                       style={styles.removeBtn}
@@ -543,11 +671,39 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       />
                     </View>
                   </View>
+                  {v.commissionEnabled && (
+                    <Text style={styles.commissionBadge}>
+                      Commission: employee gets {v.commissionEmployeeSharePercent}% of the excess over{' '}
+                      {formatCurrency(parseFloat(v.commissionBasePrice) || 0, currency)}
+                    </Text>
+                  )}
                 </View>
               ))}
               <Button title="+ Add Variant" variant="outline" size="sm" onPress={addVariant} />
             </View>
           </>
+        )}
+
+        {commissionModalIndex !== null && form.variants[commissionModalIndex] && (
+          <VariantCommissionModal
+            visible={commissionModalIndex !== null}
+            onClose={() => setCommissionModalIndex(null)}
+            variantName={form.variants[commissionModalIndex].name}
+            sellingPrice={parseFloat(form.variants[commissionModalIndex].sellingPrice) || 0}
+            initialValue={{
+              enabled: form.variants[commissionModalIndex].commissionEnabled,
+              basePrice: form.variants[commissionModalIndex].commissionBasePrice,
+              employeeSharePercent: form.variants[commissionModalIndex].commissionEmployeeSharePercent,
+            }}
+            onConfirm={(value: VariantCommissionValue) => {
+              updateVariant(commissionModalIndex, {
+                commissionEnabled: value.enabled,
+                commissionBasePrice: value.basePrice,
+                commissionEmployeeSharePercent: value.employeeSharePercent,
+              });
+              setCommissionModalIndex(null);
+            }}
+          />
         )}
 
         {/* ── Promotions & Discounts ── */}
@@ -631,7 +787,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           <Button
             title={isEditing ? 'Save Changes' : 'Add Product'}
             leftIcon={isEditing ? undefined : 'add-circle-outline'}
-            onPress={onSave}
+            onPress={handleSavePress}
             loading={loading}
             style={styles.flexBtn}
           />
@@ -807,10 +963,34 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: 4,
   },
+  priceLabelError: {
+    color: Colors.danger,
+  },
   priceInputRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  priceInputRowError: {
+    borderWidth: 1.5,
+    borderColor: Colors.danger,
+    backgroundColor: Colors.dangerSubtle,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginHorizontal: -6,
+  },
+  priceErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 5,
+  },
+  priceErrorText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.danger,
+    flex: 1,
   },
   priceCurrency: {
     fontSize: Typography.size.small,
@@ -890,6 +1070,14 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.h3,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
+  },
+  stepperValueInput: {
+    flex: 1,
+    fontSize: Typography.size.h3,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+    padding: 0,
+    margin: 0,
   },
   stepperBtns: {
     gap: 3,
@@ -986,6 +1174,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   variantHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  commissionBadge: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.primary,
+    marginTop: Spacing.xs,
+  },
 
   // ── Shared ──
   row: { flexDirection: 'row', gap: Spacing.sm },

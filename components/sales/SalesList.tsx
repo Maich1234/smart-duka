@@ -40,7 +40,6 @@ export const SalesList: React.FC<SalesListProps> = ({
     <FlashList
       showsVerticalScrollIndicator={false}
       data={sales}
-      estimatedItemSize={100}
       keyExtractor={(item) => item._id}
       renderItem={({ item }) => (
         <SaleCard

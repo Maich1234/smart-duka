@@ -79,6 +79,7 @@ export default function StaffDashboard() {
     if (canManageExpenses) {
       list.unshift({ id: 'expense', title: 'Log Expense', icon: 'receipt-outline', tint: Colors.danger, tintBg: Colors.dangerSubtle, route: '/(staff)/expenses' });
     }
+    list.push({ id: 'commission', title: 'My Commission', icon: 'cash-outline', tint: Colors.success, tintBg: Colors.primarySubtle, route: '/(staff)/commission' });
     return list;
   }, [canManageExpenses]);
 

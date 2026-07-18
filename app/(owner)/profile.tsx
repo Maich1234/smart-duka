@@ -20,7 +20,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/AuthContext';
-import { getShopConfig, updateShopConfig, uploadShopLogo } from '@/services/shop';
+import { getShopConfig, updateShopConfig, uploadShopLogo, type ShopConfigResponse } from '@/services/shop';
 import { changePassword } from '@/services/auth';
 import { getOwnerDashboard } from '@/services/dashboard';
 import { getStaff } from '@/services/staff';
@@ -35,7 +35,6 @@ import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { openHelp } from '@/utils/openHelp';
 import { router } from 'expo-router';
-import { useOnboardingStore } from '@/store/onboardingStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -197,7 +196,7 @@ export default function OwnerProfile() {
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [togglingShifts, setTogglingShifts] = useState(false);
-  const restartOnboarding = useOnboardingStore((s) => s.restart);
+  const [togglingCommissionVisibility, setTogglingCommissionVisibility] = useState(false);
 
   const { data: shopConfigData, isLoading: loadingShop } = useQuery({
     queryKey: ['shopConfig'],
@@ -255,6 +254,11 @@ export default function OwnerProfile() {
 
   const shiftManagementEnabled = shopConfigData?.data?.shiftManagementEnabled ?? false;
   const handleToggleShiftManagement = async (enabled: boolean) => {
+    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
+
+    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
+      old ? { ...old, data: { ...old.data, shiftManagementEnabled: enabled } } : old
+    );
     setTogglingShifts(true);
     try {
       await updateShopConfig({ shiftManagementEnabled: enabled });
@@ -267,15 +271,36 @@ export default function OwnerProfile() {
           : 'Shift management is off',
       });
     } catch (error: any) {
+      queryClient.setQueryData(['shopConfig'], previous);
       toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
     } finally {
       setTogglingShifts(false);
     }
   };
 
-  const handleReplayOnboarding = () => {
-    restartOnboarding();
-    router.push('/(onboarding)');
+  const showStaffCommission = shopConfigData?.data?.showStaffCommission ?? false;
+  const handleToggleStaffCommission = async (enabled: boolean) => {
+    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
+
+    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
+      old ? { ...old, data: { ...old.data, showStaffCommission: enabled } } : old
+    );
+    setTogglingCommissionVisibility(true);
+    try {
+      await updateShopConfig({ showStaffCommission: enabled });
+      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
+      toast({
+        type: 'success',
+        message: enabled
+          ? 'Staff can now preview and track their commission'
+          : 'Commission is now hidden from staff',
+      });
+    } catch (error: any) {
+      queryClient.setQueryData(['shopConfig'], previous);
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
+    } finally {
+      setTogglingCommissionVisibility(false);
+    }
   };
 
   const handleShopUpdate = async () => {
@@ -545,21 +570,22 @@ export default function OwnerProfile() {
 
             <View style={styles.prefDivider} />
 
-            <AnimatedPressable
-              style={styles.prefRow}
-              onPress={handleReplayOnboarding}
-              accessibilityRole="button"
-              accessibilityLabel="Replay the welcome tour"
-            >
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.accentSubtle }]}>
-                <Ionicons name="play-outline" size={17} color={Colors.accentDark} />
+            <View style={styles.prefRow}>
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
+                <Ionicons name="cash-outline" size={17} color={Colors.primary} />
               </View>
               <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Replay the Tour</Text>
-                <Text style={styles.prefSub}>See the welcome experience again</Text>
+                <Text style={styles.prefTitle}>Show Commission to Staff</Text>
+                <Text style={styles.prefSub}>Let staff preview and track their earned commission</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </AnimatedPressable>
+              <Switch
+                value={showStaffCommission}
+                onValueChange={handleToggleStaffCommission}
+                disabled={togglingCommissionVisibility || loadingShop}
+                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+                thumbColor={showStaffCommission ? Colors.primary : Colors.textTertiary}
+              />
+            </View>
 
             <View style={styles.prefDivider} />
 

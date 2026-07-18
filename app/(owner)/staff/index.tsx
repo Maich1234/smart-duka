@@ -180,7 +180,6 @@ export default function OwnerStaffList() {
       <FlashList
         showsVerticalScrollIndicator={false}
         data={staffList}
-        estimatedItemSize={80}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
           <StaffCard

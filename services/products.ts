@@ -8,6 +8,14 @@ export interface BundleItem {
   quantity: number;
 }
 
+export interface VariantCommission {
+  enabled: boolean;
+  /** Owner-only: the shop's floor price. Never sent to staff. */
+  basePrice?: number;
+  /** Owner-only: % of the excess (sellingPrice - basePrice) that goes to the employee. */
+  employeeSharePercent?: number;
+}
+
 export interface ProductVariant {
   _id: string;
   name: string;
@@ -16,6 +24,11 @@ export interface ProductVariant {
   quantity: number;
   sku?: string;
   lowStockAlert: number;
+  /** Present in owner-facing responses only. */
+  commission?: VariantCommission;
+  /** Staff-facing derived value (KES/unit) — only present when the shop owner
+   * has enabled commission visibility and the variant has commission enabled. */
+  commissionPreview?: number;
 }
 
 export interface ProductPromotion {
@@ -79,7 +92,7 @@ export interface CreateProductData {
   maxPrice?: number;
   allowPriceOverride?: boolean;
   bundleItems?: BundleItem[];
-  variants?: Omit<ProductVariant, '_id'>[];
+  variants?: Omit<ProductVariant, '_id' | 'commissionPreview'>[];
   promotions?: ProductPromotion[];
 }
 
@@ -98,7 +111,7 @@ export interface UpdateProductData {
   maxPrice?: number;
   allowPriceOverride?: boolean;
   bundleItems?: BundleItem[];
-  variants?: Omit<ProductVariant, '_id'>[];
+  variants?: Omit<ProductVariant, '_id' | 'commissionPreview'>[];
   promotions?: ProductPromotion[];
 }
 

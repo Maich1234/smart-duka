@@ -46,7 +46,12 @@ export const useOwnerAttention = (data: OwnerDashboardData | undefined): Attenti
             ? `${critical.length} nearly out — restock to avoid lost sales`
             : 'Restock soon to stay ahead',
         severity: critical.length > 0 ? 'critical' : 'warning',
-        route: '/(owner)/inventory',
+        // A single flagged product goes straight to that product; with
+        // several, land on the inventory list instead of picking one.
+        route:
+          lowStock.length === 1
+            ? `/(owner)/inventory/${worst._id}/edit`
+            : '/(owner)/inventory',
       });
     }
 

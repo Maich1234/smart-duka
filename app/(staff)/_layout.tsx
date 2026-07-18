@@ -227,6 +227,7 @@ export default function StaffLayout() {
       <Tabs.Screen name="profile"   options={{ title: 'Profile' }} />
       <Tabs.Screen name="expenses"  options={{ title: 'Expenses', href: null }} />
       <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
+      <Tabs.Screen name="commission" options={{ title: 'My Commission', href: null }} />
     </Tabs>
   );
 }

@@ -76,6 +76,11 @@ export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
               <Text style={[styles.chipPrice, active && styles.chipTextActive]}>
                 {formatCurrency(v.sellingPrice)}{outOfStock ? ' · Out of stock' : ''}
               </Text>
+              {v.commissionPreview != null && (
+                <Text style={[styles.chipCommission, active && styles.chipTextActive]}>
+                  Earn {formatCurrency(v.commissionPreview)}
+                </Text>
+              )}
             </AnimatedPressable>
           );
         })}
@@ -105,6 +110,7 @@ const styles = StyleSheet.create({
   chipDisabled: { opacity: 0.4 },
   chipText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
   chipPrice: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
+  chipCommission: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2, fontFamily: Typography.fontFamilySemiBold },
   chipTextActive: { color: Colors.white },
   maxStock: { fontSize: Typography.size.small, textAlign: 'center', color: Colors.textSecondary, marginBottom: Spacing.sm },
   buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },

@@ -20,7 +20,9 @@ const api = axios.create({
 // Refunds move money out of the till — they must never fire silently later.
 // Subscription actions (trial, pay, cancel) are billing events — replaying
 // them from a queue hours later could charge the owner unexpectedly.
-const REALTIME_ONLY = ['/mpesa/initiate', '/mpesa/verify-receipt', '/refund', '/subscriptions/'];
+// A chat message answered hours later, out of context, would be actively
+// wrong rather than just delayed.
+const REALTIME_ONLY = ['/mpesa/initiate', '/mpesa/verify-receipt', '/refund', '/subscriptions/', '/staff/seat-payment', '/ai/chat'];
 
 // Auth requests carry credentials and only make sense interactively — never
 // write them (and the password inside) to the offline outbox. Fail fast with
@@ -174,17 +176,23 @@ api.interceptors.response.use(
             cfg.headers = { ...(cfg.headers ?? {}), Authorization: `Bearer ${newToken}` };
             return api(cfg);
           }
+          // newToken is null — refreshAuthToken() already set
+          // sessionExpiredReason (expired vs revoked_elsewhere) before
+          // returning. SessionExpiredHandler in _layout.tsx picks it up.
         } catch {
           // Refresh unreachable (network) — session may still be valid, so
           // fail this request without logging the user out.
           return Promise.reject(error);
         }
+      } else if (cfg?.headers?.Authorization) {
+        // No refresh token, or already retried once: nothing has set a
+        // reason yet, so this is the generic case. Only surface "session
+        // expired" when this request actually carried a session token — a
+        // 401 with no Authorization header (login, register, forgot-password)
+        // is a credentials/auth failure, not an expired session, and the
+        // caller already shows its own error message for those.
+        useAuthStore.getState().setSessionExpired('expired');
       }
-      // No refresh token, already retried, or the server rejected the
-      // refresh: the session is over. Signal the React layer —
-      // SessionExpiredHandler in _layout.tsx shows the animated toast and
-      // then calls logout().
-      useAuthStore.getState().setSessionExpired(true);
     }
     return Promise.reject(error);
   }

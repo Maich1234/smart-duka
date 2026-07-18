@@ -208,7 +208,6 @@ export const ExpensesScreen: React.FC = () => {
       <FlashList
         showsVerticalScrollIndicator={false}
         data={expenses}
-        estimatedItemSize={70}
         keyExtractor={(item) => item._id}
         renderItem={({ item, index }) => (
           <ListRow

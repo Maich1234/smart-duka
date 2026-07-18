@@ -101,7 +101,6 @@ export const NotificationsList: React.FC = () => {
       )}
       <FlashList
         data={items}
-        estimatedItemSize={84}
         keyExtractor={(item) => item._id}
         showsVerticalScrollIndicator={false}
         onEndReached={() => hasNextPage && fetchNextPage()}

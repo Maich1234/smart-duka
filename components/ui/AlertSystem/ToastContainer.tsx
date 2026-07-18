@@ -5,7 +5,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   LinearTransition,
@@ -69,6 +70,8 @@ const TOAST_CONFIG: Record<
 
 const DEFAULT_DURATION = 3200;
 const MAX_TOASTS = 3;
+const SWIPE_DISMISS_DISTANCE = 80;
+const SWIPE_DISMISS_VELOCITY = 800;
 
 // ─── Single Toast Item ────────────────────────────────────────────────────────
 
@@ -81,6 +84,7 @@ interface ToastItemProps {
 function ToastItem({ toast, onRemove, index }: ToastItemProps) {
   const cfg = TOAST_CONFIG[toast.type];
   const translateY = useSharedValue(-80);
+  const translateX = useSharedValue(0);
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.92);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,6 +92,19 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
   const remove = useCallback(() => {
     onRemove(toast.id);
   }, [toast.id, onRemove]);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  const scheduleAutoDismiss = useCallback(() => {
+    clearTimer();
+    const duration = toast.duration ?? DEFAULT_DURATION;
+    timerRef.current = setTimeout(() => {
+      animateOut();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, duration);
+  }, [toast.duration, clearTimer]);
 
   // Animate in on mount
   React.useLayoutEffect(() => {
@@ -101,56 +118,88 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
     else if (toast.type === 'error') haptics.error();
     else if (toast.type === 'warning') haptics.warning();
 
-    const duration = toast.duration ?? DEFAULT_DURATION;
-    timerRef.current = setTimeout(() => {
-      animateOut();
-    }, duration);
+    scheduleAutoDismiss();
 
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
+    return clearTimer;
   }, []);
 
   const animateOut = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
+    clearTimer();
     opacity.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.ease) });
     scale.value = withTiming(0.96, { duration: 200 });
     translateY.value = withTiming(-40, { duration: 200 }, (finished) => {
       if (finished) runOnJS(remove)();
     });
-  }, [remove]);
+  }, [remove, clearTimer]);
+
+  const swipeOut = useCallback((direction: 1 | -1) => {
+    clearTimer();
+    const screenWidth = Dimensions.get('window').width;
+    opacity.value = withTiming(0, { duration: 180 });
+    translateX.value = withTiming(direction * screenWidth, { duration: 220 }, (finished) => {
+      if (finished) runOnJS(remove)();
+    });
+  }, [remove, clearTimer]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-14, 14])
+    .onStart(() => {
+      runOnJS(clearTimer)();
+    })
+    .onUpdate((event) => {
+      translateX.value = event.translationX;
+    })
+    .onEnd((event) => {
+      const shouldDismiss =
+        Math.abs(event.translationX) > SWIPE_DISMISS_DISTANCE ||
+        Math.abs(event.velocityX) > SWIPE_DISMISS_VELOCITY;
+      if (shouldDismiss) {
+        const direction = event.translationX >= 0 ? 1 : -1;
+        runOnJS(swipeOut)(direction);
+      } else {
+        translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
+        runOnJS(scheduleAutoDismiss)();
+      }
+    });
 
   const containerAnim = useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [{ translateY: translateY.value }, { scale: scale.value }],
+    transform: [
+      { translateY: translateY.value },
+      { translateX: translateX.value },
+      { scale: scale.value },
+    ],
   }));
 
   return (
-    <Animated.View
-      layout={LinearTransition.springify().damping(22).stiffness(260)}
-      style={[styles.toast, containerAnim]}
-    >
-      {/* Left accent stripe */}
-      <View style={[styles.stripe, { backgroundColor: cfg.border }]} />
+    <GestureDetector gesture={panGesture}>
+      <Animated.View
+        layout={LinearTransition.springify().damping(22).stiffness(260)}
+        style={[styles.toast, containerAnim]}
+      >
+        {/* Left accent stripe */}
+        <View style={[styles.stripe, { backgroundColor: cfg.border }]} />
 
-      <View style={styles.toastInner}>
-        <View style={[styles.toastIconWrap, { backgroundColor: cfg.border + '18' }]}>
-          <Ionicons name={cfg.icon as any} size={18} color={cfg.color} />
+        <View style={styles.toastInner}>
+          <View style={[styles.toastIconWrap, { backgroundColor: cfg.border + '18' }]}>
+            <Ionicons name={cfg.icon as any} size={18} color={cfg.color} />
+          </View>
+          <Text style={styles.toastMessage} numberOfLines={2}>
+            {toast.message}
+          </Text>
+          <AnimatedPressable
+            onPress={animateOut}
+            pressScale={0.85}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss notification"
+          >
+            <Ionicons name="close" size={15} color={Colors.textTertiary} style={styles.toastClose} />
+          </AnimatedPressable>
         </View>
-        <Text style={styles.toastMessage} numberOfLines={2}>
-          {toast.message}
-        </Text>
-        <AnimatedPressable
-          onPress={animateOut}
-          pressScale={0.85}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss notification"
-        >
-          <Ionicons name="close" size={15} color={Colors.textTertiary} style={styles.toastClose} />
-        </AnimatedPressable>
-      </View>
-    </Animated.View>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 

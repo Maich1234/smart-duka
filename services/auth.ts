@@ -1,4 +1,5 @@
 import api from './api';
+import { getDeviceInfo } from '../utils/deviceId';
 
 export interface LoginResponse {
   success: boolean;
@@ -77,7 +78,8 @@ export interface VerifyEmailData {
  * Login with email and password
  */
 export const login = async (email: string, password: string): Promise<LoginResponse> => {
-  const response = await api.post('/auth/login', { email, password });
+  const device = await getDeviceInfo();
+  const response = await api.post('/auth/login', { email, password, device });
   return response.data;
 };
 

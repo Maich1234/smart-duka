@@ -1,4 +1,5 @@
 import api from './api';
+import type { CommissionSummaryResponse } from './sales';
 
 export interface Staff {
   _id: string;
@@ -30,17 +31,32 @@ export interface CreateStaffData {
   email: string;
   password: string;
   phone?: string;
-  /** Set once the owner has accepted the seat-price-increase confirmation. */
-  priceConfirmed?: boolean;
+  permissions?: string[];
 }
 
-/** Shape of the 409 the backend returns when adding a seat raises the bill and priceConfirmed wasn't sent. */
+/** Shape of the 409 the backend returns when adding a seat would raise the bill — payment is required. */
 export interface SeatPriceConfirmation {
   currentAmount: number;
   projectedAmount: number;
   currency: string;
   billingCycle: 'monthly' | 'yearly';
 }
+
+export type SeatPaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled' | 'timeout';
+
+export interface SeatPaymentState {
+  paymentId: string;
+  status: SeatPaymentStatus;
+  amount: number;
+  currency: string;
+  receipt: string | null;
+  errorMessage: string | null;
+  staff: Staff | null;
+}
+
+export type InitiateSeatPaymentResult =
+  | { mode: 'created'; staff: Staff }
+  | { mode: 'payment_pending'; paymentId: string; amount: number; currency: string };
 
 export interface UpdateStaffData {
   name?: string;
@@ -97,6 +113,47 @@ export const createStaff = async (data: CreateStaffData): Promise<SingleStaffRes
   return response.data;
 };
 
+/** Checks whether an email is already taken — used for the system-generated email field's onBlur check. */
+export const checkStaffEmailAvailability = async (email: string): Promise<{ available: boolean }> => {
+  const response = await api.get('/staff/check-email', { params: { email } });
+  return response.data.data;
+};
+
+/**
+ * Starts an M-PESA STK Push for the seat this staff member would occupy.
+ * If the seat turns out to be free by the time this runs (e.g. someone else
+ * was just removed), the backend creates the staff directly instead —
+ * check `mode` on the response.
+ */
+export const initiateSeatPayment = async (
+  data: CreateStaffData & { phoneNumber: string },
+  idempotencyKey?: string
+): Promise<{ success: boolean; data: InitiateSeatPaymentResult; message?: string }> => {
+  const response = await api.post(
+    '/staff/seat-payment',
+    data,
+    idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined
+  );
+  return response.data;
+};
+
+export const getSeatPaymentStatus = async (paymentId: string): Promise<{ success: boolean; data: SeatPaymentState }> => {
+  const response = await api.get(`/staff/seat-payment/${paymentId}`);
+  return response.data;
+};
+
+/** Re-verifies a specific seat payment directly against M-PESA — "I definitely paid, check again." */
+export const recheckSeatPayment = async (paymentId: string): Promise<{ success: boolean; data: SeatPaymentState }> => {
+  const response = await api.post(`/staff/seat-payment/${paymentId}/recheck`);
+  return response.data;
+};
+
+/** Recovery path: the owner pastes their M-PESA confirmation SMS to unblock a seat payment that never activated. */
+export const reconcileSeatPaymentByMessage = async (message: string): Promise<{ success: boolean; data: SeatPaymentState; message: string }> => {
+  const response = await api.post('/staff/seat-payment/reconcile', { message });
+  return response.data;
+};
+
 /**
  * Update staff member details (Owner only)
  */
@@ -131,6 +188,19 @@ export const getStaffSales = async (id: string, params?: {
   limit?: number;
 }): Promise<StaffSalesResponse> => {
   const response = await api.get(`/staff/${id}/sales`, { params });
+  return response.data;
+};
+
+/**
+ * Get a staff member's commission summary (Owner only) — always visible to
+ * the owner regardless of the `showStaffCommission` toggle, which only
+ * gates the staff member's own view of the same data.
+ */
+export const getStaffCommission = async (id: string, params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<CommissionSummaryResponse> => {
+  const response = await api.get(`/staff/${id}/commission`, { params });
   return response.data;
 };
 

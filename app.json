@@ -22,7 +22,9 @@
       ]
     },
     "android": {
-      "permissions": ["android.permission.POST_NOTIFICATIONS"],
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -67,6 +69,10 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "notification": {
+      "icon": "./assets/notification-icon/notification_icon_xxxhdpi.png",
+      "color": "#0F766E"
+    },
     "plugins": [
       "expo-router",
       [
@@ -84,12 +90,14 @@
       "@react-native-community/datetimepicker",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      "./plugins/withNotificationIcon",
       [
         "expo-build-properties",
         {
           "android": {
             "enableProguardInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "enableMinifyInReleaseBuilds": true
           },
           "ios": {
             "useFrameworks": "static",
@@ -114,15 +122,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "5c0dd2e5-470b-4d6a-b4f7-54ef552e75f8"
+        "projectId": "35fd7583-1715-4d40-bf73-9a052a020622"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/5c0dd2e5-470b-4d6a-b4f7-54ef552e75f8"
+      "url": "https://u.expo.dev/35fd7583-1715-4d40-bf73-9a052a020622"
     },
-    "owner": "muchael123"
+    "owner": "maich123"
   }
 }

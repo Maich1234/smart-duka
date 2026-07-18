@@ -268,6 +268,14 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Ask Smart Duka',
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="expenses"
         options={{
           title: 'Expenses',

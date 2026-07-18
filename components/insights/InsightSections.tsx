@@ -64,33 +64,87 @@ const COMPONENT_LABELS: Record<keyof BusinessSnapshot['health']['components'], s
 const scoreColor = (score: number) =>
   score >= 75 ? Colors.success : score >= 50 ? Colors.warning : Colors.danger;
 
+function InsufficientHealthCard({ health }: { health: BusinessSnapshot['health'] }) {
+  return (
+    <View style={[hs.card, Shadows.sm]}>
+      <Text style={id.heading}>Not enough data yet</Text>
+      <Text style={id.subheading}>We&apos;ll calculate your Business Health once we&apos;ve seen:</Text>
+      <View style={id.list}>
+        {health.requirements.map((req) => (
+          <View key={req.key} style={id.row}>
+            <Ionicons
+              name={req.met ? 'checkmark-circle' : 'ellipse-outline'}
+              size={16}
+              color={req.met ? Colors.success : Colors.textTertiary}
+            />
+            <Text style={[id.label, { color: req.met ? Colors.textPrimary : Colors.textTertiary }]}>
+              {req.label}
+              {req.target != null ? ` (${Math.min(req.current ?? 0, req.target)}/${req.target})` : ''}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <View style={id.confidenceRow}>
+        <Text style={id.confidenceLabel}>Current confidence</Text>
+        <Text style={id.confidenceValue}>{health.confidence}%</Text>
+      </View>
+    </View>
+  );
+}
+
+const id = StyleSheet.create({
+  heading: { fontSize: 14, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary, marginBottom: 2 },
+  subheading: { fontSize: 12, fontFamily: Typography.fontFamily, color: Colors.textTertiary, marginBottom: Spacing.md },
+  list: { gap: 8, marginBottom: Spacing.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  label: { flex: 1, fontSize: 13, fontFamily: Typography.fontFamily },
+  confidenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  confidenceLabel: { fontSize: 11, fontFamily: Typography.fontFamilySemiBold, color: Colors.textTertiary },
+  confidenceValue: { fontSize: 14, fontFamily: Typography.fontFamilyBold, color: Colors.warning },
+});
+
 export function HealthScoreCard({ health }: { health: BusinessSnapshot['health'] }) {
   const color = scoreColor(health.score);
   return (
     <Animated.View entering={FadeInDown.duration(340).delay(40)}>
       <SectionHeader icon="pulse-outline" title="Business Health" />
-      <View style={[hs.card, Shadows.sm]}>
-        <View style={hs.ringRow}>
-          <ProgressRing progress={health.score / 100} size={104} strokeWidth={9} color={color} trackColor={Colors.divider}>
-            <Text style={[hs.scoreNum, { color }]}>{health.score}</Text>
-          </ProgressRing>
-          <View style={hs.components}>
-            {(Object.keys(COMPONENT_LABELS) as (keyof typeof COMPONENT_LABELS)[]).map((key) => (
-              <View key={key} style={hs.componentRow}>
-                <Text style={hs.componentLabel}>{COMPONENT_LABELS[key]}</Text>
-                <View style={hs.componentTrack}>
-                  <View
-                    style={[
-                      hs.componentFill,
-                      { width: `${Math.max(0, Math.min(100, health.components[key]))}%`, backgroundColor: scoreColor(health.components[key]) },
-                    ]}
-                  />
+      {health.sufficient ? (
+        <View style={[hs.card, Shadows.sm]}>
+          <View style={hs.ringRow}>
+            <ProgressRing progress={health.score / 100} size={104} strokeWidth={9} color={color} trackColor={Colors.divider}>
+              <Text style={[hs.scoreNum, { color }]}>{health.score}</Text>
+            </ProgressRing>
+            <View style={hs.components}>
+              {(Object.keys(COMPONENT_LABELS) as (keyof typeof COMPONENT_LABELS)[]).map((key) => (
+                <View key={key} style={hs.componentRow}>
+                  <Text style={hs.componentLabel}>{COMPONENT_LABELS[key]}</Text>
+                  <View style={hs.componentTrack}>
+                    <View
+                      style={[
+                        hs.componentFill,
+                        { width: `${Math.max(0, Math.min(100, health.components[key]))}%`, backgroundColor: scoreColor(health.components[key]) },
+                      ]}
+                    />
+                  </View>
                 </View>
-              </View>
-            ))}
+              ))}
+            </View>
+          </View>
+          <View style={hs.confidenceRow}>
+            <Text style={hs.confidenceLabel}>Confidence</Text>
+            <Text style={hs.confidenceValue}>{health.confidence}%</Text>
           </View>
         </View>
-      </View>
+      ) : (
+        <InsufficientHealthCard health={health} />
+      )}
     </Animated.View>
   );
 }
@@ -110,6 +164,18 @@ const hs = StyleSheet.create({
   componentLabel: { fontSize: 11, fontFamily: Typography.fontFamilySemiBold, color: Colors.textTertiary },
   componentTrack: { height: 5, borderRadius: 3, backgroundColor: Colors.divider, overflow: 'hidden' },
   componentFill: { height: '100%', borderRadius: 3 },
+  confidenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  confidenceLabel: { fontSize: 11, fontFamily: Typography.fontFamilySemiBold, color: Colors.textTertiary },
+  confidenceValue: { fontSize: 12, fontFamily: Typography.fontFamilyBold, color: Colors.success },
 });
 
 // ─── AiNarrativeCard ──────────────────────────────────────────────────────────
@@ -120,7 +186,15 @@ const PRIORITY_STYLE: Record<AiInsight['priority'], { fg: string; bg: string; la
   low: { fg: Colors.success, bg: Colors.successSubtle, label: 'Low priority' },
 };
 
-export function AiNarrativeCard({ insight, cachedNote }: { insight: AiInsight; cachedNote?: string }) {
+export function AiNarrativeCard({
+  insight,
+  cachedNote,
+  onAskWhy,
+}: {
+  insight: AiInsight;
+  cachedNote?: string;
+  onAskWhy?: () => void;
+}) {
   const tone = PRIORITY_STYLE[insight.priority];
   return (
     <Animated.View entering={FadeInDown.duration(340).delay(100)}>
@@ -141,6 +215,17 @@ export function AiNarrativeCard({ insight, cachedNote }: { insight: AiInsight; c
           </View>
         )}
         {cachedNote && <Text style={nc.cachedNote}>{cachedNote}</Text>}
+        {onAskWhy && (
+          <AnimatedPressable
+            onPress={onAskWhy}
+            style={nc.askWhyRow}
+            accessibilityRole="button"
+            accessibilityLabel="Ask Smart Duka AI why"
+          >
+            <Text style={nc.askWhyText}>Ask why</Text>
+            <Ionicons name="arrow-forward" size={13} color={Colors.primary} />
+          </AnimatedPressable>
+        )}
       </View>
     </Animated.View>
   );
@@ -162,6 +247,8 @@ const nc = StyleSheet.create({
   actionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   actionText: { flex: 1, fontSize: Typography.size.small, lineHeight: 20, fontFamily: Typography.fontFamily, color: Colors.textPrimary },
   cachedNote: { fontSize: 11, fontFamily: Typography.fontFamily, color: Colors.textTertiary, marginTop: 2 },
+  askWhyRow: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 2 },
+  askWhyText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.primary },
 });
 
 // ─── AlertsList ───────────────────────────────────────────────────────────────

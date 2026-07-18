@@ -63,7 +63,6 @@ export default function ShiftsList() {
   return (
     <FlashList
       data={shifts}
-      estimatedItemSize={100}
       keyExtractor={(item) => item._id}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.list}

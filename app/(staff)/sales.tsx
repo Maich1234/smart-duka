@@ -24,6 +24,7 @@ import { ReceiptModal } from '@/components/sales/ReceiptModal';
 import { MpesaPaymentModal } from '@/components/payments/MpesaPaymentModal';
 import { ShiftGate, ActiveShiftBar } from '@/components/shifts/ShiftGate';
 import { applyBestPromotion } from '@/utils/promotions';
+import { formatCurrency } from '@/utils/formatters';
 import { isOfflineQueued } from '@/utils/errors';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -324,6 +325,7 @@ export default function StaffSales() {
         cartUnitPrice: variant.sellingPrice,
         cartVariantId: variant._id,
         cartVariantName: variant.name,
+        cartVariantCommission: variant.commissionPreview,
       });
     }
     setVariantModalVisible(false);
@@ -339,6 +341,10 @@ export default function StaffSales() {
   );
   const totalAmount = cartPromoResults.reduce((sum, r) => sum + r.subtotal, 0);
   const totalSavings = cartPromoResults.reduce((sum, r) => sum + r.discountAmount, 0);
+  const totalCommission = cart.reduce(
+    (sum, item) => sum + (item.cartVariantCommission ?? 0) * item.cartQuantity,
+    0
+  );
 
   const buildSaleItems = () => cart.map((item) => ({
     productId: item._id,
@@ -506,9 +512,15 @@ export default function StaffSales() {
                       ),
                     }}
                     unitPrice={item.cartUnitPrice}
+                    commissionPerUnit={item.cartVariantCommission}
                     onRemove={() => removeFromCart(cartKey(item))}
                   />
                 ))}
+                {totalCommission > 0 && (
+                  <Text style={styles.cartCommissionTotal}>
+                    Your commission: {formatCurrency(totalCommission)}
+                  </Text>
+                )}
                 <CartSummary
                   total={totalAmount}
                   totalSavings={totalSavings}
@@ -717,6 +729,13 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     marginBottom: Spacing.sm,
     color: Colors.textPrimary,
+  },
+  cartCommissionTotal: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.success,
+    textAlign: 'right',
+    marginTop: Spacing.xs,
   },
   historySection: { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg, marginBottom: Spacing.xl },
   paginationRow: {

@@ -302,7 +302,6 @@ export default function OwnerInventory() {
       <FlashList
         showsVerticalScrollIndicator={false}
         data={filteredProducts}
-        estimatedItemSize={120}
         keyExtractor={(item) => item._id}
         renderItem={({ item, index }) => (
           <ProductCard

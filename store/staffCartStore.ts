@@ -6,6 +6,8 @@ export interface CartEntry extends Product {
   cartUnitPrice?: number;
   cartVariantId?: string;
   cartVariantName?: string;
+  /** Employee's commission per unit for this variant, if the shop shows it. */
+  cartVariantCommission?: number;
 }
 
 export const cartKey = (item: CartEntry) => `${item._id}:${item.cartVariantId ?? ''}`;

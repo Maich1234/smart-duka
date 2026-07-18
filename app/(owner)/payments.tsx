@@ -82,7 +82,6 @@ export default function PaymentsScreen() {
     <View style={styles.container}>
       <FlashList
         data={allTransactions}
-        estimatedItemSize={80}
         keyExtractor={(item) => item._id}
         showsVerticalScrollIndicator={false}
         onEndReached={() => hasNextPage && fetchNextPage()}

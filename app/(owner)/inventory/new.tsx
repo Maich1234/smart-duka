@@ -46,19 +46,9 @@ export default function NewProductScreen() {
     },
   });
 
+  // ProductForm validates required fields itself (highlighting the specific
+  // field and scrolling to it) and only calls onSave once the form is valid.
   const handleSave = () => {
-    if (!form.name || !form.category || !form.sellingPrice || !form.costPrice) {
-      toast({ type: 'error', message: 'Please fill all required fields' });
-      return;
-    }
-    if (form.productType === 'bundle' && form.bundleItems.length === 0) {
-      toast({ type: 'error', message: 'Add at least one item to the bundle' });
-      return;
-    }
-    if (form.productType === 'configurable' && form.variants.length === 0) {
-      toast({ type: 'error', message: 'Add at least one variant' });
-      return;
-    }
 
     // Bundle/configurable products carry no meaningful stock of their own —
     // real availability lives on bundle components / variants instead.
@@ -95,6 +85,13 @@ export default function NewProductScreen() {
         costPrice: parseFloat(v.costPrice) || 0,
         quantity: parseInt(v.quantity) || 0,
         lowStockAlert: parseInt(v.lowStockAlert) || 5,
+        commission: v.commissionEnabled
+          ? {
+              enabled: true,
+              basePrice: parseFloat(v.commissionBasePrice) || 0,
+              employeeSharePercent: parseFloat(v.commissionEmployeeSharePercent) || 100,
+            }
+          : { enabled: false },
       }));
     }
     if (!isCompositeType) {

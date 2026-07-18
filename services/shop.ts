@@ -15,6 +15,11 @@ export interface Shop {
   motto?: string;
   /** Owner feature flag: staff must clock in before selling. */
   shiftManagementEnabled?: boolean;
+  /** Owner feature flag: staff can preview commission while selling and view their own earnings. */
+  showStaffCommission?: boolean;
+  /** ISO timestamp — earliest possible date for any sale, used as a
+   * lower bound on sales date-range pickers. */
+  createdAt?: string;
 }
 
 export interface ShopConfigResponse {
@@ -34,6 +39,7 @@ export interface UpdateShopConfigData {
   logoUrl?: string;
   motto?: string;
   shiftManagementEnabled?: boolean;
+  showStaffCommission?: boolean;
 }
 
 export const getShopConfig = async (): Promise<ShopConfigResponse> => {
