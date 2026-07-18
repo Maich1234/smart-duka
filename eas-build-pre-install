@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# npm 11.6.3 has a `npm ci` regression that spuriously reports valid
+# packages as "Missing ... from lock file" (npm/cli#8767, fixed by
+# npm/cli#8981 in a later release). Pin to the last known-good version
+# until the fix ships in a stable release EAS images pick up.
+npm install -g npm@11.6.2
