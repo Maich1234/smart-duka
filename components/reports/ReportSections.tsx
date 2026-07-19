@@ -366,7 +366,26 @@ const SHORTCUTS = [
   },
 ] as const;
 
-export function QuickShortcuts() {
+const PURCHASES_SHORTCUT = {
+  id: 'purchases',
+  label: 'Purchases',
+  sub: 'Stock buying',
+  icon: 'cart-outline' as const,
+  colors: ['#0B5B54', '#0F766E'] as [string, string],
+  route: '/(owner)/purchases',
+} as const;
+
+interface QuickShortcutsProps {
+  /** Only true once the owner has turned on the Purchasing module — kept
+   * completely out of navigation otherwise, per that feature's own spec. */
+  showPurchases?: boolean;
+}
+
+export function QuickShortcuts({ showPurchases = false }: QuickShortcutsProps) {
+  const shortcuts = showPurchases
+    ? [...SHORTCUTS.slice(0, 2), PURCHASES_SHORTCUT, ...SHORTCUTS.slice(2)]
+    : SHORTCUTS;
+
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(260)}>
       <SectionHeader icon="grid-outline" title="Quick Access" delay={240} />
@@ -375,7 +394,7 @@ export function QuickShortcuts() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={qs.scroll}
       >
-        {SHORTCUTS.map((s) => (
+        {shortcuts.map((s) => (
           <AnimatedPressable
             key={s.id}
             onPress={() => router.push(s.route as never)}

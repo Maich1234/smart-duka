@@ -10,7 +10,9 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { ScreenFade } from '@/components/ui/motion';
 import { Shimmer } from '@/components/ui/Shimmer';
 import { useAuthStore, type AuthState } from '@/store/authStore';
+import { usePermission } from '@/utils/permissions';
 import { getOwnerDashboard } from '@/services/dashboard';
+import { getShopConfig } from '@/services/shop';
 import { useOwnerAttention } from '@/hooks/useAttention';
 import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
@@ -48,12 +50,17 @@ const getShopInitials = (name: string) =>
     .toUpperCase();
 
 // Ranked by daily usage: expenses get logged every day, products get added
-// weekly, reports get opened when there's a question to answer.
-const ACTION_TILES: QuickActionTile[] = [
+// weekly, reports get opened when there's a question to answer. Purchases
+// sits with expenses — restocking is a similarly frequent workflow — but
+// only appears once the owner has turned the module on (see profile.tsx).
+const BASE_ACTION_TILES: QuickActionTile[] = [
   { id: 'expense', title: 'Log Expense', icon: 'receipt-outline', tint: Colors.danger, tintBg: Colors.dangerSubtle, route: '/(owner)/expenses' },
   { id: 'product', title: 'Add Product', icon: 'cube-outline', tint: Colors.accentDark, tintBg: Colors.accentSubtle, route: '/(owner)/inventory/new' },
   { id: 'reports', title: 'Reports', icon: 'bar-chart-outline', tint: Colors.info, tintBg: '#DBEAFE', route: '/(owner)/reports' },
 ];
+const PURCHASES_TILE: QuickActionTile = {
+  id: 'purchases', title: 'Purchases', icon: 'cart-outline', tint: Colors.primary, tintBg: Colors.primarySubtle, route: '/(owner)/purchases',
+};
 
 const DashboardSkeleton = () => (
   <View style={styles.skeletonContainer}>
@@ -80,6 +87,17 @@ export default function OwnerDashboard() {
     queryKey: ['ownerDashboard'],
     queryFn: getOwnerDashboard,
   });
+
+  const canViewPurchases = usePermission('view_purchases');
+  const { data: shopConfigData } = useQuery({
+    queryKey: ['shopConfig'],
+    queryFn: getShopConfig,
+  });
+  const showPurchasesTile = canViewPurchases && (shopConfigData?.data?.purchasingEnabled ?? false);
+  const actionTiles = useMemo(
+    () => (showPurchasesTile ? [BASE_ACTION_TILES[0], PURCHASES_TILE, ...BASE_ACTION_TILES.slice(1)] : BASE_ACTION_TILES),
+    [showPurchasesTile],
+  );
 
   const [timeContext, setTimeContext] = useState({
     greeting: getGreeting(),
@@ -177,7 +195,7 @@ export default function OwnerDashboard() {
           <GettingStartedChecklist />
 
           {/* 4 · What should I do next? */}
-          <QuickActions primaryRoute="/(owner)/sales" tiles={ACTION_TILES} />
+          <QuickActions primaryRoute="/(owner)/sales" tiles={actionTiles} />
 
           {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
           <TrialBanner />

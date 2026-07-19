@@ -12,6 +12,7 @@ import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getStaffDashboard } from '@/services/dashboard';
+import { getShopConfig } from '@/services/shop';
 import { useStaffAttention } from '@/hooks/useAttention';
 import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
@@ -50,10 +51,16 @@ export default function StaffDashboard() {
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
   const canManageExpenses = usePermission('manage_expenses');
+  const canViewPurchases = usePermission('view_purchases');
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['staffDashboard'],
     queryFn: getStaffDashboard,
   });
+  const { data: shopConfigData } = useQuery({
+    queryKey: ['shopConfig'],
+    queryFn: getShopConfig,
+  });
+  const showPurchasesTile = canViewPurchases && (shopConfigData?.data?.purchasingEnabled ?? false);
 
   const [timeContext, setTimeContext] = useState({
     greeting: getGreeting(),
@@ -79,9 +86,12 @@ export default function StaffDashboard() {
     if (canManageExpenses) {
       list.unshift({ id: 'expense', title: 'Log Expense', icon: 'receipt-outline', tint: Colors.danger, tintBg: Colors.dangerSubtle, route: '/(staff)/expenses' });
     }
+    if (showPurchasesTile) {
+      list.unshift({ id: 'purchases', title: 'Purchases', icon: 'cart-outline', tint: Colors.primary, tintBg: Colors.primarySubtle, route: '/(staff)/purchases' });
+    }
     list.push({ id: 'commission', title: 'My Commission', icon: 'cash-outline', tint: Colors.success, tintBg: Colors.primarySubtle, route: '/(staff)/commission' });
     return list;
-  }, [canManageExpenses]);
+  }, [canManageExpenses, showPurchasesTile]);
 
   const unreadCount = useUnreadNotificationsCount();
 

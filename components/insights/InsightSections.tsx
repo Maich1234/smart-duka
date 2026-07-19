@@ -384,6 +384,34 @@ export function UpsellCard() {
   );
 }
 
+// ─── AiDisabledCard ─────────────────────────────────────────────────────────
+
+/** Shown when the shop is subscribed but has switched Smart Duka AI off in Profile — distinct from UpsellCard, which is for shops that aren't subscribed at all. */
+export function AiDisabledCard() {
+  return (
+    <AnimatedPressable
+      onPress={() => {
+        haptics.light();
+        router.push('/(owner)/profile');
+      }}
+      style={[uc.card, Shadows.sm]}
+      accessibilityRole="button"
+      accessibilityLabel="Turn on Smart Duka AI from your Profile"
+    >
+      <View style={uc.iconWrap}>
+        <Ionicons name="sparkles" size={22} color={Colors.accentDark} />
+      </View>
+      <Text style={uc.title}>Smart Duka AI is off</Text>
+      <Text style={uc.body}>
+        You've turned this off for your shop. Turn it back on from Profile → Smart Duka AI to use it again.
+      </Text>
+      <View style={uc.cta}>
+        <Text style={uc.ctaText}>Go to Profile</Text>
+      </View>
+    </AnimatedPressable>
+  );
+}
+
 const uc = StyleSheet.create({
   card: {
     alignItems: 'center',

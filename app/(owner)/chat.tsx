@@ -11,7 +11,8 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
-import { UpsellCard } from '@/components/insights/InsightSections';
+import { UpsellCard, AiDisabledCard } from '@/components/insights/InsightSections';
+import { useAiAccess } from '@/hooks/useAiAccess';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAlert } from '@/context/AlertContext';
 import {
@@ -44,11 +45,11 @@ export default function AiChatScreen() {
   const { seed } = useLocalSearchParams<{ seed?: string }>();
   const tabBarHeight = useBottomTabBarHeight();
 
-  const { access, plan, isLoading: isSubscriptionLoading } = useSubscription();
-  // Same gate as /(owner)/insights.tsx — any active subscription (trial,
-  // paid, or grace), no plan-tier distinction. Matches the backend's
-  // requireActiveSubscription on POST /ai/chat.
-  const hasAiChat = access?.state === 'trialing' || access?.state === 'active' || access?.state === 'grace';
+  // Same gate as /(owner)/insights.tsx — subscription state, plan feature,
+  // and the shop's own Smart Duka AI toggle. Matches the backend's
+  // requireActiveSubscription + requireFeature + requireAiEnabled on POST /ai/chat.
+  const { hasAiAccess: hasAiChat, state: aiAccessState, isLoading: isSubscriptionLoading } = useAiAccess();
+  const { plan } = useSubscription();
 
   const { alert, toast } = useAlert();
 
@@ -170,7 +171,7 @@ export default function AiChatScreen() {
   if (!hasAiChat) {
     return (
       <Screen contentContainerStyle={s.upsellContent}>
-        <UpsellCard />
+        {aiAccessState === 'disabled' ? <AiDisabledCard /> : <UpsellCard />}
       </Screen>
     );
   }

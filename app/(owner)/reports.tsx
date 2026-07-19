@@ -15,7 +15,9 @@ import { StatusBar } from 'expo-status-bar';
 import { getSalesReport, type ReportPeriod } from '@/services/reports';
 import { getRatingsSummary } from '@/services/ratings';
 import { getDepletionAnalytics } from '@/services/analytics';
+import { getShopConfig } from '@/services/shop';
 import { useAuthStore, type AuthState } from '@/store/authStore';
+import { usePermission } from '@/utils/permissions';
 import { PeriodSegmentControl } from '@/components/reports/PeriodSegmentControl';
 import { HeroRevenueCard } from '@/components/reports/HeroRevenueCard';
 import {
@@ -131,6 +133,13 @@ export default function OwnerReports() {
     queryFn: () => getDepletionAnalytics(),
   });
 
+  const canViewPurchases = usePermission('view_purchases');
+  const { data: shopConfigData } = useQuery({
+    queryKey: ['shopConfig'],
+    queryFn: getShopConfig,
+  });
+  const showPurchasesShortcut = canViewPurchases && (shopConfigData?.data?.purchasingEnabled ?? false);
+
   if (isLoading) return <ReportsSkeleton />;
 
   const report = data?.data;
@@ -203,7 +212,7 @@ export default function OwnerReports() {
       <View style={s.gap} />
 
       {/* ── quick-access shortcuts ─────────────────────────────────── */}
-      <QuickShortcuts />
+      <QuickShortcuts showPurchases={showPurchasesShortcut} />
 
       <View style={s.sectionGap} />
 

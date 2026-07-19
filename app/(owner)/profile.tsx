@@ -33,6 +33,8 @@ import {
 import { ShopSettingsForm } from '@/components/profile/ShopSettingsForm';
 import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
+import { SmartDukaAiSection } from '@/components/profile/SmartDukaAiSection';
+import { useAiAccess } from '@/hooks/useAiAccess';
 import { openHelp } from '@/utils/openHelp';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
@@ -197,6 +199,8 @@ export default function OwnerProfile() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [togglingShifts, setTogglingShifts] = useState(false);
   const [togglingCommissionVisibility, setTogglingCommissionVisibility] = useState(false);
+  const [togglingPurchasing, setTogglingPurchasing] = useState(false);
+  const [togglingAi, setTogglingAi] = useState(false);
 
   const { data: shopConfigData, isLoading: loadingShop } = useQuery({
     queryKey: ['shopConfig'],
@@ -278,6 +282,31 @@ export default function OwnerProfile() {
     }
   };
 
+  const purchasingEnabled = shopConfigData?.data?.purchasingEnabled ?? false;
+  const handleTogglePurchasing = async (enabled: boolean) => {
+    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
+
+    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
+      old ? { ...old, data: { ...old.data, purchasingEnabled: enabled } } : old
+    );
+    setTogglingPurchasing(true);
+    try {
+      await updateShopConfig({ purchasingEnabled: enabled });
+      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
+      toast({
+        type: 'success',
+        message: enabled
+          ? 'Purchasing is on — record stock purchases from the Purchases tab'
+          : 'Purchasing is off and hidden from navigation',
+      });
+    } catch (error: any) {
+      queryClient.setQueryData(['shopConfig'], previous);
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
+    } finally {
+      setTogglingPurchasing(false);
+    }
+  };
+
   const showStaffCommission = shopConfigData?.data?.showStaffCommission ?? false;
   const handleToggleStaffCommission = async (enabled: boolean) => {
     const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
@@ -300,6 +329,30 @@ export default function OwnerProfile() {
       toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
     } finally {
       setTogglingCommissionVisibility(false);
+    }
+  };
+
+  const { state: aiAccessState, aiEnabled } = useAiAccess();
+  const handleToggleAi = async (enabled: boolean) => {
+    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
+
+    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
+      old ? { ...old, data: { ...old.data, aiEnabled: enabled } } : old
+    );
+    setTogglingAi(true);
+    try {
+      await updateShopConfig({ aiEnabled: enabled });
+      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
+      queryClient.invalidateQueries({ queryKey: ['aiInsight'] });
+      toast({
+        type: 'success',
+        message: enabled ? 'Smart Duka AI is on' : 'Smart Duka AI is off — no data is sent to Gemini',
+      });
+    } catch (error: any) {
+      queryClient.setQueryData(['shopConfig'], previous);
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
+    } finally {
+      setTogglingAi(false);
     }
   };
 
@@ -589,6 +642,25 @@ export default function OwnerProfile() {
 
             <View style={styles.prefDivider} />
 
+            <View style={styles.prefRow}>
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
+                <Ionicons name="cart-outline" size={17} color={Colors.primary} />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Enable Purchasing Module</Text>
+                <Text style={styles.prefSub}>Record stock purchases from suppliers and update inventory automatically</Text>
+              </View>
+              <Switch
+                value={purchasingEnabled}
+                onValueChange={handleTogglePurchasing}
+                disabled={togglingPurchasing || loadingShop}
+                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+                thumbColor={purchasingEnabled ? Colors.primary : Colors.textTertiary}
+              />
+            </View>
+
+            <View style={styles.prefDivider} />
+
             <AnimatedPressable
               style={styles.prefRow}
               onPress={() => router.push('/(owner)/subscription')}
@@ -605,6 +677,18 @@ export default function OwnerProfile() {
               <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
             </AnimatedPressable>
           </View>
+        </Animated.View>
+
+        {/* ── SMART DUKA AI ─────────────────────────────────────────────── */}
+        <SectionLabel label="SMART DUKA AI" />
+        <Animated.View entering={FadeInUp.duration(360).delay(130)} style={styles.sectionWrap}>
+          <SmartDukaAiSection
+            state={aiAccessState}
+            aiEnabled={aiEnabled}
+            toggling={togglingAi}
+            loadingShop={loadingShop}
+            onToggle={handleToggleAi}
+          />
         </Animated.View>
 
         {/* ── SECURITY ──────────────────────────────────────────────────── */}

@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
 import { getAiInsight } from '@/services/aiInsight';
 import { useAuthStore, type AuthState } from '@/store/authStore';
-import { useSubscription } from '@/hooks/useSubscription';
+import { useAiAccess } from '@/hooks/useAiAccess';
 import { useAiInsight } from '@/hooks/useAiInsight';
 import { cacheInsight } from '@/utils/aiInsightCache';
 import { formatRelativeTime } from '@/utils/formatters';
@@ -19,6 +19,7 @@ import {
   TrendSummary,
   ReportsShortcut,
   UpsellCard,
+  AiDisabledCard,
 } from '@/components/insights/InsightSections';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -34,10 +35,10 @@ export default function OwnerInsights() {
   const currency = user?.shop?.currency;
   const shopId = user?.shop?._id;
 
-  const { access, isLoading: isSubscriptionLoading } = useSubscription();
-  // AI insights are available to any active subscription (trial, paid, or
-  // grace) — no plan-tier gate. Matches the backend's requireActiveSubscription.
-  const hasAiInsights = access?.state === 'trialing' || access?.state === 'active' || access?.state === 'grace';
+  // Subscription state, plan feature, and the shop's own Smart Duka AI
+  // toggle. Matches the backend's requireActiveSubscription + requireFeature
+  // + requireAiEnabled on GET /ai/insight.
+  const { hasAiAccess: hasAiInsights, state: aiAccessState, isLoading: isSubscriptionLoading } = useAiAccess();
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['aiInsight'],
@@ -82,7 +83,7 @@ export default function OwnerInsights() {
             <ActivityIndicator color={Colors.primary} />
           </View>
         ) : !hasAiInsights ? (
-          <UpsellCard />
+          aiAccessState === 'disabled' ? <AiDisabledCard /> : <UpsellCard />
         ) : isLoading && !cached ? (
           <View style={s.loading}>
             <ActivityIndicator color={Colors.primary} />

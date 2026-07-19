@@ -283,6 +283,14 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="purchases"
+        options={{
+          title: 'Purchases',
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="payments"
         options={{
           title: 'M-Pesa Transactions',
