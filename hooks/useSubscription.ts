@@ -17,8 +17,13 @@ export const useSubscription = () => {
     staleTime: 5 * 60_000,
   });
 
+  const subscription = query.data?.data?.subscription ?? null;
+  const plan = subscription?.plan && typeof subscription.plan === 'object' ? subscription.plan : null;
+
   return {
-    subscription: query.data?.data?.subscription ?? null,
+    subscription,
+    /** The populated plan doc (chatLimits, features, pricing, ...) — null while loading or if plan is unpopulated. */
+    plan,
     /** Undefined while loading — callers must not lock on missing data. */
     access: query.data?.data?.access,
     renewal: query.data?.data?.renewal ?? null,

@@ -138,9 +138,12 @@ api.interceptors.response.use(
       });
     }
     if (error.message === 'OFFLINE_REALTIME') {
+      // Shared across every REALTIME_ONLY endpoint (M-Pesa, refunds,
+      // subscriptions, seat payments, AI chat) — keep this wording generic,
+      // never name one of them specifically.
       return Promise.reject({
         offlineRealtime: true,
-        message: 'M-Pesa requires an internet connection. Please connect and try again.',
+        message: 'This requires an internet connection. Please connect and try again.',
       });
     }
     // Network failure mid-flight: request was dispatched but never completed.

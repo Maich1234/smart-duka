@@ -1,6 +1,12 @@
 import { getDb, isOfflineDbAvailable } from './offlineDb';
 import type { AiInsightData } from '@/services/aiInsight';
 
+// Must match SNAPSHOT_VERSION in the backend's businessSnapshotBuilder.js.
+// A cached row from before a snapshot shape change is otherwise trusted
+// as-is and can crash screens built against the new shape (e.g. Insights
+// reading health.requirements before that field existed).
+const CURRENT_SNAPSHOT_VERSION = 2;
+
 export interface CachedInsight {
   summary: string;
   priority: string;
@@ -47,12 +53,14 @@ export const getCachedInsight = (shopId: string): CachedInsight | null => {
   );
   if (!row) return null;
   try {
+    const snapshot = JSON.parse(row.snapshot);
+    if (snapshot.version !== CURRENT_SNAPSHOT_VERSION) return null;
     return {
       summary: row.summary,
       priority: row.priority,
       actions: JSON.parse(row.actions),
       health: row.health,
-      snapshot: JSON.parse(row.snapshot),
+      snapshot,
       cachedAt: row.cached_at,
     };
   } catch {

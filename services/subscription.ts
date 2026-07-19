@@ -34,6 +34,12 @@ export interface SubscriptionPlan {
   priceComparison: string;
   pricing: PlanPricing;
   recommended: boolean;
+  /** Per-tier AI chat quotas — null (or a missing field, on older plans) means unlimited. */
+  chatLimits?: {
+    maxConversations: number | null;
+    maxNewConversationsPerDay: number | null;
+    maxMessagesPerDay: number | null;
+  };
 }
 
 export interface PlansResponse {
