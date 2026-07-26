@@ -337,6 +337,13 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="printer"
+        options={{
+          title: 'Receipt Printer',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',

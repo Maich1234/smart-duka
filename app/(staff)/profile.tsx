@@ -9,6 +9,7 @@ import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { DeleteAccountSection } from '@/components/profile/DeleteAccountSection';
 import { LegalSection } from '@/components/profile/LegalSection';
+import { PrinterSection } from '@/components/profile/PrinterSection';
 import { Button } from '@/components/ui/Button';
 import { openHelp } from '@/utils/openHelp';
 import { Colors } from '@/constants/Colors';
@@ -46,6 +47,7 @@ export default function StaffProfile() {
           style={styles.helpButton}
         />
         <AccountInfo name={user.name} email={user.email} role={user.role} />
+        <PrinterSection href="/(staff)/printer" />
         <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
         <LegalSection />
         <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />

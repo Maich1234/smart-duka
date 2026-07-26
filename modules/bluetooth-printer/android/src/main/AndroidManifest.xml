@@ -1,0 +1,34 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <!-- Classic Bluetooth (RFCOMM/SPP) is how the cheap 58mm thermal printers
+       sold locally expose themselves. Declared here rather than in app.json so
+       BLUETOOTH_SCAN can carry `neverForLocation` — without it Android 12+
+       would force a location-permission prompt just to list printers. These
+       match react-native-ble-plx's own manifest entries so the two merge
+       cleanly instead of conflicting. -->
+  <uses-permission
+    android:name="android.permission.BLUETOOTH"
+    android:maxSdkVersion="30" />
+  <uses-permission
+    android:name="android.permission.BLUETOOTH_ADMIN"
+    android:maxSdkVersion="30" />
+  <uses-permission
+    android:name="android.permission.BLUETOOTH_SCAN"
+    android:usesPermissionFlags="neverForLocation"
+    tools:targetApi="s" />
+  <uses-permission
+    android:name="android.permission.BLUETOOTH_CONNECT"
+    tools:targetApi="s" />
+
+  <!-- Discovery on Android 11 and below is location-gated. -->
+  <uses-permission
+    android:name="android.permission.ACCESS_FINE_LOCATION"
+    android:maxSdkVersion="30" />
+
+  <!-- A phone without Bluetooth still runs the app; it just prints via the
+       system print service instead. -->
+  <uses-feature
+    android:name="android.hardware.bluetooth"
+    android:required="false" />
+</manifest>

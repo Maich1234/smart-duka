@@ -37,6 +37,7 @@ import { DeleteAccountSection } from '@/components/profile/DeleteAccountSection'
 import { LegalSection } from '@/components/profile/LegalSection';
 import { SmartDukaAiSection } from '@/components/profile/SmartDukaAiSection';
 import { useAiAccess } from '@/hooks/useAiAccess';
+import { usePrinterStore } from '@/store/printerStore';
 import { openHelp } from '@/utils/openHelp';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
@@ -203,6 +204,7 @@ export default function OwnerProfile() {
   const [togglingCommissionVisibility, setTogglingCommissionVisibility] = useState(false);
   const [togglingPurchasing, setTogglingPurchasing] = useState(false);
   const [togglingAi, setTogglingAi] = useState(false);
+  const savedPrinter = usePrinterStore((s) => s.printer);
 
   const { data: shopConfigData, isLoading: loadingShop } = useQuery({
     queryKey: ['shopConfig'],
@@ -660,6 +662,28 @@ export default function OwnerProfile() {
                 thumbColor={purchasingEnabled ? Colors.primary : Colors.textTertiary}
               />
             </View>
+
+            <View style={styles.prefDivider} />
+
+            <AnimatedPressable
+              style={styles.prefRow}
+              onPress={() => router.push('/(owner)/printer')}
+              accessibilityRole="button"
+              accessibilityLabel="Set up a Bluetooth receipt printer"
+            >
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
+                <Ionicons name="print-outline" size={17} color={Colors.primary} />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Receipt Printer</Text>
+                <Text style={styles.prefSub}>
+                  {savedPrinter
+                    ? `${savedPrinter.name} · ${savedPrinter.paperWidth}mm`
+                    : 'Print straight to a Bluetooth thermal printer'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+            </AnimatedPressable>
 
             <View style={styles.prefDivider} />
 

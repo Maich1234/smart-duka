@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Smart Duka uses the camera to capture your business logo.",
         "NSPhotoLibraryUsageDescription": "Smart Duka accesses your photo library to set a business logo.",
-        "NSPhotoLibraryAddUsageDescription": "Smart Duka saves images to your photo library."
+        "NSPhotoLibraryAddUsageDescription": "Smart Duka saves images to your photo library.",
+        "NSBluetoothAlwaysUsageDescription": "Smart Duka connects to your Bluetooth receipt printer to print sale receipts."
       },
       "associatedDomains": [
         "applinks:smart-duka--fqsxcq2wom.expo.app",
@@ -116,6 +117,14 @@
         {
           "photosPermission": "Allow Smart Duka to access your photos to set a business logo.",
           "cameraPermission": "Allow Smart Duka to use the camera to capture a business logo."
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": true,
+          "bluetoothAlwaysPermission": "Smart Duka connects to your Bluetooth receipt printer to print sale receipts."
         }
       ]
     ],

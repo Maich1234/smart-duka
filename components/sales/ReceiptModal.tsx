@@ -4,8 +4,9 @@ import { BottomSheet } from '../ui/BottomSheet';
 import { Button } from '../ui/Button';
 import { ReceiptPreview } from './ReceiptPreview';
 import { Sale } from '@/services/sales';
-import { printHtml } from '@/utils/printReceipt';
-import { buildReceiptHtml } from '@/utils/receiptHtml';
+import { useAlert } from '@/context/AlertContext';
+import { usePrinterStore } from '@/store/printerStore';
+import { printSale, type PrintTarget } from '@/utils/printSale';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -35,19 +36,28 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   logoUrl,
   motto,
 }) => {
-  const [printing, setPrinting] = useState(false);
+  const [printing, setPrinting] = useState<PrintTarget | null>(null);
+  const { toast } = useAlert();
+  const printer = usePrinterStore((s) => s.printer);
 
-  const handlePrint = async () => {
+  const handlePrint = async (target: PrintTarget) => {
     if (!sale) return;
-    setPrinting(true);
+    setPrinting(target);
     try {
-      const html = await buildReceiptHtml(sale, shopName, shopPhone, currency, servedByName, thankYouNote, logoUrl, motto);
-      await printHtml(html);
+      const outcome = await printSale(
+        sale,
+        { shopName, shopPhone, currency, servedByName, thankYouNote, logoUrl, motto },
+        target
+      );
+      // Only worth a toast when the receipt did not come out where it was aimed.
+      if (outcome.fallbackReason) {
+        toast({ type: 'warning', message: `${outcome.fallbackReason} Using the system printer instead.` });
+      }
     } catch {
       // Most rejections here are the user dismissing the system print sheet,
       // not a real failure — keep the receipt open so they can simply retry.
     } finally {
-      setPrinting(false);
+      setPrinting(null);
     }
   };
 
@@ -75,7 +85,24 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
         />
       </ScrollView>
 
-      <Button title="Print Receipt" onPress={handlePrint} loading={printing} style={styles.printBtn} />
+      <Button
+        title={printer ? `Print to ${printer.name}` : 'Print Receipt'}
+        leftIcon={printer ? 'print' : undefined}
+        onPress={() => handlePrint('bluetooth')}
+        loading={printing === 'bluetooth'}
+        style={styles.printBtn}
+      />
+      {/* Escape hatch once a Bluetooth printer is saved: PDF, sharing, or a
+          different printer entirely without unpairing the counter's one. */}
+      {printer && (
+        <Button
+          title="System printer / PDF"
+          variant="ghost"
+          onPress={() => handlePrint('system')}
+          loading={printing === 'system'}
+          style={styles.printBtn}
+        />
+      )}
       <Button title="Done" variant="outline" onPress={onClose} />
     </BottomSheet>
   );

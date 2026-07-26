@@ -5,8 +5,9 @@ import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
 import { ReceiptPreview } from './ReceiptPreview';
 import { Sale } from '@/services/sales';
-import { printHtml } from '@/utils/printReceipt';
-import { buildReceiptHtml } from '@/utils/receiptHtml';
+import { useAlert } from '@/context/AlertContext';
+import { usePrinterStore } from '@/store/printerStore';
+import { printSale, type PrintTarget } from '@/utils/printSale';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -50,18 +51,26 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   onRefund,
   refunding = false,
 }) => {
-  const [printing, setPrinting] = useState(false);
+  const [printing, setPrinting] = useState<PrintTarget | null>(null);
+  const { toast } = useAlert();
+  const printer = usePrinterStore((s) => s.printer);
 
-  const handlePrint = async () => {
+  const handlePrint = async (target: PrintTarget) => {
     if (!sale) return;
-    setPrinting(true);
+    setPrinting(target);
     try {
-      const html = await buildReceiptHtml(sale, shopName, shopPhone, currency, undefined, thankYouNote, logoUrl, motto);
-      await printHtml(html);
+      const outcome = await printSale(
+        sale,
+        { shopName, shopPhone, currency, thankYouNote, logoUrl, motto },
+        target
+      );
+      if (outcome.fallbackReason) {
+        toast({ type: 'warning', message: `${outcome.fallbackReason} Using the system printer instead.` });
+      }
     } catch {
       // Likely the user dismissed the system print sheet — not a real failure.
     } finally {
-      setPrinting(false);
+      setPrinting(null);
     }
   };
 
@@ -118,8 +127,24 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
         <View style={styles.buttonRow}>
           <Button title="Close" variant="outline" onPress={onClose} style={styles.flexBtn} />
-          <Button title="Print Receipt" onPress={handlePrint} loading={printing} style={styles.flexBtn} />
+          <Button
+            title={printer ? 'Print' : 'Print Receipt'}
+            leftIcon={printer ? 'print' : undefined}
+            onPress={() => handlePrint('bluetooth')}
+            loading={printing === 'bluetooth'}
+            style={styles.flexBtn}
+          />
         </View>
+
+        {printer && (
+          <Button
+            title="System printer / PDF"
+            variant="ghost"
+            onPress={() => handlePrint('system')}
+            loading={printing === 'system'}
+            style={styles.voidBtn}
+          />
+        )}
 
         {canRefund && !isSettled && onRefund && (
           <Button
