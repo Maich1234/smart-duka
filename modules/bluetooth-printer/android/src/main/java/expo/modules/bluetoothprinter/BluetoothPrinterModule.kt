@@ -91,8 +91,13 @@ class BluetoothPrinterModule : Module() {
       withContext(Dispatchers.IO) { writeBytes(Base64.decode(base64, Base64.DEFAULT)) }
     }
 
-    AsyncFunction("disconnect") Coroutine {
-      withContext(Dispatchers.IO) { closeSocket() }
+    // Plain AsyncFunction rather than `Coroutine`: every Coroutine overload is
+    // generic, so a no-parameter block is ambiguous between `suspend () -> R`
+    // and `suspend (P0) -> R`. AsyncFunction has a non-generic zero-arg
+    // overload that resolves cleanly, and it already runs off the JS thread —
+    // closing a socket is quick enough not to need Dispatchers.IO.
+    AsyncFunction("disconnect") {
+      closeSocket()
     }
 
     OnDestroy {
