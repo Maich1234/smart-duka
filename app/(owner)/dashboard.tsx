@@ -195,7 +195,7 @@ export default function OwnerDashboard() {
           <GettingStartedChecklist />
 
           {/* 4 · What should I do next? */}
-          <QuickActions primaryRoute="/(owner)/sales" tiles={actionTiles} />
+          <QuickActions primaryRoute="/(owner)/pos" tiles={actionTiles} />
 
           {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
           <TrialBanner />

@@ -368,17 +368,21 @@ export function UpsellCard() {
       }}
       style={[uc.card, Shadows.sm]}
       accessibilityRole="button"
-      accessibilityLabel="Activate your subscription to unlock AI insights"
+      accessibilityLabel="See subscription status"
     >
       <View style={uc.iconWrap}>
         <Ionicons name="sparkles" size={22} color={Colors.accentDark} />
       </View>
-      <Text style={uc.title}>Unlock AI Insights</Text>
+      <Text style={uc.title}>AI Insights need an active subscription</Text>
+      {/* Describes what the feature is and why it's unavailable. Not a sales
+          pitch and not a route to a checkout — the app carries no purchase
+          surface (see app/(owner)/subscription.tsx). */}
       <Text style={uc.body}>
-        Get a daily business health score and a plain-language explanation of what changed and what to do next — included with any active subscription.
+        A daily business health score and a plain-language explanation of what changed and what to do
+        next. This shop&apos;s subscription isn&apos;t active right now.
       </Text>
       <View style={uc.cta}>
-        <Text style={uc.ctaText}>Activate Subscription</Text>
+        <Text style={uc.ctaText}>View status</Text>
       </View>
     </AnimatedPressable>
   );

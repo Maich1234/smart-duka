@@ -7,6 +7,8 @@ import { useAuth } from '@/context/AuthContext';
 import { changePassword } from '@/services/auth';
 import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
+import { DeleteAccountSection } from '@/components/profile/DeleteAccountSection';
+import { LegalSection } from '@/components/profile/LegalSection';
 import { Button } from '@/components/ui/Button';
 import { openHelp } from '@/utils/openHelp';
 import { Colors } from '@/constants/Colors';
@@ -45,7 +47,9 @@ export default function StaffProfile() {
         />
         <AccountInfo name={user.name} email={user.email} role={user.role} />
         <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
+        <LegalSection />
         <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
+        <DeleteAccountSection />
       </ScrollView>
     </KeyboardAvoidingView>
   );

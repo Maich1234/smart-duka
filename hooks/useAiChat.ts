@@ -4,20 +4,34 @@ import { getConversations, getConversation, sendChatMessage, archiveConversation
 const CONVERSATIONS_KEY = ['aiChat', 'conversations'] as const;
 const conversationKey = (id: string) => ['aiChat', 'conversation', id] as const;
 
+/** How many past threads the history drawer lists. */
+const HISTORY_LIMIT = 50;
+
 /**
- * The single most-recent, non-archived thread — v1 only ever shows one
- * continuous conversation per owner (matches the "brief is proactive, chat
- * is pull-based follow-up" framing, not a multi-thread inbox). Also surfaces
- * the total non-archived conversation count (from the list endpoint's own
- * pagination) so the screen can pre-empt the plan's conversation cap
- * client-side, without a dedicated count endpoint.
+ * The owner's conversation history, most recent first.
+ *
+ * This used to fetch `{ limit: 1 }` and throw the rest away: the backend has
+ * always stored and paginated every thread, but the UI only ever showed the
+ * newest one, and starting a new chat made the previous thread permanently
+ * unreachable — which reads as "the app deleted my chat". Worse, the plan-cap
+ * message told owners to "delete an old one" when they had no way to see any.
+ *
+ * The first entry is still the thread the screen auto-opens, so the previous
+ * single-thread behaviour is preserved; the rest now feeds the history drawer.
+ * `totalConversations` comes from the list endpoint's own pagination, so the
+ * plan's conversation cap can be pre-empted client-side without a dedicated
+ * count endpoint.
  */
-export const useLatestConversation = (enabled: boolean) =>
+export const useConversationHistory = (enabled: boolean) =>
   useQuery({
     queryKey: CONVERSATIONS_KEY,
-    queryFn: () => getConversations({ limit: 1 }),
+    queryFn: () => getConversations({ limit: HISTORY_LIMIT }),
     enabled,
-    select: (res) => ({ conversation: res.data[0] ?? null, totalConversations: res.pagination.total }),
+    select: (res) => ({
+      conversations: res.data,
+      latest: res.data[0] ?? null,
+      totalConversations: res.pagination.total,
+    }),
   });
 
 export const useConversationMessages = (conversationId: string | undefined) =>

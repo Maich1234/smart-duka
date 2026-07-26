@@ -3,11 +3,11 @@ import { View, Text, TextInput, StyleSheet, ScrollView, KeyboardAvoidingView, Pl
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { createStaff, updateStaffPermissions, checkStaffEmailAvailability, type SeatPriceConfirmation, type Staff } from '@/services/staff';
-import { SeatPayModal } from '@/components/staff/SeatPayModal';
+import { createStaff, updateStaffPermissions, checkStaffEmailAvailability, previewSeatAddition } from '@/services/staff';
+import { formatCurrency } from '@/utils/formatters';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useStaffDraftStore } from '@/store/staffDraftStore';
@@ -35,8 +35,16 @@ export default function NewStaffScreen() {
   const [localPart, setLocalPart] = useState('');
   const [localPartTouched, setLocalPartTouched] = useState(false);
   const [availability, setAvailability] = useState<Availability>('idle');
-  const [seatPayment, setSeatPayment] = useState<SeatPriceConfirmation | null>(null);
   const { toast } = useAlert();
+
+  // Disclosure only — seats are postpaid, so there is nothing to pay here and
+  // a failure to load this must never block adding a team member.
+  const { data: seatPreview } = useQuery({
+    queryKey: ['staff', 'seatPreview'],
+    queryFn: previewSeatAddition,
+    staleTime: 60_000,
+    retry: false,
+  });
 
   useEffect(() => {
     setPermissions(DEFAULT_STAFF_PERMISSIONS);
@@ -86,17 +94,18 @@ export default function NewStaffScreen() {
       await updateStaffPermissions(staffId, permissions);
       return created;
     },
-    onSuccess: () => finishAndLeave(successMessage),
+    onSuccess: (created) => {
+      // The server reports what the seat actually added, prorated. Prefer it
+      // over the preview — head-count may have moved since the screen loaded.
+      const billed = created.billing?.addedToNextInvoice;
+      finishAndLeave(
+        billed
+          ? `${successMessage} ${formatCurrency(billed, seatPreview?.currency ?? 'KES')} will be added to your next bill.`
+          : successMessage,
+      );
+    },
     onError: (error: any) => {
-      const data = error.response?.data;
-      // Adding this seat raises the bill — payment is required before the
-      // staff member can go active. Collect it via SeatPayModal instead of
-      // just showing a confirm dialog (that used to be the billing bypass).
-      if (error.response?.status === 409 && data?.code === 'SEAT_PAYMENT_REQUIRED') {
-        setSeatPayment(data.data);
-        return;
-      }
-      toast({ type: 'error', message: data?.message || 'Failed to add staff' });
+      toast({ type: 'error', message: error.response?.data?.message || 'Failed to add staff' });
     },
   });
 
@@ -117,11 +126,6 @@ export default function NewStaffScreen() {
       return toast({ type: 'error', message: 'Password must be at least 6 characters' });
     }
     saveMutation.mutate();
-  };
-
-  const handleSeatPaymentSuccess = (_staff: Staff) => {
-    setSeatPayment(null);
-    finishAndLeave(successMessage);
   };
 
   return (
@@ -233,23 +237,24 @@ export default function NewStaffScreen() {
           </AnimatedPressable>
         </View>
 
+        {/* Postpaid seat disclosure. No payment happens on this screen —
+            the team member is active immediately and the prorated cost
+            appears on the next invoice. */}
+        {seatPreview?.willCharge && (
+          <View style={styles.billingNote}>
+            <Ionicons name="information-circle-outline" size={18} color={Colors.info} />
+            <Text style={styles.billingNoteText}>
+              This adds {formatCurrency(seatPreview.amount, seatPreview.currency)} to your next bill
+              {seatPreview.nextInvoiceAt
+                ? ` on ${new Date(seatPreview.nextInvoiceAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}`
+                : ''}
+              . They can start work right away.
+            </Text>
+          </View>
+        )}
+
         <Button title="Add Staff Member" onPress={handleSave} loading={saveMutation.isPending} style={styles.button} />
       </ScrollView>
-
-      <SeatPayModal
-        visible={!!seatPayment}
-        amount={seatPayment ? seatPayment.projectedAmount - seatPayment.currentAmount : 0}
-        currency={seatPayment?.currency ?? 'KES'}
-        staffDraft={{
-          name: form.name,
-          email: emailMode === 'system' ? systemEmail : form.email,
-          password: form.password,
-          phone: form.phone || undefined,
-          permissions,
-        }}
-        onClose={() => setSeatPayment(null)}
-        onSuccess={handleSeatPaymentSuccess}
-      />
     </KeyboardAvoidingView>
   );
 }
@@ -367,5 +372,21 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   permissionsCount: { fontSize: Typography.size.small, color: Colors.textSecondary, marginTop: 2 },
+  billingNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: '#EFF6FF',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  billingNoteText: {
+    flex: 1,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+  },
   button: { marginTop: Spacing.sm },
 });

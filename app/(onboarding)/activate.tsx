@@ -8,9 +8,8 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { PlanCards } from '@/components/subscription/PlanCards';
 import { Scene, SceneGradient } from '@/components/onboarding/theme';
-import { getPlans, activateTrial, type BillingCycle } from '@/services/subscription';
+import { getPlans, activateTrial } from '@/services/subscription';
 import { useInvalidateSubscription } from '@/hooks/useSubscription';
 import { haptics } from '@/utils/haptics';
 import { Typography } from '@/constants/Typography';
@@ -24,8 +23,6 @@ import { Spacing } from '@/constants/Spacing';
  * lands them on the dashboard, where the trial banner re-offers.
  */
 export default function Activate() {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [activating, setActivating] = useState(false);
   const invalidateSubscription = useInvalidateSubscription();
 
@@ -37,9 +34,6 @@ export default function Activate() {
 
   const plans = data?.data;
 
-  // Recommended tier is pre-selected until the user picks a card themselves.
-  const effectiveSlug = selectedSlug ?? plans?.recommendedPlanSlug ?? null;
-
   const enterDashboard = () => router.replace('/(owner)/dashboard');
 
   const startTrial = async () => {
@@ -47,10 +41,10 @@ export default function Activate() {
     haptics.medium();
     setActivating(true);
     try {
-      await activateTrial({
-        planSlug: effectiveSlug ?? undefined,
-        billingCycle,
-      });
+      // The server picks the tier that fits this shop's head-count. There is
+      // no plan picker here any more — plan choice belongs with payment, and
+      // payment lives on the web.
+      await activateTrial();
       haptics.success();
     } catch {
       // Never strand a brand-new shop on a pricing screen — the dashboard
@@ -100,19 +94,26 @@ export default function Activate() {
                 </View>
               </View>
 
-              <PlanCards
-                plans={plans.plans}
-                staffCount={plans.staffCount}
-                currency={plans.currency}
-                billingCycle={billingCycle}
-                onBillingCycleChange={setBillingCycle}
-                selectedSlug={effectiveSlug}
-                onSelect={setSelectedSlug}
-              />
+              {/* What the trial unlocks. Prices and plan selection are
+                  deliberately absent — this app carries no pricing or
+                  purchase surface at all (see app/(owner)/subscription.tsx
+                  for why). Choosing and paying for a plan happens on the web
+                  before the trial ends. */}
+              <View style={styles.includesCard}>
+                <Text style={styles.includesTitle}>Everything is switched on</Text>
+                {(plans.plans.find((p) => p.slug === plans.recommendedPlanSlug)?.highlights ?? [])
+                  .slice(0, 6)
+                  .map((highlight) => (
+                    <View key={highlight} style={styles.includesRow}>
+                      <Ionicons name="checkmark-circle" size={16} color={Scene.glow} />
+                      <Text style={styles.includesText}>{highlight}</Text>
+                    </View>
+                  ))}
+              </View>
 
               <Text style={styles.reassurance}>
-                Join free for {trialDays} days today. Your subscription only starts
-                after your trial ends, and you can cancel anytime.
+                Join free for {trialDays} days today. Nothing is charged now, and
+                you can cancel anytime.
               </Text>
             </Animated.View>
           )}
@@ -195,6 +196,32 @@ const styles = StyleSheet.create({
   offerNote: {
     color: Scene.textDim,
     fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+  },
+  includesCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  includesTitle: {
+    color: '#F8FAFC',
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    marginBottom: Spacing.xs,
+  },
+  includesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  includesText: {
+    flex: 1,
+    color: Scene.textDim,
+    fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,
   },
   reassurance: {

@@ -33,6 +33,8 @@ import {
 import { ShopSettingsForm } from '@/components/profile/ShopSettingsForm';
 import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
+import { DeleteAccountSection } from '@/components/profile/DeleteAccountSection';
+import { LegalSection } from '@/components/profile/LegalSection';
 import { SmartDukaAiSection } from '@/components/profile/SmartDukaAiSection';
 import { useAiAccess } from '@/hooks/useAiAccess';
 import { openHelp } from '@/utils/openHelp';
@@ -718,6 +720,10 @@ export default function OwnerProfile() {
           ))}
         </Animated.View>
 
+        {/* ── LEGAL ─────────────────────────────────────────────────────── */}
+        <SectionLabel label="LEGAL" />
+        <LegalSection />
+
         {/* ── SIGN OUT ──────────────────────────────────────────────────── */}
         <Animated.View entering={FadeIn.duration(300).delay(180)} style={styles.signOutWrap}>
           <AnimatedPressable style={styles.signOutBtn} onPress={handleLogout}>
@@ -729,6 +735,8 @@ export default function OwnerProfile() {
             </View>
             <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
           </AnimatedPressable>
+
+          <DeleteAccountSection />
         </Animated.View>
 
       </ScrollView>

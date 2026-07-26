@@ -1,28 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { Button } from '@/components/ui/Button';
-import { SubscriptionPayModal } from '@/components/subscription/SubscriptionPayModal';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { useSubscription, useInvalidateSubscription } from '@/hooks/useSubscription';
-import {
-  activateTrial,
-  cancelSubscription,
-  getPlans,
-  previewPricing,
-  reconcileSubscriptionByMessage,
-  type BillingCycle,
-  type SubscriptionPlan,
-} from '@/services/subscription';
-import { useAuthStore } from '@/store/authStore';
-import { useAlert } from '@/context/AlertContext';
-import { haptics } from '@/utils/haptics';
+import { type SubscriptionPlan } from '@/services/subscription';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { formatCurrency, formatDate } from '@/utils/formatters';
+import { BorderRadius } from '@/constants/BorderRadius';
+import { formatDate } from '@/utils/formatters';
 
 const STATE_META = {
   none: { label: 'Not activated', color: Colors.textSecondary, bg: Colors.background, icon: 'gift-outline' as const },
@@ -33,632 +20,195 @@ const STATE_META = {
 };
 
 /**
- * Subscription management — and, when the grace period runs out, the
- * paywall itself: the owner layout redirects every tab here while the shop
- * is locked, so paying via M-PESA is the only way forward.
+ * Subscription **status**. Deliberately read-only.
+ *
+ * Google Play's payments policy requires Play Billing for in-app purchases
+ * that unlock app functionality, and our subscription gates reports,
+ * analytics, AI, and the lock screen. Rather than adopt Play Billing, this
+ * app carries no purchase flow at all — the standard pattern for B2B SaaS on
+ * Play (Xero, Zoho, Salesforce) — and billing lives entirely on the web app.
+ *
+ * Play's anti-steering rules go further than "no checkout": the app must not
+ * link to, name, or direct users toward the external payment page either. So
+ * this screen states where things stand and stops. Do not add a URL, a
+ * Linking.openURL call, a "Manage online" button, or a QR code here.
+ *
+ * Renewal reminders reach owners through push notifications, the in-app
+ * notification inbox, and email — channels *outside* the app binary, where
+ * linking to checkout is permitted and where the renewal funnel now lives.
  */
 export default function SubscriptionScreen() {
-  const user = useAuthStore((s) => s.user);
-  const { subscription, access, renewal, isLoading, refetch } = useSubscription();
+  const { subscription, access, isLoading, refetch } = useSubscription();
   const invalidate = useInvalidateSubscription();
-  const { alert, toast } = useAlert();
-  const [payVisible, setPayVisible] = useState(false);
-  const [working, setWorking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [showPlanPicker, setShowPlanPicker] = useState(false);
-  const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
-  const [selectedCycle, setSelectedCycle] = useState<BillingCycle | null>(null);
 
   const plan = (subscription?.plan ?? null) as SubscriptionPlan | null;
   const state = access?.state ?? 'none';
   const meta = STATE_META[state];
 
-  // Defaults to the current renewal until the owner picks something else.
-  useEffect(() => {
-    if (renewal && selectedPlanSlug == null) setSelectedPlanSlug(renewal.planSlug);
-    if (renewal && selectedCycle == null) setSelectedCycle(renewal.billingCycle);
-  }, [renewal, selectedPlanSlug, selectedCycle]);
-
-  const { data: plansData } = useQuery({
-    queryKey: ['subscriptionPlans'],
-    queryFn: getPlans,
-    enabled: showPlanPicker,
-    staleTime: 60_000,
-  });
-
-  const effectivePlanSlug = selectedPlanSlug ?? renewal?.planSlug ?? null;
-  const effectiveCycle = selectedCycle ?? renewal?.billingCycle ?? 'monthly';
-  const planChanged = !!renewal && (effectivePlanSlug !== renewal.planSlug || effectiveCycle !== renewal.billingCycle);
-
-  const { data: previewData } = useQuery({
-    queryKey: ['subscriptionPreview', effectivePlanSlug, effectiveCycle],
-    queryFn: () => previewPricing({ planSlug: effectivePlanSlug!, billingCycle: effectiveCycle }),
-    enabled: planChanged && !!effectivePlanSlug,
-    staleTime: 30_000,
-  });
-
-  const payAmount = planChanged && previewData ? previewData.data.amountDue : renewal?.amountDue ?? 0;
-  const payCurrency = previewData?.data.currency ?? renewal?.currency ?? 'KES';
-
   const onRefresh = async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
-
-  const startTrial = async () => {
-    if (working) return;
-    haptics.medium();
-    setWorking(true);
     try {
-      const res = await activateTrial();
-      toast({ type: 'success', message: res.message });
       invalidate();
-    } catch (err: any) {
-      toast({ type: 'error', message: err?.response?.data?.message ?? 'Could not activate the trial. Try again.' });
+      await refetch();
     } finally {
-      setWorking(false);
+      setRefreshing(false);
     }
   };
 
-  const [showPasteSheet, setShowPasteSheet] = useState(false);
-  const [pastedMessage, setPastedMessage] = useState('');
-  const [pasteError, setPasteError] = useState<string | null>(null);
-  const [verifyingPaste, setVerifyingPaste] = useState(false);
-
-  const handleVerifyPastedMessage = async () => {
-    const text = pastedMessage.trim();
-    if (!text || verifyingPaste) return;
-    haptics.light();
-    setVerifyingPaste(true);
-    setPasteError(null);
-    try {
-      const res = await reconcileSubscriptionByMessage(text);
-      if (res.data.status === 'success') {
-        haptics.success();
-        toast({ type: 'success', message: res.message });
-        setShowPasteSheet(false);
-        setPastedMessage('');
-        invalidate();
-      } else {
-        setPasteError(res.message);
-      }
-    } catch (err: any) {
-      setPasteError(err?.response?.data?.message ?? "Couldn't verify that message. Check it's the full M-PESA SMS and try again.");
-    } finally {
-      setVerifyingPaste(false);
-    }
-  };
-
-  const confirmCancel = () => {
-    alert({
-      type: 'confirm',
-      title: 'Cancel subscription?',
-      message: 'You keep full access until the end of your current period. You can re-subscribe anytime.',
-      buttons: [
-        { label: 'Keep subscription', variant: 'secondary' },
-        {
-          label: 'Cancel subscription',
-          variant: 'danger',
-          onPress: async () => {
-            try {
-              const res = await cancelSubscription();
-              toast({ type: 'success', message: res.message });
-              invalidate();
-            } catch (err: any) {
-              toast({ type: 'error', message: err?.response?.data?.message ?? 'Could not cancel. Try again.' });
-            }
-          },
-        },
-      ],
-    });
-  };
-
-  if (isLoading && !subscription) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={Colors.primary} size="large" />
-      </View>
-    );
-  }
-
-  const expiresAt = access?.expiresAt ? formatDate(access.expiresAt) : null;
-  const canPay = !!renewal && (state === 'trialing' || state === 'grace' || state === 'locked' || state === 'active');
+  if (isLoading) return <LoadingState />;
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
-      >
+    <ScrollView
+      style={styles.flex}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+    >
+      <Animated.View entering={FadeInUp.duration(360)} style={styles.card}>
+        <View style={[styles.statusChip, { backgroundColor: meta.bg }]}>
+          <Ionicons name={meta.icon} size={14} color={meta.color} />
+          <Text style={[styles.statusChipText, { color: meta.color }]}>{meta.label}</Text>
+        </View>
+
+        <Text style={styles.planName}>{plan?.name ?? 'No plan yet'}</Text>
+        {plan?.tagline ? <Text style={styles.planTagline}>{plan.tagline}</Text> : null}
+
+        {state === 'trialing' && access?.expiresAt && (
+          <Text style={styles.detail}>
+            Your free trial runs until {formatDate(access.expiresAt)} — {access.daysLeft} day
+            {access.daysLeft === 1 ? '' : 's'} left.
+          </Text>
+        )}
+        {state === 'active' && access?.expiresAt && (
+          <Text style={styles.detail}>Renews on {formatDate(access.expiresAt)}.</Text>
+        )}
+        {state === 'grace' && (
+          <Text style={styles.detail}>
+            Your subscription has ended. Your shop keeps working for {access?.graceDaysLeft} more day
+            {access?.graceDaysLeft === 1 ? '' : 's'}.
+          </Text>
+        )}
         {state === 'locked' && (
-          <Animated.View entering={FadeInUp.duration(360)} style={styles.lockedCard}>
-            <Ionicons name="lock-closed" size={22} color={Colors.danger} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.lockedTitle}>Your shop is paused</Text>
-              <Text style={styles.lockedSub}>
-                Your subscription and grace period have ended. Pay below to pick
-                up right where you left off — all your data is safe.
-              </Text>
-            </View>
-          </Animated.View>
+          <Text style={styles.detail}>
+            Your subscription has ended and this shop is paused. Your data is safe and nothing has been
+            deleted — everything comes straight back when the subscription is renewed.
+          </Text>
         )}
-
-        {(state === 'locked' || state === 'grace') && (
-          <Animated.View entering={FadeInUp.duration(360).delay(30)} style={styles.recoveryCard}>
-            {showPasteSheet ? (
-              <>
-                <Text style={styles.recoveryTitle}>Paste your M-PESA confirmation SMS</Text>
-                <Text style={styles.recoverySub}>
-                  Already paid but still seeing this? We'll check it directly with M-PESA.
-                </Text>
-                <TextInput
-                  style={styles.pasteInput}
-                  value={pastedMessage}
-                  onChangeText={(t) => {
-                    setPastedMessage(t);
-                    if (pasteError) setPasteError(null);
-                  }}
-                  placeholder="QGH7XXXXX Confirmed. Ksh500.00 sent to..."
-                  placeholderTextColor={Colors.textTertiary}
-                  multiline
-                  numberOfLines={3}
-                  accessibilityLabel="M-PESA confirmation message"
-                />
-                {!!pasteError && <Text style={styles.recoveryError}>{pasteError}</Text>}
-                <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                  <Button
-                    title="Cancel"
-                    variant="secondary"
-                    onPress={() => { setShowPasteSheet(false); setPasteError(null); }}
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    title="Verify"
-                    onPress={handleVerifyPastedMessage}
-                    loading={verifyingPaste}
-                    disabled={!pastedMessage.trim()}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </>
-            ) : (
-              <AnimatedPressable
-                onPress={() => { haptics.light(); setShowPasteSheet(true); }}
-                style={styles.recoveryLink}
-                accessibilityRole="button"
-              >
-                <Ionicons name="chatbox-ellipses-outline" size={16} color={Colors.primary} />
-                <Text style={styles.recoveryLinkText}>Already paid? Paste your M-PESA message</Text>
-              </AnimatedPressable>
-            )}
-          </Animated.View>
+        {state === 'none' && (
+          <Text style={styles.detail}>This shop doesn&apos;t have a subscription yet.</Text>
         )}
+      </Animated.View>
 
-        {/* Status card */}
-        <Animated.View entering={FadeInUp.duration(360).delay(60)} style={styles.card}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
-              <Ionicons name={meta.icon} size={14} color={meta.color} />
-              <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
-            </View>
-            {access?.cancelled && (
-              <Text style={styles.cancelledNote}>Cancelled — active until period end</Text>
-            )}
+      {/* Where billing is handled. Named as a fact about the account, with no
+          link, address, or call to action — see the note on this component. */}
+      <Animated.View entering={FadeInUp.duration(360).delay(80)} style={styles.noteCard}>
+        <Ionicons name="desktop-outline" size={20} color={Colors.textSecondary} />
+        <View style={styles.noteText}>
+          <Text style={styles.noteTitle}>Billing is managed on the web</Text>
+          <Text style={styles.noteBody}>
+            Plans, payments, and receipts for this shop are handled from a browser, not the app. We email
+            the shop owner a renewal reminder before every billing date.
+          </Text>
+        </View>
+      </Animated.View>
+
+      {subscription?.staffCount ? (
+        <Animated.View entering={FadeInUp.duration(360).delay(140)} style={styles.card}>
+          <Text style={styles.sectionLabel}>TEAM</Text>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Billable people</Text>
+            <Text style={styles.rowValue}>{subscription.staffCount}</Text>
           </View>
-
-          <Text style={styles.planName}>{plan?.name ? `${plan.name} plan` : 'Smart Duka'}</Text>
-          {!!plan?.tagline && <Text style={styles.planTagline}>{plan.tagline}</Text>}
-
-          <View style={styles.divider} />
-
-          {state === 'trialing' && (
-            <InfoRow icon="time-outline" label="Trial ends" value={`${expiresAt} · ${access?.daysLeft} day${access?.daysLeft === 1 ? '' : 's'} left`} />
-          )}
-          {state === 'active' && (
-            <InfoRow icon="refresh-outline" label={access?.cancelled ? 'Access until' : 'Renews'} value={expiresAt ?? '—'} />
-          )}
-          {state === 'grace' && (
-            <InfoRow
-              icon="alert-circle-outline"
-              label="Grace period"
-              value={`${access?.graceDaysLeft} day${access?.graceDaysLeft === 1 ? '' : 's'} left to pay`}
-            />
-          )}
-          {renewal && (
-            <InfoRow
-              icon="people-outline"
-              label="Team size"
-              value={`${renewal.staffCount} ${renewal.staffCount === 1 ? 'person' : 'people'}`}
-            />
-          )}
-          {renewal && (
-            <InfoRow
-              icon="card-outline"
-              label={renewal.billingCycle === 'yearly' ? 'Yearly price' : 'Monthly price'}
-              value={formatCurrency(renewal.amountDue, renewal.currency)}
-            />
-          )}
-
-          {state === 'none' && (
-            <>
-              <Text style={styles.noneNote}>
-                Your free trial is waiting. Activate it now — no payment needed
-                to start.
-              </Text>
-              <Button title="Activate free trial" onPress={startTrial} loading={working} style={{ alignSelf: 'stretch' }} />
-            </>
-          )}
-
-          {canPay && (
-            <AnimatedPressable
-              onPress={() => {
-                haptics.light();
-                setShowPlanPicker((s) => !s);
-              }}
-              style={styles.changePlanLink}
-              accessibilityRole="button"
-              accessibilityLabel={showPlanPicker ? 'Hide plans' : 'Change plan'}
-            >
-              <Text style={styles.changePlanText}>{showPlanPicker ? 'Hide plans' : 'Change plan'}</Text>
-              <Ionicons name={showPlanPicker ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.primary} />
-            </AnimatedPressable>
-          )}
-
-          {canPay && showPlanPicker && plansData && (
-            <Animated.View entering={FadeInUp.duration(240)} style={styles.planPicker}>
-              <View style={styles.cycleToggleRow}>
-                {(['monthly', 'yearly'] as const).map((cycle) => {
-                  const active = effectiveCycle === cycle;
-                  return (
-                    <AnimatedPressable
-                      key={cycle}
-                      onPress={() => {
-                        haptics.light();
-                        setSelectedCycle(cycle);
-                      }}
-                      style={[styles.cycleToggleBtn, active && styles.cycleToggleBtnActive]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <Text style={[styles.cycleToggleText, active && styles.cycleToggleTextActive]}>
-                        {cycle === 'monthly' ? 'Monthly' : 'Yearly'}
-                      </Text>
-                    </AnimatedPressable>
-                  );
-                })}
-              </View>
-
-              {plansData.data.plans.map((p) => {
-                const selected = effectivePlanSlug === p.slug;
-                const price = effectiveCycle === 'yearly'
-                  ? p.pricing.yearlyTotal
-                  : p.billingType === 'per_staff' ? p.monthlyPrice : p.pricing.monthlyTotal;
-                const unit = effectiveCycle === 'yearly' ? 'per year' : p.billingType === 'per_staff' ? 'per staff / month' : 'per month';
-                return (
-                  <AnimatedPressable
-                    key={p.slug}
-                    onPress={() => {
-                      haptics.light();
-                      setSelectedPlanSlug(p.slug);
-                    }}
-                    style={[styles.planRow, selected && styles.planRowSelected]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${p.name} plan`}
-                  >
-                    <View style={styles.planRowRadio}>
-                      {selected && <View style={styles.planRowRadioInner} />}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.planRowName}>{p.name}</Text>
-                      {!!p.tagline && <Text style={styles.planRowTagline}>{p.tagline}</Text>}
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.planRowPrice}>{formatCurrency(price, plansData.data.currency)}</Text>
-                      <Text style={styles.planRowUnit}>{unit}</Text>
-                    </View>
-                  </AnimatedPressable>
-                );
-              })}
-            </Animated.View>
-          )}
-
-          {canPay && (
-            <Button
-              title={state === 'active' ? `Extend now · ${formatCurrency(payAmount, payCurrency)}` : `Pay with M-PESA · ${formatCurrency(payAmount, payCurrency)}`}
-              onPress={() => {
-                haptics.medium();
-                setPayVisible(true);
-              }}
-              style={{ alignSelf: 'stretch', marginTop: Spacing.md }}
-            />
-          )}
+          <Text style={styles.footnote}>
+            Adding or removing a team member adjusts the next bill automatically, prorated for the days
+            left in the current period.
+          </Text>
         </Animated.View>
-
-        {/* Cancel */}
-        {subscription && subscription.status !== 'cancelled' && state !== 'locked' && (
-          <Animated.View entering={FadeInUp.duration(360).delay(120)}>
-            <AnimatedPressable onPress={confirmCancel} style={styles.cancelRow} accessibilityRole="button">
-              <Text style={styles.cancelText}>Cancel subscription</Text>
-            </AnimatedPressable>
-          </Animated.View>
-        )}
-      </ScrollView>
-
-      <SubscriptionPayModal
-        visible={payVisible}
-        amount={payAmount}
-        currency={payCurrency}
-        billingCycle={effectiveCycle}
-        planSlug={effectivePlanSlug ?? undefined}
-        defaultPhone={user?.shop?.phone}
-        onClose={() => setPayVisible(false)}
-        onSuccess={() => {
-          setPayVisible(false);
-          setShowPlanPicker(false);
-          setSelectedPlanSlug(null);
-          setSelectedCycle(null);
-          invalidate();
-        }}
-      />
-    </View>
+      ) : null}
+    </ScrollView>
   );
 }
 
-const InfoRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; label: string; value: string }> = ({ icon, label, value }) => (
-  <View style={styles.infoRow}>
-    <Ionicons name={icon} size={16} color={Colors.textTertiary} />
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue}>{value}</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
-  scroll: { padding: Spacing.md, paddingBottom: 120 },
-  lockedCard: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    backgroundColor: Colors.dangerSubtle,
-    borderRadius: 16,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  lockedTitle: {
-    color: Colors.danger,
-    fontSize: Typography.size.body,
-    fontFamily: Typography.fontFamilyBold,
-  },
-  lockedSub: {
-    color: '#7F1D1D',
-    fontSize: Typography.size.caption,
-    lineHeight: Typography.lineHeight.caption,
-    fontFamily: Typography.fontFamily,
-    marginTop: 2,
-  },
-  recoveryCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  recoveryLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  recoveryLinkText: {
-    color: Colors.primary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
-  recoveryTitle: {
-    color: Colors.textPrimary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilyBold,
-    marginBottom: 2,
-  },
-  recoverySub: {
-    color: Colors.textSecondary,
-    fontSize: Typography.size.caption,
-    lineHeight: Typography.lineHeight.caption,
-    fontFamily: Typography.fontFamily,
-    marginBottom: Spacing.sm,
-  },
-  pasteInput: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    color: Colors.textPrimary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamily,
-    textAlignVertical: 'top',
-    minHeight: 72,
-    marginBottom: Spacing.sm,
-  },
-  recoveryError: {
-    color: Colors.danger,
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamily,
-    marginBottom: Spacing.sm,
-  },
+  flex: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.lg, gap: Spacing.md },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 18,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
+    borderColor: Colors.divider,
+    padding: Spacing.lg,
+    gap: Spacing.xs,
   },
-  statusRow: {
+  statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: 10,
+    alignSelf: 'flex-start',
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
+    borderRadius: 999,
+    marginBottom: Spacing.sm,
   },
-  statusText: {
+  statusChipText: {
     fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamilyBold,
-  },
-  cancelledNote: {
-    color: Colors.textTertiary,
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamily,
+    fontFamily: Typography.fontFamilySemiBold,
   },
   planName: {
-    color: Colors.textPrimary,
     fontSize: Typography.size.h2,
     fontFamily: Typography.fontFamilyBold,
+    color: Colors.textPrimary,
+    letterSpacing: -0.4,
   },
   planTagline: {
-    color: Colors.textSecondary,
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,
-    marginTop: 2,
-  },
-  divider: { height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  infoLabel: {
     color: Colors.textSecondary,
+  },
+  detail: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,
-    flex: 1,
-  },
-  infoValue: {
-    color: Colors.textPrimary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
-  noneNote: {
     color: Colors.textSecondary,
-    fontSize: Typography.size.small,
-    lineHeight: Typography.lineHeight.small,
-    fontFamily: Typography.fontFamily,
-    marginBottom: Spacing.md,
-  },
-  cancelRow: {
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
+    lineHeight: 20,
     marginTop: Spacing.sm,
   },
-  cancelText: {
-    color: Colors.danger,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
-  changePlanLink: {
+  noteCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    marginBottom: Spacing.sm,
-  },
-  changePlanText: {
-    color: Colors.primary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
-  planPicker: {
-    backgroundColor: Colors.background,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  cycleToggleRow: {
-    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
     backgroundColor: Colors.surface,
-    borderRadius: 11,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 3,
-    marginBottom: Spacing.sm,
+    borderColor: Colors.divider,
+    padding: Spacing.lg,
   },
-  cycleToggleBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 9,
+  noteText: { flex: 1, gap: 4 },
+  noteTitle: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
   },
-  cycleToggleBtnActive: {
-    backgroundColor: Colors.primarySubtle,
-  },
-  cycleToggleText: {
+  noteBody: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  sectionLabel: {
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
-  },
-  cycleToggleTextActive: { color: Colors.primaryDark },
-  planRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    padding: Spacing.sm,
+    color: Colors.textTertiary,
+    letterSpacing: 0.8,
     marginBottom: Spacing.xs,
   },
-  planRowSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primarySubtle,
-  },
-  planRowRadio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  planRowRadioInner: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
-  },
-  planRowName: {
-    color: Colors.textPrimary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilyBold,
-  },
-  planRowTagline: {
-    color: Colors.textSecondary,
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rowLabel: { fontSize: Typography.size.body, fontFamily: Typography.fontFamily, color: Colors.textSecondary },
+  rowValue: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  footnote: {
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,
-    marginTop: 1,
-  },
-  planRowPrice: {
-    color: Colors.textPrimary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilyBold,
-  },
-  planRowUnit: {
     color: Colors.textTertiary,
-    fontSize: 10,
-    fontFamily: Typography.fontFamily,
+    lineHeight: 17,
+    marginTop: Spacing.sm,
   },
 });

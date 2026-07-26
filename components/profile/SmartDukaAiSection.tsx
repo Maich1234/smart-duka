@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import { openHelp } from '@/utils/openHelp';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -82,6 +83,24 @@ export function SmartDukaAiSection({ state, aiEnabled, toggling, loadingShop, on
           </AnimatedPressable>
         </>
       )}
+
+      <View style={s.divider} />
+
+      <AnimatedPressable
+        style={s.row}
+        onPress={() => openHelp('smart-duka-ai')}
+        accessibilityRole="button"
+        accessibilityLabel="Help with Smart Duka AI"
+      >
+        <View style={[s.iconWrap, { backgroundColor: Colors.primarySubtle }]}>
+          <Ionicons name="help-circle-outline" size={17} color={Colors.primary} />
+        </View>
+        <View style={s.text}>
+          <Text style={s.title}>Help with Smart Duka AI</Text>
+          <Text style={s.sub}>How it works, what it can do, and how to turn it on</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+      </AnimatedPressable>
 
       <BottomSheet visible={showPrivacy} onClose={() => setShowPrivacy(false)}>
         <Text style={p.title}>Smart Duka AI & your data</Text>

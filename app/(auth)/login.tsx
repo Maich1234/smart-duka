@@ -10,6 +10,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { router, useLocalSearchParams } from 'expo-router';
+import { openLegal } from '@/utils/openLegal';
 import { StatusBar } from 'expo-status-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuth } from '@/context/AuthContext';
@@ -162,12 +163,46 @@ export default function LoginScreen() {
           <Text style={styles.createLink}> Create your shop</Text>
           <Ionicons name="arrow-forward" size={14} color={Colors.primary} style={styles.createArrow} />
         </Pressable>
+
+        {/* Reachable, not a gate. Consent is captured once at registration
+            (see components/auth/TermsCheckbox.tsx); re-ticking a box every
+            shift would be friction on the screen a cashier opens most, and
+            wouldn't be consent — they already agreed. These are here so the
+            documents are always one tap away, which Play requires of the
+            privacy policy. */}
+        <View style={styles.legalRow}>
+          <Text style={styles.legalText} onPress={() => openLegal('terms')} accessibilityRole="link">
+            Terms
+          </Text>
+          <Text style={styles.legalDot}>·</Text>
+          <Text style={styles.legalText} onPress={() => openLegal('privacy')} accessibilityRole="link">
+            Privacy Policy
+          </Text>
+        </View>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: Spacing.lg,
+  },
+  legalText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textTertiary,
+    textDecorationLine: 'underline',
+    paddingVertical: 6,
+  },
+  legalDot: {
+    fontSize: Typography.size.caption,
+    color: Colors.textTertiary,
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',

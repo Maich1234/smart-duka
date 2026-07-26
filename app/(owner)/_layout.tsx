@@ -244,6 +244,16 @@ export default function OwnerLayout() {
           headerShown: false,
         }}
       />
+      {/* The owner's till. Reached from the dashboard's primary action and
+          from Sales, not the tab bar — five tabs is already the limit. */}
+      <Tabs.Screen
+        name="pos"
+        options={{
+          title: 'New Sale',
+          href: null,
+          headerShown: false,
+        }}
+      />
       <Tabs.Screen
         name="staff"
         options={{

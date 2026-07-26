@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
+import { TermsCheckbox } from '@/components/auth/TermsCheckbox';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -28,6 +29,9 @@ const registerSchema = z
     confirmPassword: z.string().min(8),
     shopName: z.string().min(2, 'Shop name is required'),
     phone: z.string().optional(),
+    acceptedTerms: z.literal(true, {
+      message: 'Please accept the Terms and Privacy Policy to continue',
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -82,6 +86,9 @@ export default function RegisterScreen() {
         password: data.password,
         shopName: data.shopName,
         phone: data.phone,
+        // Re-checked server-side, which refuses to create the account without
+        // it and records the version accepted against the user.
+        acceptedTerms: data.acceptedTerms,
       });
       if (res.success) {
         router.replace({ pathname: '/(auth)/verify-email', params: { email: data.email } });
@@ -223,6 +230,18 @@ export default function RegisterScreen() {
             keyboardType="phone-pad"
             returnKeyType="done"
             hint="Used for M-Pesa payment notifications"
+          />
+        )}
+      />
+
+      <Controller
+        control={control}
+        name="acceptedTerms"
+        render={({ field: { onChange, value } }) => (
+          <TermsCheckbox
+            value={value === true}
+            onChange={onChange}
+            error={errors.acceptedTerms?.message}
           />
         )}
       />

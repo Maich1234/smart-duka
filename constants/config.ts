@@ -7,14 +7,28 @@ export { Colors, Spacing, Typography, Shadows };
 
 export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
 
-// Base URL of the deployed public web export — used to build the QR code
-// link on receipts (must point at a host serving the (public) route group).
-export const PUBLIC_WEB_URL = 'https://smart-duka--01nm282g2e.expo.app/';
+/**
+ * The Smart Duka web front end (the `smart-duka-web` Next.js app on Vercel).
+ *
+ * One host serves everything the app links out to: the Help & Learning
+ * Center (/help), public receipts (/r/<token>), the privacy policy, terms,
+ * and the public account-deletion page. Overridable so a preview deployment
+ * or a future custom domain doesn't need a code change — set
+ * EXPO_PUBLIC_WEB_URL in the EAS build profile.
+ *
+ * No trailing slash: every consumer appends a path beginning with "/".
+ */
+export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? 'https://smart-duka-web-delta.vercel.app')
+  .replace(/\/+$/, '');
 
-// Base URL of the deployed web export that serves the Help & Learning
-// Center (app/help/*.web.tsx — web-only, excluded from native builds).
-// Native screens link out to this instead of bundling the help UI.
-export const HELP_CENTER_URL = 'https://smart-duka--01nm282g2e.expo.app/';
+// Used to build the QR code link on receipts. Points at the Next.js app's
+// /r/[token] route — previously the Expo web export, which is no longer where
+// public pages live.
+export const PUBLIC_WEB_URL = WEB_URL;
+
+// Base URL of the Help & Learning Center. No help content ships in this app on
+// any platform — openHelp() always opens the browser (see utils/openHelp.ts).
+export const HELP_CENTER_URL = WEB_URL;
 
 // Matches app.json's "scheme" — used to deep-link from the web verification
 // page into the native app when it's installed (falls back to the web page

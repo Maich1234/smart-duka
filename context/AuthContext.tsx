@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect } from 'react';
 import { router } from 'expo-router';
 import axios from 'axios';
 import * as Haptics from 'expo-haptics';
+import { clearProductCache } from '@/utils/productCache';
 import { useAuthStore } from '@/store/authStore';
 import { login as loginApi, getProfile } from '@/services/auth';
 import { API_BASE_URL } from '@/constants/config';
@@ -114,6 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       // Must run before clearAll/storeLogout — it needs the still-valid auth token.
       await unregisterDeviceFromNotifications();
+      // The cached catalogue is shop data on a shared device — a staff member
+      // signing out must not leave the next person able to browse it.
+      clearProductCache();
       await clearAll();
       storeLogout();
       router.replace('/(auth)/login');

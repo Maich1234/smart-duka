@@ -131,65 +131,16 @@ export async function getMySubscription(): Promise<MySubscriptionResponse> {
   return res.data;
 }
 
-export async function activateTrial(params?: {
-  planSlug?: string;
-  billingCycle?: BillingCycle;
-}): Promise<{ success: boolean; data: { subscription: Subscription; alreadyActivated: boolean }; message: string }> {
-  const res = await api.post('/subscriptions/trial', params ?? {});
-  return res.data;
-}
-
-export async function previewPricing(params: {
-  staffCount?: number;
-  billingCycle?: BillingCycle;
-  planSlug?: string;
-  promoCode?: string;
-}): Promise<{ success: boolean; data: PricingPreview }> {
-  const res = await api.get('/subscriptions/preview', { params });
-  return res.data;
-}
-
-export async function validatePromo(code: string): Promise<{
+/**
+ * Starts the free trial. Takes no plan or cycle — the server picks the tier
+ * that fits the shop's head-count, and plan choice belongs with payment.
+ */
+export async function activateTrial(): Promise<{
   success: boolean;
-  data: { code: string; title: string; description: string; discountType: 'percentage' | 'fixed'; discountValue: number };
+  data: { subscription: Subscription; alreadyActivated: boolean };
+  message: string;
 }> {
-  const res = await api.post('/subscriptions/promo/validate', { code });
-  return res.data;
-}
-
-/** Starts an M-PESA STK Push for the server-computed amount. */
-export async function initiateSubscriptionPayment(
-  params: { phoneNumber: string; billingCycle: BillingCycle; planSlug?: string; promoCode?: string },
-  idempotencyKey?: string
-): Promise<{ success: boolean; idempotent?: boolean; data: { paymentId: string; status: PaymentStatus; amount: number; currency: string }; message: string }> {
-  const res = await api.post(
-    '/subscriptions/pay',
-    params,
-    idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined
-  );
-  return res.data;
-}
-
-export async function getSubscriptionPaymentStatus(
-  paymentId: string
-): Promise<{ success: boolean; data: SubscriptionPaymentState }> {
-  const res = await api.get(`/subscriptions/pay/${paymentId}`);
-  return res.data;
-}
-
-/** Re-verifies a specific payment directly against M-PESA — "I definitely paid, check again." */
-export async function recheckSubscriptionPayment(
-  paymentId: string
-): Promise<{ success: boolean; data: SubscriptionPaymentState }> {
-  const res = await api.post(`/subscriptions/pay/${paymentId}/recheck`);
-  return res.data;
-}
-
-/** Recovery path: the owner pastes their M-PESA confirmation SMS to unblock a payment that never activated. */
-export async function reconcileSubscriptionByMessage(
-  message: string
-): Promise<{ success: boolean; data: SubscriptionPaymentState; message: string }> {
-  const res = await api.post('/subscriptions/reconcile', { message });
+  const res = await api.post('/subscriptions/trial', {});
   return res.data;
 }
 
@@ -197,3 +148,13 @@ export async function cancelSubscription(): Promise<{ success: boolean; data: { 
   const res = await api.post('/subscriptions/cancel');
   return res.data;
 }
+
+// NOTE: there is deliberately no pricing preview, promo validation, payment
+// initiation, payment polling, or payment reconciliation in this file.
+//
+// Google Play requires Play Billing for in-app purchases that unlock app
+// functionality, and its anti-steering rules also forbid linking users to an
+// external checkout from inside the app. So the app binary contains no
+// purchase surface at all: those endpoints exist on the backend and are
+// consumed only by the web app. Re-adding any of them here would put the
+// Play listing at risk of removal, not just rejection.

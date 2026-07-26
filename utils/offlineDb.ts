@@ -30,6 +30,15 @@ export const initOfflineDb = (): void => {
   }
   try {
     const db = getDb();
+    // product_cache is a local mirror of the shop's catalogue so the till can
+    // find a product by typing instead of asking the server. The POS used to
+    // search server-side, ten results per page: a network round trip per
+    // keystroke burst on Kenyan mobile data, twenty pages to browse a 200-SKU
+    // shop, and offline a term the cashier had never searched before returned
+    // nothing at all — the offline promise failed at the counter, which is
+    // where it has to hold. `search_blob` is a lowercased name + category +
+    // description for one LIKE scan; `payload` is the full Product JSON so the
+    // cart, variant picker, and promotions behave identically online and off.
     db.execSync(`
       CREATE TABLE IF NOT EXISTS offline_queue (
         id TEXT PRIMARY KEY,
@@ -59,6 +68,20 @@ export const initOfflineDb = (): void => {
       );
       CREATE INDEX IF NOT EXISTS idx_insight_shop_date
         ON ai_insight_cache(shop_id, date);
+
+      CREATE TABLE IF NOT EXISTS product_cache (
+        id TEXT PRIMARY KEY,
+        shop_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        search_blob TEXT NOT NULL,
+        category TEXT,
+        payload TEXT NOT NULL,
+        synced_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_product_cache_shop
+        ON product_cache(shop_id, name);
+      CREATE INDEX IF NOT EXISTS idx_product_cache_search
+        ON product_cache(shop_id, search_blob);
     `);
   } catch (err) {
     _available = false;

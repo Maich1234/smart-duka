@@ -37,7 +37,7 @@ export const TrialBanner: React.FC = () => {
     tone = 'urgent';
   } else if (access.state === 'locked') {
     icon = 'lock-closed-outline';
-    text = 'Subscription expired. Pay now to keep selling.';
+    text = 'Subscription expired — this shop is paused.';
     tone = 'urgent';
   } else {
     return null;
@@ -63,9 +63,12 @@ export const TrialBanner: React.FC = () => {
       <Text style={[styles.text, { color: palette.fg }]} numberOfLines={2}>
         {text}
       </Text>
+      {/* "Activate" starts the free trial, which is not a purchase. Every
+          other state opens the read-only status screen — no payment verb
+          here, and nothing that steers toward an external checkout. */}
       <View style={[styles.cta, { borderColor: palette.fg }]}>
         <Text style={[styles.ctaText, { color: palette.fg }]}>
-          {access.state === 'none' ? 'Activate' : access.state === 'trialing' ? 'View' : 'Pay now'}
+          {access.state === 'none' ? 'Activate' : 'View'}
         </Text>
       </View>
     </AnimatedPressable>

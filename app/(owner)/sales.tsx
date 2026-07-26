@@ -288,6 +288,19 @@ export default function OwnerSales() {
               <Text style={styles.txCount}>{txCount}</Text>
             </View>
           </View>
+
+          {/* This screen is history and analytics only. An owner who lands
+              here looking to sell needs a way through to the till. */}
+          <AnimatedPressable
+            onPress={() => router.push('/(owner)/pos' as any)}
+            style={styles.heroSellButton}
+            accessibilityRole="button"
+            accessibilityLabel="Record a new sale"
+          >
+            <Ionicons name="cart" size={16} color={Colors.primary} />
+            <Text style={styles.heroSellText}>New Sale</Text>
+            <Ionicons name="arrow-forward" size={14} color={Colors.primary} />
+          </AnimatedPressable>
         </LinearGradient>
       </Animated.View>
 
@@ -623,6 +636,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+  },
+  heroSellButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+    marginTop: Spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: Colors.white,
+    minHeight: 44,
+  },
+  heroSellText: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
   },
   heroLeft: {
     flex: 1,

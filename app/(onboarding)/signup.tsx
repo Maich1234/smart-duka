@@ -10,6 +10,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { TermsCheckbox } from '@/components/auth/TermsCheckbox';
 import { Screen } from '@/components/ui/Screen';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import { register as registerApi } from '@/services/auth';
@@ -32,6 +33,9 @@ const signupSchema = z
       .min(8, 'Password must be at least 8 characters')
       .regex(/[0-9]/, 'Must contain at least one number'),
     confirmPassword: z.string().min(8),
+    acceptedTerms: z.literal(true, {
+      message: 'Please accept the Terms and Privacy Policy to continue',
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -73,6 +77,7 @@ export default function OnboardingSignup() {
         password: data.password,
         shopName: draft.shopName || 'My Smart Shop',
         phone: draft.phone || undefined,
+        acceptedTerms: data.acceptedTerms,
       });
       if (res.success) {
         haptics.success();
@@ -196,6 +201,18 @@ export default function OnboardingSignup() {
               onSubmitEditing={handleSubmit(onSubmit)}
               autoComplete="new-password"
               textContentType="newPassword"
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="acceptedTerms"
+          render={({ field: { onChange, value } }) => (
+            <TermsCheckbox
+              value={value === true}
+              onChange={onChange}
+              error={errors.acceptedTerms?.message}
             />
           )}
         />

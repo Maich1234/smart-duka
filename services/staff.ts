@@ -24,6 +24,8 @@ export interface SingleStaffResponse {
   success: boolean;
   data: Staff;
   message?: string;
+  /** Present when the change moved billable head-count — see SeatBillingNote. */
+  billing?: SeatBillingNote | null;
 }
 
 export interface CreateStaffData {
@@ -34,29 +36,31 @@ export interface CreateStaffData {
   permissions?: string[];
 }
 
-/** Shape of the 409 the backend returns when adding a seat would raise the bill — payment is required. */
-export interface SeatPriceConfirmation {
-  currentAmount: number;
-  projectedAmount: number;
+/**
+ * What one more seat will add to the next invoice.
+ *
+ * Seats used to be prepaid: adding a cashier returned a 409 and demanded an
+ * M-Pesa STK push for a *full* billing period, however little of it was left
+ * — a full year on annual plans. They're postpaid and prorated now, so this
+ * is a disclosure rather than a checkout, and the app carries no purchase
+ * flow at all (which is also what keeps it inside Play's payments policy).
+ */
+export interface SeatPreview {
+  willCharge: boolean;
+  /** Prorated for the remainder of the current period. */
+  amount: number;
+  fullPeriodAmount: number;
   currency: string;
+  nextInvoiceAt: string | null;
   billingCycle: 'monthly' | 'yearly';
 }
 
-export type SeatPaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled' | 'timeout';
-
-export interface SeatPaymentState {
-  paymentId: string;
-  status: SeatPaymentStatus;
-  amount: number;
-  currency: string;
-  receipt: string | null;
-  errorMessage: string | null;
-  staff: Staff | null;
+/** Returned alongside a created/updated staff member when the bill changed. */
+export interface SeatBillingNote {
+  addedToNextInvoice: number;
+  currency?: string;
+  nextInvoiceAt?: string | null;
 }
-
-export type InitiateSeatPaymentResult =
-  | { mode: 'created'; staff: Staff }
-  | { mode: 'payment_pending'; paymentId: string; amount: number; currency: string };
 
 export interface UpdateStaffData {
   name?: string;
@@ -120,38 +124,15 @@ export const checkStaffEmailAvailability = async (email: string): Promise<{ avai
 };
 
 /**
- * Starts an M-PESA STK Push for the seat this staff member would occupy.
- * If the seat turns out to be free by the time this runs (e.g. someone else
- * was just removed), the backend creates the staff directly instead —
- * check `mode` on the response.
+ * What adding one more team member will add to the next invoice.
+ *
+ * Purely informational — seats are postpaid now, so nothing is charged here
+ * and there is no payment step to complete. Shown as a note before the owner
+ * commits, so the bill is never a surprise.
  */
-export const initiateSeatPayment = async (
-  data: CreateStaffData & { phoneNumber: string },
-  idempotencyKey?: string
-): Promise<{ success: boolean; data: InitiateSeatPaymentResult; message?: string }> => {
-  const response = await api.post(
-    '/staff/seat-payment',
-    data,
-    idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined
-  );
-  return response.data;
-};
-
-export const getSeatPaymentStatus = async (paymentId: string): Promise<{ success: boolean; data: SeatPaymentState }> => {
-  const response = await api.get(`/staff/seat-payment/${paymentId}`);
-  return response.data;
-};
-
-/** Re-verifies a specific seat payment directly against M-PESA — "I definitely paid, check again." */
-export const recheckSeatPayment = async (paymentId: string): Promise<{ success: boolean; data: SeatPaymentState }> => {
-  const response = await api.post(`/staff/seat-payment/${paymentId}/recheck`);
-  return response.data;
-};
-
-/** Recovery path: the owner pastes their M-PESA confirmation SMS to unblock a seat payment that never activated. */
-export const reconcileSeatPaymentByMessage = async (message: string): Promise<{ success: boolean; data: SeatPaymentState; message: string }> => {
-  const response = await api.post('/staff/seat-payment/reconcile', { message });
-  return response.data;
+export const previewSeatAddition = async (): Promise<SeatPreview> => {
+  const response = await api.get('/staff/seat-preview');
+  return response.data.data;
 };
 
 /**

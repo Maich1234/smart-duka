@@ -16,11 +16,12 @@ import { useAiAccess } from '@/hooks/useAiAccess';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAlert } from '@/context/AlertContext';
 import {
-  useLatestConversation,
+  useConversationHistory,
   useConversationMessages,
   useSendChatMessage,
   useArchiveConversation,
 } from '@/hooks/useAiChat';
+import { ChatHistorySheet } from '@/components/chat/ChatHistorySheet';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -33,13 +34,15 @@ interface DisplayMessage {
 }
 
 /**
- * Single active thread per owner — auto-opens the latest non-archived
- * conversation and auto-creates one on first message. "New chat" and
- * "Delete" act on that one active thread rather than a multi-thread list
- * screen (the backend's list endpoint already supports that later without
- * an API change) — deleting falls back to the next-latest thread if one
- * exists, and starting new makes the old thread unreachable from this
- * screen until a list UI exists.
+ * Ask Smart Duka. Auto-opens the latest non-archived conversation and
+ * auto-creates one on the first message.
+ *
+ * Past threads are reachable from the history sheet. They previously were
+ * not: the screen fetched only the newest conversation and starting a new
+ * chat made the old one unreachable, which owners read as the app having
+ * deleted their history — and the plan-cap message told them to "delete an
+ * old one" when none were visible. The backend always stored and paginated
+ * the full list, so this needed no API change.
  */
 export default function AiChatScreen() {
   const { seed } = useLocalSearchParams<{ seed?: string }>();
@@ -63,10 +66,12 @@ export default function AiChatScreen() {
   const [pendingText, setPendingText] = useState<string | null>(null);
   const listRef = useRef<FlatList<DisplayMessage>>(null);
 
-  const { data: latest, isLoading: isLoadingLatest } = useLatestConversation(hasAiChat);
+  const [historyVisible, setHistoryVisible] = useState(false);
+
+  const { data: history, isLoading: isLoadingLatest } = useConversationHistory(hasAiChat);
   useEffect(() => {
-    if (!conversationId && !skipAutoLoad && latest?.conversation?._id) setConversationId(latest.conversation._id);
-  }, [latest, conversationId, skipAutoLoad]);
+    if (!conversationId && !skipAutoLoad && history?.latest?._id) setConversationId(history.latest._id);
+  }, [history, conversationId, skipAutoLoad]);
 
   const { data: thread, isLoading: isLoadingThread } = useConversationMessages(conversationId);
   const sendMutation = useSendChatMessage(conversationId);
@@ -114,10 +119,10 @@ export default function AiChatScreen() {
   const handleNewChat = () => {
     if (sendMutation.isPending) return;
     const maxConversations = plan?.chatLimits?.maxConversations;
-    if (maxConversations != null && (latest?.totalConversations ?? 0) >= maxConversations) {
+    if (maxConversations != null && (history?.totalConversations ?? 0) >= maxConversations) {
       toast({
         type: 'info',
-        message: `Your plan allows up to ${maxConversations} conversation${maxConversations === 1 ? '' : 's'}. Delete an old one to start a new one, or upgrade your plan.`,
+        message: `Your plan allows up to ${maxConversations} conversation${maxConversations === 1 ? '' : 's'}. Open Past conversations to delete one, or move to a bigger plan.`,
       });
       return;
     }
@@ -187,6 +192,16 @@ export default function AiChatScreen() {
           <Text style={s.subtitle}>Grounded answers about your business</Text>
         </View>
         <View style={s.headerActions}>
+          {(history?.conversations.length ?? 0) > 0 && (
+            <AnimatedPressable
+              onPress={() => setHistoryVisible(true)}
+              style={s.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Past conversations"
+            >
+              <Ionicons name="time-outline" size={22} color={Colors.textPrimary} />
+            </AnimatedPressable>
+          )}
           <AnimatedPressable
             onPress={handleNewChat}
             style={s.headerBtn}
@@ -231,6 +246,20 @@ export default function AiChatScreen() {
       )}
 
       <ChatComposer value={inputText} onChangeText={setInputText} onSend={handleSend} disabled={sendMutation.isPending} />
+
+      <ChatHistorySheet
+        visible={historyVisible}
+        conversations={history?.conversations ?? []}
+        activeId={conversationId}
+        onClose={() => setHistoryVisible(false)}
+        onSelect={(id) => {
+          // Picking a thread cancels any pending "new chat" state, otherwise
+          // the auto-load effect would fight the explicit choice.
+          setSkipAutoLoad(false);
+          setPendingText(null);
+          setConversationId(id);
+        }}
+      />
     </Screen>
   );
 }

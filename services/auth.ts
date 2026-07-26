@@ -20,6 +20,12 @@ export interface LoginResponse {
 }
 
 export interface RegisterData {
+  /**
+   * Consent to the Terms of Service and Privacy Policy. The server rejects
+   * registration without it and records the accepted version against the
+   * user, so this is evidence rather than a UI formality.
+   */
+  acceptedTerms: boolean;
   name: string;
   email: string;
   password: string;
@@ -152,5 +158,53 @@ export const verifyEmail = async (email: string, code: string) => {
  */
 export const resendVerificationEmail = async (email: string) => {
   const response = await api.post('/auth/resend-verification-email', { email });
+  return response.data;
+};
+
+export interface AccountDeletionPreview {
+  role: 'owner' | 'staff';
+  /** True when deleting also destroys the shop and every staff account in it. */
+  cascades: boolean;
+  staffAccountsRemoved: number;
+  shopName: string | null;
+  retainedForBookkeeping: string[];
+  /** Length of the cooling-off window before anything is actually destroyed. */
+  graceDays: number;
+  /** Set when a closure is already scheduled. */
+  deletionScheduledAt: string | null;
+}
+
+/**
+ * What deleting this account will actually destroy. Owners are usually
+ * unaware that it takes their whole team and shop with it, so the
+ * confirmation screen states real consequences rather than a generic warning.
+ */
+export const previewAccountDeletion = async (): Promise<AccountDeletionPreview> => {
+  const response = await api.get('/auth/me/deletion-preview');
+  return response.data.data;
+};
+
+/**
+ * Schedules account closure. Required in-app by Google Play policy for any
+ * app that offers account creation.
+ *
+ * Nothing is destroyed immediately: the account keeps working through a
+ * 14-day cooling-off window and can be restored with cancelAccountDeletion.
+ * Password-gated plus a typed confirmation — a borrowed unlocked phone must
+ * not be able to destroy a business.
+ */
+export const deleteAccount = async (
+  password: string,
+): Promise<{ success: boolean; message: string; data: { deletionScheduledAt: string; graceDays: number } }> => {
+  const response = await api.delete('/auth/me', { data: { password, confirm: 'DELETE' } });
+  return response.data;
+};
+
+/**
+ * Calls off a scheduled closure. No password: the user is already signed in,
+ * and backing out of a destructive action should be effortless.
+ */
+export const cancelAccountDeletion = async (): Promise<{ success: boolean; message: string }> => {
+  const response = await api.post('/auth/me/restore');
   return response.data;
 };
