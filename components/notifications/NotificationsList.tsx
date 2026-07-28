@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,6 +7,8 @@ import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { NotificationDetailSheet } from './NotificationDetailSheet';
+import { iconForType } from './notificationMeta';
 import {
   getNotifications,
   markNotificationRead,
@@ -19,20 +21,14 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
-const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
-  depletion_alert: 'cube-outline',
-  daily_sales_anomaly: 'trending-up-outline',
-  daily_summary: 'bar-chart-outline',
-  subscription_reminder: 'shield-checkmark-outline',
-  shift_closed: 'time-outline',
-  campaign: 'megaphone-outline',
-  general: 'notifications-outline',
-};
-
 /** Shared inbox UI rendered by both the owner and staff Notifications screens. */
 export const NotificationsList: React.FC = () => {
   const tabBarHeight = useBottomTabBarHeight();
   const queryClient = useQueryClient();
+  // Kept separate from `detailVisible` so the sheet still has content to
+  // render while it slides out (same pattern as SaleDetailsModal).
+  const [selected, setSelected] = useState<AppNotification | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
 
   const { data, isLoading, isRefetching, refetch, fetchNextPage, hasNextPage } = useInfiniteQuery({
     queryKey: ['notifications'],
@@ -76,8 +72,14 @@ export const NotificationsList: React.FC = () => {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] }),
   });
 
+  // Opening the full text is the primary action; marking it read is a
+  // side-effect of having read it. Doing only the latter (the old behaviour)
+  // made a tap look like it destroyed the thing the user wanted to read,
+  // since list rows clamp the title to one line and the body to two.
   const onPressItem = (item: AppNotification) => {
     haptics.light();
+    setSelected(item);
+    setDetailVisible(true);
     if (!item.read) markReadMutation.mutate(item._id);
   };
 
@@ -117,7 +119,7 @@ export const NotificationsList: React.FC = () => {
           >
             <View style={[styles.iconWrap, !item.read && styles.iconWrapUnread]}>
               <Ionicons
-                name={TYPE_ICON[item.type] ?? TYPE_ICON.general}
+                name={iconForType(item.type)}
                 size={18}
                 color={item.read ? Colors.textTertiary : Colors.primary}
               />
@@ -134,6 +136,11 @@ export const NotificationsList: React.FC = () => {
             </View>
           </AnimatedPressable>
         )}
+      />
+      <NotificationDetailSheet
+        visible={detailVisible}
+        onClose={() => setDetailVisible(false)}
+        notification={selected}
       />
     </View>
   );
