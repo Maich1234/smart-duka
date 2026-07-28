@@ -21,7 +21,9 @@ export interface Sale {
   invoiceNumber: string;
   items: SaleItem[];
   totalAmount: number;
-  paymentMethod: 'cash' | 'mpesa' | 'card';
+  paymentMethod: string;
+  /** Button label snapshotted at sale time — survives renaming or removing the method. */
+  paymentMethodLabel?: string;
   staff: {
     _id: string;
     name: string;
@@ -81,7 +83,8 @@ export interface CreateSaleData {
     /** Required for 'configurable' products */
     variantId?: string;
   }[];
-  paymentMethod: 'cash' | 'mpesa' | 'card';
+  /** A key from the shop's own payment methods — 'cash', 'mpesa', 'airtel_money', … */
+  paymentMethod: string;
   /** Normal M-Pesa flow: links the confirmed STK Push transaction */
   mpesaTransactionId?: string;
   /** Offline fallback: M-Pesa receipt code entered manually from customer's SMS */
@@ -99,6 +102,9 @@ export interface SalesStats {
   transactionCount: number;
   avgSale: number;
   percentageChange: number;
+  /** Every method the shop actually took money on. The cash/mpesa/card totals
+   * above predate shop-defined methods and only cover those three. */
+  byMethod?: { method: string; label: string; total: number; count: number }[];
 }
 
 export interface SalesStatsResponse {
@@ -141,7 +147,7 @@ export const getSales = async (params?: {
   startDate?: string;
   endDate?: string;
   staffId?: string;
-  paymentMethod?: 'cash' | 'mpesa' | 'card';
+  paymentMethod?: string;
   /** Server-side search across invoice number and cashier name */
   search?: string;
   page?: number;

@@ -344,6 +344,13 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="payment-methods"
+        options={{
+          title: 'Payment Methods',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',

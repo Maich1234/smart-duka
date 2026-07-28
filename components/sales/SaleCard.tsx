@@ -6,13 +6,15 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { formatCurrency } from '@/utils/formatters';
+import { saleMethodLabel } from '@/constants/paymentMethods';
 
 interface SaleCardProps {
   sale: {
     _id: string;
     invoiceNumber: string;
     totalAmount: number;
-    paymentMethod: 'cash' | 'mpesa' | 'card';
+    paymentMethod: string;
+    paymentMethodLabel?: string;
     createdAt: string;
     staff?: { name: string };
     status?: 'completed' | 'voided' | 'refund_pending' | 'refunded';
@@ -36,6 +38,9 @@ const PAYMENT_CONFIG: Record<string, { label: string; color: string; bg: string 
   cash:   { label: 'CASH',   color: '#92400E', bg: '#FEF3C7' },
   card:   { label: 'CARD',   color: '#7C3AED', bg: '#EDE9FE' },
 };
+
+/** Neutral colours for a shop's own methods — Airtel, a bank, anything named. */
+const CUSTOM_PAYMENT_STYLE = { color: '#475569', bg: '#F1F5F9' };
 
 function getInitials(name: string): string {
   return name
@@ -73,7 +78,12 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
     ? { label: 'REFUNDED', color: '#BE185D', bg: '#FCE7F3' }
     : isRefundPending
     ? { label: 'REFUNDING…', color: '#B45309', bg: '#FEF3C7' }
-    : PAYMENT_CONFIG[sale.paymentMethod] ?? PAYMENT_CONFIG.cash;
+    // Falling back to the CASH badge used to mislabel every shop-defined
+    // method as cash; use the sale's own label instead.
+    : PAYMENT_CONFIG[sale.paymentMethod] ?? {
+        ...CUSTOM_PAYMENT_STYLE,
+        label: saleMethodLabel(sale).toUpperCase(),
+      };
 
   return (
     <AnimatedPressable onPress={onPress} style={styles.row}>

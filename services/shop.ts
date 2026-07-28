@@ -1,4 +1,5 @@
 import api from './api';
+import type { ShopPaymentMethod } from '@/constants/paymentMethods';
 
 export interface Shop {
   _id: string;
@@ -28,6 +29,10 @@ export interface Shop {
    * Consultant chat) are available. Independent of subscription tier — a
    * subscriber can still opt out of AI processing for their shop. */
   aiEnabled?: boolean;
+  /** The till's payment buttons, owner-managed and ordered. Absent on shops
+   * that predate the setting — read it through resolveSaleMethods(), which
+   * falls back to Cash + M-PESA. */
+  paymentMethods?: ShopPaymentMethod[];
   /** ISO timestamp — earliest possible date for any sale, used as a
    * lower bound on sales date-range pickers. */
   createdAt?: string;
@@ -54,6 +59,8 @@ export interface UpdateShopConfigData {
   purchasingEnabled?: boolean;
   purchaseCostAllocationMethod?: 'quantity' | 'value' | 'none';
   aiEnabled?: boolean;
+  /** Sent as the complete ordered list — array position becomes button order. */
+  paymentMethods?: ShopPaymentMethod[];
 }
 
 export const getShopConfig = async (): Promise<ShopConfigResponse> => {

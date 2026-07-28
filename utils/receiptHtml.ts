@@ -2,6 +2,7 @@ import QRCode from 'qrcode';
 import { Sale } from '@/services/sales';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { PUBLIC_WEB_URL } from '@/constants/config';
+import { saleMethodLabel } from '@/constants/paymentMethods';
 
 function escapeHtml(value: string): string {
   return value
@@ -88,7 +89,7 @@ export async function buildReceiptHtml(
     <tr><td><b>Invoice</b></td><td style="text-align:right">${escapeHtml(sale.invoiceNumber)}</td></tr>
     <tr><td><b>Date</b></td><td style="text-align:right">${formatDateTime(sale.createdAt)}</td></tr>
     <tr><td><b>Served By</b></td><td style="text-align:right">${escapeHtml(sale.staff?.name ?? servedByName ?? '-')}</td></tr>
-    <tr><td><b>Payment</b></td><td style="text-align:right">${sale.paymentMethod.toUpperCase()}</td></tr>
+    <tr><td><b>Payment</b></td><td style="text-align:right">${saleMethodLabel(sale).toUpperCase()}</td></tr>
   </table>
   ${mpesaSection}
   <hr style="border:none;border-top:1px dashed #000;margin:8px 0">

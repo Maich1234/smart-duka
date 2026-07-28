@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
@@ -38,6 +38,7 @@ import { LegalSection } from '@/components/profile/LegalSection';
 import { SmartDukaAiSection } from '@/components/profile/SmartDukaAiSection';
 import { useAiAccess } from '@/hooks/useAiAccess';
 import { usePrinterStore } from '@/store/printerStore';
+import { resolveSaleMethods } from '@/constants/paymentMethods';
 import { openHelp } from '@/utils/openHelp';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
@@ -259,6 +260,14 @@ export default function OwnerProfile() {
         : 'Some access wasn\'t granted — you can allow it from your device Settings.',
     });
   };
+
+  // Names the buttons the till is currently offering, so the owner can see the
+  // setup without opening the screen.
+  const paymentMethodsSummary = useMemo(() => {
+    const active = resolveSaleMethods(shopConfigData?.data?.paymentMethods);
+    if (active.length <= 3) return active.map((m) => m.label).join(' · ');
+    return `${active.slice(0, 2).map((m) => m.label).join(' · ')} + ${active.length - 2} more`;
+  }, [shopConfigData]);
 
   const shiftManagementEnabled = shopConfigData?.data?.shiftManagementEnabled ?? false;
   const handleToggleShiftManagement = async (enabled: boolean) => {
@@ -662,6 +671,26 @@ export default function OwnerProfile() {
                 thumbColor={purchasingEnabled ? Colors.primary : Colors.textTertiary}
               />
             </View>
+
+            <View style={styles.prefDivider} />
+
+            <AnimatedPressable
+              style={styles.prefRow}
+              onPress={() => router.push('/(owner)/payment-methods')}
+              accessibilityRole="button"
+              accessibilityLabel="Choose the payment buttons shown at the till"
+            >
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
+                <Ionicons name="wallet-outline" size={17} color={Colors.primary} />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Payment Methods</Text>
+                <Text style={styles.prefSub}>
+                  {paymentMethodsSummary}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+            </AnimatedPressable>
 
             <View style={styles.prefDivider} />
 

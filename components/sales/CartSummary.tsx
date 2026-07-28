@@ -6,6 +6,11 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { formatCurrency } from '@/utils/formatters';
+import {
+  MPESA_METHOD_KEY,
+  methodIcon,
+  type ShopPaymentMethod,
+} from '@/constants/paymentMethods';
 
 // Strip the +254 prefix so only the 9-digit suffix is shown in the input.
 // The full E.164 value (+254XXXXXXXXX) is stored in the parent state.
@@ -21,10 +26,13 @@ export function isValidKenyanPhone(phone: string): boolean {
 interface CartSummaryProps {
   total: number;
   totalSavings?: number;
-  paymentMethod: 'cash' | 'mpesa';
-  onPaymentMethodChange: (method: 'cash' | 'mpesa') => void;
+  /** The shop's enabled buttons, already ordered. */
+  methods: ShopPaymentMethod[];
+  paymentMethod: string;
+  onPaymentMethodChange: (method: string) => void;
   onCheckout: () => void;
   loading?: boolean;
+  /** True only when the shop has connected M-Pesa Business — enables STK Push. */
   mpesaEnabled?: boolean;
   customerPhone?: string;
   onCustomerPhoneChange?: (phone: string) => void;
@@ -36,9 +44,48 @@ interface CartSummaryProps {
   onManualReceiptCodeChange?: (code: string) => void;
 }
 
+/**
+ * The M-Pesa receipt code from the customer's confirmation SMS.
+ *
+ * Required in the "Already Paid" flow of a connected shop (it's the only proof
+ * the sale has), optional everywhere else — an unconfigured shop must be able
+ * to sell in one tap, so nothing here may block checkout.
+ */
+const ManualMpesaCode: React.FC<{
+  value: string;
+  onChange?: (code: string) => void;
+  hint: string;
+  optional?: boolean;
+}> = ({ value, onChange, hint, optional = false }) => (
+  <>
+    <Text style={styles.phoneLabel}>
+      {optional ? 'M-Pesa Code (optional)' : 'M-Pesa Receipt Code'}
+    </Text>
+    <TextInput
+      style={styles.receiptInput}
+      value={value}
+      onChangeText={(text) => onChange?.(text.toUpperCase())}
+      autoCapitalize="characters"
+      autoCorrect={false}
+      placeholder="e.g. QGJ7ABC123"
+      placeholderTextColor={Colors.textTertiary}
+      returnKeyType="done"
+      maxLength={20}
+      accessibilityLabel="M-Pesa receipt code"
+    />
+    {!optional && value.length > 0 && value.trim().length < 6 && (
+      <Text style={styles.phoneError}>Enter a valid M-Pesa receipt code</Text>
+    )}
+    <View style={styles.alreadyPaidHint}>
+      <Text style={styles.alreadyPaidHintText}>{hint}</Text>
+    </View>
+  </>
+);
+
 export const CartSummary: React.FC<CartSummaryProps> = ({
   total,
   totalSavings = 0,
+  methods,
   paymentMethod,
   onPaymentMethodChange,
   onCheckout,
@@ -52,32 +99,24 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   manualReceiptCode = '',
   onManualReceiptCodeChange,
 }) => {
-  const isMpesa = paymentMethod === 'mpesa';
-  const mpesaReady = isMpesa && mpesaEnabled && isValidKenyanPhone(customerPhone);
-  const manualReady = isMpesa && manualReceiptCode.trim().length >= 6;
+  const isMpesa = paymentMethod === MPESA_METHOD_KEY;
+  // STK Push is only on the table with Daraja credentials saved. Without them
+  // M-Pesa is an ordinary button: the customer paid on a Pochi, a till or a
+  // personal number, and the cashier is recording that.
+  const stkAvailable = isMpesa && mpesaEnabled;
+  const stkSelected = stkAvailable && mpesaMode === 'stk';
+  const mpesaReady = stkSelected && isValidKenyanPhone(customerPhone);
 
   const handleDigitChange = (digits: string) => {
     const clean = digits.replace(/\D/g, '').slice(0, 9);
     onCustomerPhoneChange?.(clean ? `+254${clean}` : '');
   };
 
-  const checkoutLabel = !isMpesa
-    ? 'Complete Sale'
-    : mpesaMode === 'manual'
-      ? 'Record Sale'
-      : 'Send Payment Request';
-
-  const checkoutIcon = !isMpesa
-    ? 'checkmark-circle-outline'
-    : mpesaMode === 'manual'
-      ? 'checkmark-circle-outline'
-      : 'phone-portrait-outline';
-
-  const checkoutDisabled =
-    isMpesa &&
-    (mpesaMode === 'stk'
-      ? !mpesaEnabled || !mpesaReady
-      : !manualReady);
+  const checkoutLabel = stkSelected ? 'Send Payment Request' : 'Complete Sale';
+  const checkoutIcon = stkSelected ? 'phone-portrait-outline' : 'checkmark-circle-outline';
+  // Only the STK path can block checkout, and only because it needs a number to
+  // push to. Every other combination records the sale and prints, like cash.
+  const checkoutDisabled = stkSelected && !mpesaReady;
 
   return (
     <View style={styles.container}>
@@ -89,31 +128,27 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         <Text style={styles.totalAmount}>{formatCurrency(total, currency)}</Text>
       </View>
 
-      {/* Payment method selector */}
+      {/* Payment method selector — the shop's own buttons, in its own order */}
       <View style={styles.paymentRow}>
-        <Button
-          title="Cash"
-          variant={paymentMethod === 'cash' ? 'primary' : 'outline'}
-          onPress={() => onPaymentMethodChange('cash')}
-          size="sm"
-          style={styles.paymentBtn}
-          leftIcon={paymentMethod === 'cash' ? 'checkmark-circle' : undefined}
-          accessibilityLabel="Pay with cash"
-          accessibilityState={{ selected: paymentMethod === 'cash' }}
-        />
-        <Button
-          title="M-Pesa"
-          variant={paymentMethod === 'mpesa' ? 'primary' : 'outline'}
-          onPress={() => onPaymentMethodChange('mpesa')}
-          size="sm"
-          style={styles.paymentBtn}
-          leftIcon={paymentMethod === 'mpesa' ? 'checkmark-circle' : undefined}
-          accessibilityLabel="Pay with M-Pesa"
-          accessibilityState={{ selected: paymentMethod === 'mpesa' }}
-        />
+        {methods.map((method) => {
+          const selected = paymentMethod === method.key;
+          return (
+            <Button
+              key={method.key}
+              title={method.label}
+              variant={selected ? 'primary' : 'outline'}
+              onPress={() => onPaymentMethodChange(method.key)}
+              size="sm"
+              style={styles.paymentBtn}
+              leftIcon={selected ? 'checkmark-circle' : (methodIcon(method) as any)}
+              accessibilityLabel={`Pay with ${method.label}`}
+              accessibilityState={{ selected }}
+            />
+          );
+        })}
       </View>
 
-      {isMpesa && (
+      {stkAvailable && (
         <Animated.View entering={FadeInDown.duration(220).springify()} exiting={FadeOut.duration(150)}>
           {/* Sub-mode: STK Push vs Already Paid */}
           <View style={styles.subModeRow}>
@@ -157,39 +192,28 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
               {customerPhone.length > 0 && !isValidKenyanPhone(customerPhone) && (
                 <Text style={styles.phoneError}>Enter a valid number starting with 7 or 1 (9 digits)</Text>
               )}
-              {!mpesaEnabled && (
-                <View style={styles.mpesaWarning}>
-                  <Text style={styles.mpesaWarningText}>
-                    M-Pesa is not configured for this shop. Contact the owner to connect M-Pesa Business.
-                  </Text>
-                </View>
-              )}
             </>
           ) : (
-            <>
-              {/* Manual receipt code */}
-              <Text style={styles.phoneLabel}>M-Pesa Receipt Code</Text>
-              <TextInput
-                style={styles.receiptInput}
-                value={manualReceiptCode}
-                onChangeText={(text) => onManualReceiptCodeChange?.(text.toUpperCase())}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                placeholder="e.g. QGJ7ABC123"
-                placeholderTextColor={Colors.textTertiary}
-                returnKeyType="done"
-                maxLength={20}
-              />
-              {manualReceiptCode.length > 0 && manualReceiptCode.trim().length < 6 && (
-                <Text style={styles.phoneError}>Enter a valid M-Pesa receipt code</Text>
-              )}
-              <View style={styles.alreadyPaidHint}>
-                <Text style={styles.alreadyPaidHintText}>
-                  Use this when the customer has already paid via M-Pesa directly. Enter the code from their M-Pesa confirmation SMS.
-                </Text>
-              </View>
-            </>
+            <ManualMpesaCode
+              value={manualReceiptCode}
+              onChange={onManualReceiptCodeChange}
+              hint="Use this when the customer has already paid via M-Pesa directly. Enter the code from their M-Pesa confirmation SMS."
+            />
           )}
+        </Animated.View>
+      )}
+
+      {/* M-Pesa without Daraja credentials — a Pochi, a personal number, or a
+          till nobody has connected yet. The sale completes on one tap; the
+          receipt code is there for whoever reconciles later, never required. */}
+      {isMpesa && !mpesaEnabled && (
+        <Animated.View entering={FadeInDown.duration(220).springify()} exiting={FadeOut.duration(150)}>
+          <ManualMpesaCode
+            value={manualReceiptCode}
+            onChange={onManualReceiptCodeChange}
+            optional
+            hint="Optional — helps you match this sale to your M-Pesa statement later."
+          />
         </Animated.View>
       )}
 
@@ -235,10 +259,13 @@ const styles = StyleSheet.create({
   },
   paymentRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
-  paymentBtn: { flex: 1 },
+  // Two buttons split the row as before; a shop with more gets a tidy wrap
+  // instead of six slivers.
+  paymentBtn: { flexGrow: 1, flexBasis: '30%' },
 
   // Sub-mode selector
   subModeRow: {
@@ -328,16 +355,4 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
-  mpesaWarning: {
-    backgroundColor: Colors.warningSubtle,
-    borderRadius: 8,
-    padding: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  mpesaWarningText: {
-    fontSize: 12,
-    color: '#92400E',
-    fontFamily: Typography.fontFamily,
-    lineHeight: 16,
-  },
 });

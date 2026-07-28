@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useFocusEffect, useNavigation } from "expo-router/react-navigation";
@@ -30,6 +30,12 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { usePermission } from '@/utils/permissions';
+import {
+  CASH_METHOD_KEY,
+  MPESA_METHOD_KEY,
+  resolveSaleMethods,
+  saleMethodLabel,
+} from '@/constants/paymentMethods';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCartStore, cartKey } from '@/store/staffCartStore';
 import { isOfflineDbAvailable } from '@/utils/offlineDb';
@@ -69,7 +75,7 @@ export function PosScreen() {
   } = useSearch('pos_products');
 
   const { cart, addItem, removeItem, clearCart, updateItem } = useCartStore();
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<string>(CASH_METHOD_KEY);
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [variantModalVisible, setVariantModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -241,6 +247,21 @@ export function PosScreen() {
   });
   const mpesaEnabled = paymentStatusData?.data?.mpesa?.isConfigured ?? false;
 
+  // The shop's own till buttons. Falls back to Cash + M-PESA for shops that
+  // never opened the setting, so nobody is ever left without a way to sell.
+  const saleMethods = useMemo(
+    () => resolveSaleMethods(shopConfigData?.data?.paymentMethods),
+    [shopConfigData]
+  );
+
+  // If the selected button is removed or switched off mid-session, fall back to
+  // the first one rather than posting a method the shop no longer accepts.
+  useEffect(() => {
+    if (saleMethods.length > 0 && !saleMethods.some((m) => m.key === paymentMethod)) {
+      setPaymentMethod(saleMethods[0].key);
+    }
+  }, [saleMethods, paymentMethod]);
+
   const createSaleMutation = useMutation({
     mutationFn: createSale,
     onSuccess: (data) => {
@@ -312,7 +333,9 @@ export function PosScreen() {
   });
 
   const handleRefund = (sale: Sale) => {
-    if (sale.paymentMethod === 'mpesa') {
+    // Offering "Refund via M-Pesa" without Daraja credentials only leads to a
+    // rejected reversal, so an unconfigured shop is asked the simpler question.
+    if (sale.paymentMethod === MPESA_METHOD_KEY && mpesaEnabled) {
       alert({
         type: 'confirm',
         title: 'Refund This Sale?',
@@ -428,26 +451,10 @@ export function PosScreen() {
       toast({ type: 'warning', message: 'Add at least one product before checking out.' });
       return;
     }
-    if (paymentMethod === 'mpesa') {
-      if (mpesaMode === 'manual') {
-        // Customer already paid — skip STK push, record receipt directly.
-        const code = manualReceiptCode.trim();
-        if (code.length < 6) {
-          toast({ type: 'error', message: 'Enter a valid M-Pesa receipt code.' });
-          return;
-        }
-        createSaleMutation.mutate({
-          items: buildSaleItems(),
-          paymentMethod: 'mpesa',
-          mpesaReceiptNumber: code,
-        });
-        return;
-      }
-      // STK push flow
-      if (!mpesaEnabled) {
-        toast({ type: 'warning', message: 'The shop owner has not connected an M-Pesa Business account yet.' });
-        return;
-      }
+    // STK Push is the one flow with a precondition, and only when the shop has
+    // actually connected M-Pesa Business. Everything else — cash, an
+    // unconfigured M-Pesa, Airtel, a bank transfer — records and prints.
+    if (paymentMethod === MPESA_METHOD_KEY && mpesaEnabled && mpesaMode === 'stk') {
       if (!isValidKenyanPhone(customerPhone)) {
         toast({ type: 'error', message: 'Enter a valid Kenyan number (e.g. +254712345678).' });
         return;
@@ -455,7 +462,22 @@ export function PosScreen() {
       setMpesaModalVisible(true);
       return;
     }
-    createSaleMutation.mutate({ items: buildSaleItems(), paymentMethod });
+
+    // A receipt code is proof of payment in the connected "Already Paid" flow,
+    // so it's required there; elsewhere it's an optional reconciliation aid.
+    const code = manualReceiptCode.trim();
+    if (paymentMethod === MPESA_METHOD_KEY && mpesaEnabled && code.length < 6) {
+      toast({ type: 'error', message: 'Enter a valid M-Pesa receipt code.' });
+      return;
+    }
+
+    createSaleMutation.mutate({
+      items: buildSaleItems(),
+      paymentMethod,
+      ...(paymentMethod === MPESA_METHOD_KEY && code.length >= 6
+        ? { mpesaReceiptNumber: code }
+        : {}),
+    });
   };
 
   const handleMpesaSuccess = (transactionId: string | null, receiptNumber: string | null) => {
@@ -592,10 +614,12 @@ export function PosScreen() {
                 <CartSummary
                   total={totalAmount}
                   totalSavings={totalSavings}
+                  methods={saleMethods}
                   paymentMethod={paymentMethod}
                   onPaymentMethodChange={(m) => {
                     setPaymentMethod(m);
-                    if (m === 'cash') {
+                    // Leaving M-Pesa drops anything only M-Pesa collects.
+                    if (m !== MPESA_METHOD_KEY) {
                       setCustomerPhone('');
                       setMpesaMode('stk');
                       setManualReceiptCode('');

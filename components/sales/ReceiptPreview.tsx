@@ -8,6 +8,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { PUBLIC_WEB_URL } from '@/constants/config';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import { saleMethodLabel } from '@/constants/paymentMethods';
 
 interface ReceiptPreviewProps {
   sale: Sale;
@@ -61,7 +62,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
       <View style={styles.metaRow}>
         <Text style={styles.metaLabel}>Payment</Text>
         <View style={[styles.badge, sale.paymentMethod === 'mpesa' ? styles.badgeMpesa : styles.badgeCash]}>
-          <Text style={styles.badgeText}>{sale.paymentMethod.toUpperCase()}</Text>
+          <Text style={styles.badgeText}>{saleMethodLabel(sale).toUpperCase()}</Text>
         </View>
       </View>
 

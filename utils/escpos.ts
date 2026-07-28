@@ -1,5 +1,6 @@
 import { Sale } from '@/services/sales';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import { saleMethodLabel } from '@/constants/paymentMethods';
 
 /** Physical paper roll width. 58mm is the near-universal duka printer. */
 export type PaperWidth = 58 | 80;
@@ -202,7 +203,7 @@ export function buildReceiptEscPos(sale: Sale, options: EscPosReceiptOptions): U
   doc.columns('Invoice', sale.invoiceNumber);
   doc.columns('Date', formatDateTime(sale.createdAt));
   doc.columns('Served By', sale.staff?.name ?? servedByName ?? '-');
-  doc.columns('Payment', sale.paymentMethod.toUpperCase());
+  doc.columns('Payment', saleMethodLabel(sale).toUpperCase());
 
   if (sale.paymentMethod === 'mpesa' && sale.mpesaReceiptNumber) {
     doc.divider();
