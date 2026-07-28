@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { MoneyOutMethod } from '@/constants/paymentMethods';
 import type { Product } from '@/services/products';
 
 // Mirrors store/staffCartStore.ts's CartEntry/cartKey pattern — the whole
@@ -32,7 +33,10 @@ interface PurchaseCartStore {
   supplier: SupplierSelection | null;
   items: PurchaseCartEntry[];
   additionalCosts: PurchaseCostDraft[];
+  /** How the supplier was paid. Purchase-level, like `supplier`. */
+  paymentMethod: MoneyOutMethod;
   setSupplier: (s: SupplierSelection | null) => void;
+  setPaymentMethod: (m: MoneyOutMethod) => void;
   addItem: (item: PurchaseCartEntry) => void;
   updateItem: (key: string, updates: Partial<PurchaseCartEntry>) => void;
   removeItem: (key: string) => void;
@@ -46,7 +50,9 @@ export const usePurchaseCartStore = create<PurchaseCartStore>((set) => ({
   supplier: null,
   items: [],
   additionalCosts: [],
+  paymentMethod: 'cash',
   setSupplier: (s) => set({ supplier: s }),
+  setPaymentMethod: (m) => set({ paymentMethod: m }),
   addItem: (item) => set((s) => ({ items: [...s.items, item] })),
   removeItem: (key) => set((s) => ({ items: s.items.filter((i) => purchaseCartKey(i) !== key) })),
   updateItem: (key, updates) =>
@@ -59,5 +65,5 @@ export const usePurchaseCartStore = create<PurchaseCartStore>((set) => ({
     set((s) => ({
       additionalCosts: s.additionalCosts.map((c) => (c.key === key ? { ...c, ...updates } : c)),
     })),
-  clear: () => set({ supplier: null, items: [], additionalCosts: [] }),
+  clear: () => set({ supplier: null, items: [], additionalCosts: [], paymentMethod: 'cash' }),
 }));

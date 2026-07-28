@@ -7,6 +7,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListRow } from '@/components/ui/ListRow';
+import { MONEY_OUT_METHOD_LABELS } from '@/constants/paymentMethods';
 import { Button } from '@/components/ui/Button';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
@@ -212,7 +213,15 @@ export const ExpensesScreen: React.FC = () => {
         renderItem={({ item, index }) => (
           <ListRow
             title={item.category.charAt(0).toUpperCase() + item.category.slice(1)}
-            subtitle={`${item.description ? `${item.description} · ` : ''}${formatDate(item.date)}`}
+            subtitle={[
+              item.description,
+              formatDate(item.date),
+              // Cash is the overwhelming default and the value every pre-field
+              // record carries — only worth the pixels when it's something else.
+              item.paymentMethod && item.paymentMethod !== 'cash'
+                ? MONEY_OUT_METHOD_LABELS[item.paymentMethod]
+                : null,
+            ].filter(Boolean).join(' · ')}
             icon={CATEGORY_ICONS[item.category]}
             isLast={index === expenses.length - 1}
             onPress={() => openEdit(item)}

@@ -11,6 +11,8 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { formatDate } from '@/utils/formatters';
+import { PaymentMethodSelector } from '../ui/PaymentMethodSelector';
+import type { MoneyOutMethod } from '@/constants/paymentMethods';
 import type { CreateExpenseData, Expense, ExpenseCategory } from '@/services/expenses';
 
 interface ExpenseFormSheetProps {
@@ -41,6 +43,7 @@ export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
   const [category, setCategory] = useState<ExpenseCategory>('other');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<MoneyOutMethod>('cash');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -49,13 +52,22 @@ export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
     setCategory(expense?.category || 'other');
     setAmount(expense ? String(expense.amount) : '');
     setDescription(expense?.description || '');
+    // Expenses recorded before this field existed have no method — cash is the
+    // value the server defaulted them to.
+    setPaymentMethod(expense?.paymentMethod || 'cash');
     setDate(expense ? new Date(expense.date) : new Date());
   }, [visible, expense]);
 
   const handleSave = () => {
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
-    onSave({ category, amount: parsedAmount, description: description.trim() || undefined, date: date.toISOString() });
+    onSave({
+      category,
+      amount: parsedAmount,
+      description: description.trim() || undefined,
+      paymentMethod,
+      date: date.toISOString(),
+    });
   };
 
   return (
@@ -81,6 +93,8 @@ export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
 
       <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="0.00" />
       <Input label="Description (optional)" value={description} onChangeText={setDescription} placeholder="What was this for?" />
+
+      <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
 
       <Text style={styles.sectionLabel}>Date</Text>
       <AnimatedPressable style={styles.dateRow} onPress={() => setShowDatePicker(true)}>

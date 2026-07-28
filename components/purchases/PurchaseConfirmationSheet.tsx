@@ -8,6 +8,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import { MONEY_OUT_METHOD_LABELS, type MoneyOutMethod } from '@/constants/paymentMethods';
 
 interface PurchaseConfirmationSheetProps {
   visible: boolean;
@@ -18,6 +19,7 @@ interface PurchaseConfirmationSheetProps {
   productCount: number;
   totalQuantity: number;
   grandTotal: number;
+  paymentMethod: MoneyOutMethod;
   staffName: string;
   date: Date;
 }
@@ -45,6 +47,7 @@ export const PurchaseConfirmationSheet: React.FC<PurchaseConfirmationSheetProps>
   productCount,
   totalQuantity,
   grandTotal,
+  paymentMethod,
   staffName,
   date,
 }) => {
@@ -57,6 +60,13 @@ export const PurchaseConfirmationSheet: React.FC<PurchaseConfirmationSheetProps>
         <SummaryRow icon="cube-outline" label="Products" value={`${productCount} product${productCount === 1 ? '' : 's'}`} />
         <SummaryRow icon="layers-outline" label="Total Quantity" value={String(totalQuantity)} />
         <SummaryRow icon="cash-outline" label="Total Cost" value={formatCurrency(grandTotal)} />
+        <SummaryRow
+          icon={paymentMethod === 'credit' ? 'time-outline' : 'wallet-outline'}
+          label="Paid with"
+          value={paymentMethod === 'credit'
+            ? 'On credit — not paid yet'
+            : MONEY_OUT_METHOD_LABELS[paymentMethod]}
+        />
         <SummaryRow icon="trending-up-outline" label="Inventory Impact" value={`+${totalQuantity} unit${totalQuantity === 1 ? '' : 's'}`} />
         <SummaryRow icon="person-outline" label="Staff" value={staffName} />
         <SummaryRow icon="calendar-outline" label="Date" value={formatDateTime(date)} />

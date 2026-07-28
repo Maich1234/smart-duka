@@ -26,6 +26,7 @@ import { AdditionalCostsCard } from '@/components/purchases/AdditionalCostsCard'
 import { PurchaseSummaryBar } from '@/components/purchases/PurchaseSummaryBar';
 import { SupplierPickerSheet } from '@/components/purchases/SupplierPickerSheet';
 import { PurchaseConfirmationSheet } from '@/components/purchases/PurchaseConfirmationSheet';
+import { PaymentMethodSelector } from '@/components/ui/PaymentMethodSelector';
 import { isOfflineQueued } from '@/utils/errors';
 import { randomUUID } from '@/utils/uuid';
 import { Colors } from '@/constants/Colors';
@@ -46,8 +47,8 @@ export function NewPurchaseScreen() {
   const navigation = useNavigation();
 
   const {
-    supplier, items, additionalCosts,
-    setSupplier, addItem, updateItem, removeItem,
+    supplier, items, additionalCosts, paymentMethod,
+    setSupplier, setPaymentMethod, addItem, updateItem, removeItem,
     addCost, updateCost, removeCost, clear,
   } = usePurchaseCartStore();
 
@@ -217,6 +218,7 @@ export function NewPurchaseScreen() {
       amount: c.amount,
       ...(c.notes ? { notes: c.notes } : {}),
     })),
+    paymentMethod,
   });
 
   const handleConfirmSave = () => {
@@ -300,6 +302,16 @@ export function NewPurchaseScreen() {
             )}
 
             {items.length > 0 && (
+              <View style={styles.paymentMethodCard}>
+                <PaymentMethodSelector
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                  label="How did you pay?"
+                />
+              </View>
+            )}
+
+            {items.length > 0 && (
               <PurchaseSummaryBar
                 productsTotal={productsTotal}
                 additionalCostsTotal={additionalCostsTotal}
@@ -368,6 +380,7 @@ export function NewPurchaseScreen() {
         productCount={items.length}
         totalQuantity={totalQuantity}
         grandTotal={grandTotal}
+        paymentMethod={paymentMethod}
         staffName={userName}
         date={new Date()}
       />
@@ -412,6 +425,16 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, marginBottom: Spacing.sm, color: Colors.textPrimary },
 
   paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingVertical: Spacing.md, marginHorizontal: Spacing.lg },
+  paymentMethodCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
   paginationBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   paginationBtnDisabled: { borderColor: Colors.border },
   paginationLabel: { fontSize: 13, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary },

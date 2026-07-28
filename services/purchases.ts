@@ -1,4 +1,5 @@
 import api from './api';
+import type { MoneyOutMethod } from '@/constants/paymentMethods';
 
 export type PurchaseCostCategory =
   | 'transport' | 'delivery' | 'fuel' | 'loading' | 'offloading'
@@ -43,6 +44,8 @@ export interface Purchase {
   productsTotal?: number;
   additionalCostsTotal?: number;
   grandTotal?: number;
+  /** Absent on purchases recorded before the field existed — treat as 'cash'. */
+  paymentMethod?: MoneyOutMethod;
   allocationMethod: PurchaseAllocationMethod;
   status: PurchaseStatus;
   inventoryUpdated: boolean;
@@ -76,6 +79,7 @@ export interface CreatePurchaseData {
   supplierName?: string;
   items: CreatePurchaseItemData[];
   additionalCosts?: CreatePurchaseCostData[];
+  paymentMethod?: MoneyOutMethod;
   purchaseDate?: string;
 }
 
@@ -84,6 +88,7 @@ export interface UpdatePurchaseData {
   supplierName?: string;
   items?: CreatePurchaseItemData[];
   additionalCosts?: CreatePurchaseCostData[];
+  paymentMethod?: MoneyOutMethod;
   purchaseDate?: string;
 }
 

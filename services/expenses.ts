@@ -1,4 +1,5 @@
 import api from './api';
+import type { MoneyOutMethod } from '@/constants/paymentMethods';
 
 export type ExpenseCategory = 'rent' | 'utilities' | 'supplies' | 'transport' | 'salaries' | 'marketing' | 'other';
 
@@ -8,6 +9,7 @@ export interface Expense {
   category: ExpenseCategory;
   amount: number;
   description?: string;
+  paymentMethod?: MoneyOutMethod;
   date: string;
   recordedBy: string;
   createdAt: string;
@@ -45,6 +47,7 @@ export interface CreateExpenseData {
   category: ExpenseCategory;
   amount: number;
   description?: string;
+  paymentMethod?: MoneyOutMethod;
   date?: string;
 }
 
