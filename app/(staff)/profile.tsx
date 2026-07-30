@@ -19,7 +19,22 @@ export default function StaffProfile() {
   const { user, logout } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
   const [updatingPassword, setUpdatingPassword] = useState(false);
-  const { toast } = useAlert();
+  const { toast, alert } = useAlert();
+
+  // Signing out mid-shift loses an in-progress sale and, with one-device
+  // sessions, means asking the owner for help if the password isn't to hand —
+  // too costly to trigger from a mistap right under the legal links.
+  const handleLogout = () => {
+    alert({
+      type: 'confirm',
+      title: 'Sign out?',
+      message: 'You\'ll need to sign back in to keep selling.',
+      buttons: [
+        { label: 'Cancel', variant: 'ghost' },
+        { label: 'Sign out', variant: 'danger', onPress: logout },
+      ],
+    });
+  };
 
   const handlePasswordChange = async (current: string, newPwd: string) => {
     setUpdatingPassword(true);
@@ -50,7 +65,7 @@ export default function StaffProfile() {
         <PrinterSection href="/(staff)/printer" />
         <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
         <LegalSection />
-        <Button title="Logout" onPress={logout} variant="danger" style={styles.logoutButton} />
+        <Button title="Logout" onPress={handleLogout} variant="danger" style={styles.logoutButton} />
         <DeleteAccountSection />
       </ScrollView>
     </KeyboardAvoidingView>

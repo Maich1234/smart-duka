@@ -1,26 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { getProductById, getProducts, updateProduct, type UpdateProductData } from '@/services/products';
+import { getProductById, getProducts, updateProduct, type Product, type UpdateProductData } from '@/services/products';
 import { getShopConfig } from '@/services/shop';
 import { Screen } from '@/components/ui/Screen';
 import { ProductForm, type ProductFormData } from '@/components/inventory/ProductForm';
 
-const EMPTY_FORM: ProductFormData = {
-  name: '', category: '', sellingPrice: '', costPrice: '', quantity: '', lowStockAlert: '5',
-  productType: 'standard', unitOfMeasure: 'unit', trackInventory: true,
-  minPrice: '', maxPrice: '', allowPriceOverride: false, bundleItems: [], variants: [],
-  hasPromotions: false, promotions: [],
-};
+/** The saved product rendered into the shape ProductForm edits. */
+const toFormData = (product: Product): ProductFormData => ({
+  name: product.name,
+  category: product.category,
+  sellingPrice: String(product.sellingPrice),
+  costPrice: String(product.costPrice ?? ''),
+  quantity: String(product.quantity),
+  lowStockAlert: String(product.lowStockAlert),
+  productType: product.productType || 'standard',
+  unitOfMeasure: product.unitOfMeasure || 'unit',
+  trackInventory: product.trackInventory ?? true,
+  minPrice: product.minPrice != null ? String(product.minPrice) : '',
+  maxPrice: product.maxPrice != null ? String(product.maxPrice) : '',
+  allowPriceOverride: product.allowPriceOverride ?? false,
+  bundleItems: (product.bundleItems || []).map((b) => ({ product: b.product, quantity: String(b.quantity) })),
+  variants: (product.variants || []).map((v) => ({
+    name: v.name,
+    sellingPrice: String(v.sellingPrice),
+    costPrice: String(v.costPrice ?? ''),
+    quantity: String(v.quantity),
+    lowStockAlert: String(v.lowStockAlert),
+    commissionEnabled: v.commission?.enabled ?? false,
+    commissionBasePrice: v.commission?.basePrice != null ? String(v.commission.basePrice) : '',
+    commissionEmployeeSharePercent: String(v.commission?.employeeSharePercent ?? 100),
+  })),
+  hasPromotions: (product.promotions?.length || 0) > 0,
+  promotions: (product.promotions || []).map((p) => ({
+    label: p.label || '',
+    buyQty: String(p.buyQty),
+    freeQty: String(p.freeQty),
+    isActive: p.isActive ?? true,
+  })),
+});
 
+/**
+ * Waits for the product, then hands it to the editor below.
+ *
+ * The split is what removes the old seed-from-an-effect step: the form is
+ * initialised from real data on its very first render instead of mounting
+ * blank and being filled in afterwards, and `key` guarantees a different
+ * product gets a fresh form rather than the previous one's edits.
+ */
 export default function EditProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState<ProductFormData>(EMPTY_FORM);
-  const [seeded, setSeeded] = useState(false);
-  const { toast } = useAlert();
 
   const { data: productData, isLoading } = useQuery({
     queryKey: ['product', id],
@@ -28,43 +59,18 @@ export default function EditProductScreen() {
   });
   const product = productData?.data;
 
-  useEffect(() => {
-    if (product && !seeded) {
-      setForm({
-        name: product.name,
-        category: product.category,
-        sellingPrice: String(product.sellingPrice),
-        costPrice: String(product.costPrice ?? ''),
-        quantity: String(product.quantity),
-        lowStockAlert: String(product.lowStockAlert),
-        productType: product.productType || 'standard',
-        unitOfMeasure: product.unitOfMeasure || 'unit',
-        trackInventory: product.trackInventory ?? true,
-        minPrice: product.minPrice != null ? String(product.minPrice) : '',
-        maxPrice: product.maxPrice != null ? String(product.maxPrice) : '',
-        allowPriceOverride: product.allowPriceOverride ?? false,
-        bundleItems: (product.bundleItems || []).map((b) => ({ product: b.product, quantity: String(b.quantity) })),
-        variants: (product.variants || []).map((v) => ({
-          name: v.name,
-          sellingPrice: String(v.sellingPrice),
-          costPrice: String(v.costPrice ?? ''),
-          quantity: String(v.quantity),
-          lowStockAlert: String(v.lowStockAlert),
-          commissionEnabled: v.commission?.enabled ?? false,
-          commissionBasePrice: v.commission?.basePrice != null ? String(v.commission.basePrice) : '',
-          commissionEmployeeSharePercent: String(v.commission?.employeeSharePercent ?? 100),
-        })),
-        hasPromotions: (product.promotions?.length || 0) > 0,
-        promotions: (product.promotions || []).map((p) => ({
-          label: p.label || '',
-          buyQty: String(p.buyQty),
-          freeQty: String(p.freeQty),
-          isActive: p.isActive ?? true,
-        })),
-      });
-      setSeeded(true);
-    }
-  }, [product, seeded]);
+  if (isLoading || !product) {
+    return <LoadingState />;
+  }
+
+  return <EditProductForm key={product._id} id={id} product={product} />;
+}
+
+function EditProductForm({ id, product }: { id: string; product: Product }) {
+  const queryClient = useQueryClient();
+  const { toast } = useAlert();
+  // Lazy initialiser: computed once on mount, never re-derived from props.
+  const [form, setForm] = useState<ProductFormData>(() => toFormData(product));
 
   const { data: productsData } = useQuery({
     queryKey: ['products', ''],
@@ -146,12 +152,9 @@ export default function EditProductScreen() {
     updateMutation.mutate(payload);
   };
 
-  if (isLoading || !seeded) {
-    return <LoadingState />;
-  }
-
+  // Bottom edge omitted — see the note in inventory/new.tsx.
   return (
-    <Screen scroll={false} padded={false}>
+    <Screen scroll={false} padded={false} edges={['top', 'left', 'right']}>
       <ProductForm
         form={form}
         setForm={setForm}

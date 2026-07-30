@@ -8,10 +8,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getStaffById, getStaffCommission, deleteStaff, resetStaffPassword, getAllPermissions, type Permission } from '@/services/staff';
+import { useStaffDeletionRequests } from '@/hooks/useStaffDeletionRequests';
 import { getShopConfig } from '@/services/shop';
-import { Button } from '@/components/ui/Button';
 import { ResetPasswordModal } from '@/components/staff/ResetPasswordModal';
-import { deriveRole } from '@/components/staff/StaffCard';
+import { StaffDeletionRequestCard } from '@/components/staff/StaffDeletionRequestCard';
 import { CommissionCard, getCommissionPeriodRange, type CommissionPeriod } from '@/components/sales/CommissionCard';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -67,6 +67,12 @@ export default function StaffDetailsScreen() {
     queryKey: ['permissions'],
     queryFn: getAllPermissions,
   });
+
+  // Shares its cache with the staff list's banner, so opening a request from
+  // there costs nothing — and it carries the server's own grace/approval
+  // windows, which the card must not hardcode.
+  const { data: deletionRequestData } = useStaffDeletionRequests();
+  const pendingClosure = deletionRequestData?.data.find((r) => r._id === id);
 
   const { data: shopData } = useQuery({ queryKey: ['shop'], queryFn: getShopConfig });
   const currency = shopData?.data?.currency ?? 'KES';
@@ -142,6 +148,34 @@ export default function StaffDetailsScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Account-closure request — the owner's decision, so it sits above
+          everything else on the profile. */}
+      {staff.deletionRequestedAt && !staff.deletionScheduledAt && (
+        <View style={styles.closureSection}>
+          <StaffDeletionRequestCard
+            staffId={id}
+            staffName={staff.name}
+            requestedAt={staff.deletionRequestedAt}
+            autoApprovesAt={pendingClosure?.autoApprovesAt}
+            graceDays={deletionRequestData?.meta?.graceDays}
+            /* The card already invalidates the ['staff'] prefix, which covers
+               this screen's own ['staff', id] query. */
+          />
+        </View>
+      )}
+
+      {staff.deletionScheduledAt && (
+        <View style={styles.closureSection}>
+          <View style={styles.closureNote}>
+            <Ionicons name="alert-circle-outline" size={18} color={Colors.danger} />
+            <Text style={styles.closureNoteText}>
+              Closure approved — this account closes on {formatDate(staff.deletionScheduledAt)}.{' '}
+              {staff.name} can still cancel before then.
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Actions */}
       <View style={styles.actionsRow}>
@@ -274,6 +308,22 @@ const styles = StyleSheet.create({
   statusTextActive: { color: Colors.success },
   statusTextInactive: { color: Colors.danger },
 
+  closureSection: { marginBottom: Spacing.lg },
+  closureNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: Colors.dangerSubtle,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+  },
+  closureNoteText: {
+    flex: 1,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.danger,
+    lineHeight: 20,
+  },
   actionsRow: {
     flexDirection: 'row',
     gap: Spacing.sm,

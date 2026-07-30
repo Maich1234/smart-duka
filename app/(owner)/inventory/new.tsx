@@ -105,8 +105,10 @@ export default function NewProductScreen() {
     createMutation.mutate(payload);
   };
 
+  // No bottom safe-area edge: the tab bar is absolutely positioned over that
+  // strip, and ProductForm pads its scroll content past it instead.
   return (
-    <Screen scroll={false} padded={false}>
+    <Screen scroll={false} padded={false} edges={['top', 'left', 'right']}>
       <ProductForm
         form={form}
         setForm={setForm}

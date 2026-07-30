@@ -1,12 +1,3 @@
-import React from 'react';
-import { ComingSoonScreen } from '@/components/purchases/ComingSoonScreen';
+import { PurchaseDetailsScreen } from '@/components/purchases/PurchaseDetailsScreen';
 
-export default function PurchaseDetails() {
-  return (
-    <ComingSoonScreen
-      icon="receipt-outline"
-      title="Purchase Details"
-      subtitle="The full breakdown of this purchase will show up here soon."
-    />
-  );
-}
+export default PurchaseDetailsScreen;

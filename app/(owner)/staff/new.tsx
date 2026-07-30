@@ -32,7 +32,9 @@ export default function NewStaffScreen() {
 
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
   const [emailMode, setEmailMode] = useState<EmailMode>('real');
-  const [localPart, setLocalPart] = useState('');
+  // Only what the owner actually typed is state. The suggestion is derived from
+  // the name below, so there's nothing to synchronise in an effect.
+  const [typedLocalPart, setTypedLocalPart] = useState('');
   const [localPartTouched, setLocalPartTouched] = useState(false);
   const [availability, setAvailability] = useState<Availability>('idle');
   const { toast } = useAlert();
@@ -46,17 +48,18 @@ export default function NewStaffScreen() {
     retry: false,
   });
 
+  // Seeds the shared draft store on mount and clears it on the way out. The
+  // deps are zustand actions, created once by the store, so declaring them
+  // honestly keeps this mount-only without silencing the lint rule.
   useEffect(() => {
     setPermissions(DEFAULT_STAFF_PERMISSIONS);
     return () => reset();
-  }, []);
+  }, [setPermissions, reset]);
 
-  // Suggest a local part from the name until the owner edits it directly.
-  useEffect(() => {
-    if (emailMode === 'system' && !localPartTouched) {
-      setLocalPart(slugifyLocalPart(form.name));
-    }
-  }, [form.name, emailMode, localPartTouched]);
+  // Suggested from the name until the owner edits it directly. Derived rather
+  // than mirrored into state via an effect: the effect version re-rendered on
+  // every keystroke of the name field just to catch its own state up.
+  const localPart = localPartTouched ? typedLocalPart : slugifyLocalPart(form.name);
 
   const systemEmail = `${localPart}@${domain}`;
   const successMessage = emailMode === 'system'
@@ -167,7 +170,7 @@ export default function NewStaffScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
-              <Text style={styles.hint}>We'll email a verification code to this address before they can sign in.</Text>
+              <Text style={styles.hint}>We&apos;ll email a verification code to this address before they can sign in.</Text>
             </>
           ) : (
             <>
@@ -178,7 +181,7 @@ export default function NewStaffScreen() {
                   value={localPart}
                   onChangeText={(t) => {
                     setLocalPartTouched(true);
-                    setLocalPart(t.toLowerCase().replace(/[^a-z0-9.]/g, ''));
+                    setTypedLocalPart(t.toLowerCase().replace(/[^a-z0-9.]/g, ''));
                     setAvailability('idle');
                   }}
                   onBlur={checkAvailability}

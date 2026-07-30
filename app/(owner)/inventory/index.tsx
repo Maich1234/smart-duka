@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
@@ -91,10 +91,13 @@ export default function OwnerInventory() {
   });
   const depletion = depletionData?.data;
 
-  const [page, setPage] = useState(1);
-
-  // Reset to page 1 when search changes
-  useEffect(() => { setPage(1); }, [searchQuery]);
+  // Page is stored with the term it belongs to, so a new search derives page 1
+  // rather than setting it from an effect — the effect version rendered (and
+  // fetched) page N of the new term once before correcting itself.
+  const [paging, setPaging] = useState({ term: searchQuery, page: 1 });
+  const page = paging.term === searchQuery ? paging.page : 1;
+  const setPage = (next: number | ((current: number) => number)) =>
+    setPaging({ term: searchQuery, page: typeof next === 'function' ? next(page) : next });
 
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['products', searchQuery, page],

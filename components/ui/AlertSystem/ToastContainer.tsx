@@ -89,24 +89,45 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
   const scale = useSharedValue(0.92);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const remove = useCallback(() => {
-    onRemove(toast.id);
-  }, [toast.id, onRemove]);
+  // These are deliberately plain functions rather than useCallback. They mutate
+  // Reanimated shared values, and the React Compiler's immutability rule treats
+  // anything captured by a memoised callback as frozen — mutation-by-design is
+  // exactly what a shared value is for. Nothing here is passed to a memoised
+  // child or used as a hook dependency, so the memoisation bought nothing.
+  const remove = () => onRemove(toast.id);
 
-  const clearTimer = useCallback(() => {
+  const clearTimer = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
+  };
 
-  const scheduleAutoDismiss = useCallback(() => {
+  const animateOut = () => {
     clearTimer();
-    const duration = toast.duration ?? DEFAULT_DURATION;
-    timerRef.current = setTimeout(() => {
-      animateOut();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, duration);
-  }, [toast.duration, clearTimer]);
+    opacity.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.ease) });
+    scale.value = withTiming(0.96, { duration: 200 });
+    translateY.value = withTiming(-40, { duration: 200 }, (finished) => {
+      if (finished) runOnJS(remove)();
+    });
+  };
 
-  // Animate in on mount
+  // Declared after animateOut so the timer references a defined value rather
+  // than relying on the call being deferred past the temporal dead zone.
+  const scheduleAutoDismiss = () => {
+    clearTimer();
+    timerRef.current = setTimeout(animateOut, toast.duration ?? DEFAULT_DURATION);
+  };
+
+  const swipeOut = (direction: 1 | -1) => {
+    clearTimer();
+    const screenWidth = Dimensions.get('window').width;
+    opacity.value = withTiming(0, { duration: 180 });
+    translateX.value = withTiming(direction * screenWidth, { duration: 220 }, (finished) => {
+      if (finished) runOnJS(remove)();
+    });
+  };
+
+  // Mount-only by design: the entrance animation, its haptic and the dismiss
+  // timer all belong to this toast appearing exactly once. The helpers above
+  // are recreated each render, so declaring them would re-run the entrance.
   React.useLayoutEffect(() => {
     translateY.value = withSpring(0, { damping: 20, stiffness: 280, mass: 0.7 });
     opacity.value = withTiming(1, { duration: 200 });
@@ -121,35 +142,26 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
     scheduleAutoDismiss();
 
     return clearTimer;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const animateOut = useCallback(() => {
-    clearTimer();
-    opacity.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.ease) });
-    scale.value = withTiming(0.96, { duration: 200 });
-    translateY.value = withTiming(-40, { duration: 200 }, (finished) => {
-      if (finished) runOnJS(remove)();
-    });
-  }, [remove, clearTimer]);
-
-  const swipeOut = useCallback((direction: 1 | -1) => {
-    clearTimer();
-    const screenWidth = Dimensions.get('window').width;
-    opacity.value = withTiming(0, { duration: 180 });
-    translateX.value = withTiming(direction * screenWidth, { duration: 220 }, (finished) => {
-      if (finished) runOnJS(remove)();
-    });
-  }, [remove, clearTimer]);
-
+  // react-hooks/refs can't see across the runOnJS boundary: it flags handing it
+  // a function that touches timerRef as "may read a ref during render", but
+  // runOnJS *schedules* the call onto the JS thread when the gesture fires —
+  // the ref is never touched while rendering. Wrapping the gesture in useMemo
+  // was tried and is strictly worse (it adds an immutability error on the
+  // shared-value writes below). Scoped to the two handlers that hand off.
   const panGesture = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .failOffsetY([-14, 14])
+    // eslint-disable-next-line react-hooks/refs
     .onStart(() => {
       runOnJS(clearTimer)();
     })
     .onUpdate((event) => {
       translateX.value = event.translationX;
     })
+    // eslint-disable-next-line react-hooks/refs
     .onEnd((event) => {
       const shouldDismiss =
         Math.abs(event.translationX) > SWIPE_DISMISS_DISTANCE ||

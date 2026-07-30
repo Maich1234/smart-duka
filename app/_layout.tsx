@@ -191,7 +191,10 @@ function SessionExpiredHandler() {
     return () => {
       cancelled = true;
     };
-  }, [sessionExpiredReason]);
+    // All three deps are stable — toast and AuthContext's logout are
+    // useCallback'd, clearSessionExpired is a zustand action — so declaring
+    // them keeps this firing only on an actual session-expiry transition.
+  }, [sessionExpiredReason, clearSessionExpired, storeLogout, toast]);
 
   return null;
 }
@@ -260,6 +263,12 @@ const routeForNotification = (data?: Record<string, string>) => {
       } as const;
     case 'depletion_alert':
       return '/(owner)/inventory' as const;
+    // The approve/decline controls live on the staff member's profile, so a
+    // closure request has to land there rather than on the inbox.
+    case 'staff_deletion_request':
+      return data.staffId
+        ? (`/(owner)/staff/${data.staffId}` as const)
+        : ('/(owner)/staff' as const);
     default:
       return notificationsRouteForRole();
   }

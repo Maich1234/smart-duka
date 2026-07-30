@@ -146,7 +146,7 @@ export default function VerifyEmailScreen() {
 
         {/* Resend row */}
         <View style={styles.resendRow}>
-          <Text style={styles.resendPrompt}>Didn't get the code?</Text>
+          <Text style={styles.resendPrompt}>Didn&apos;t get the code?</Text>
           {canResend ? (
             <AnimatedPressable
               onPress={handleResend}
@@ -168,7 +168,7 @@ export default function VerifyEmailScreen() {
         <View style={styles.hint}>
           <Ionicons name="information-circle-outline" size={14} color={Colors.textTertiary} />
           <Text style={styles.hintText}>
-            Check your spam folder if you don't see the email.
+            Check your spam folder if you don&apos;t see the email.
           </Text>
         </View>
       </View>

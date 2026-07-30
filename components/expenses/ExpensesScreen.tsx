@@ -243,7 +243,7 @@ export const ExpensesScreen: React.FC = () => {
               <Ionicons name="search-outline" size={36} color={Colors.textTertiary} />
               <Text style={styles.emptySearchTitle}>No expenses found</Text>
               <Text style={styles.emptySearchSub}>
-                No results for "{searchValue}". Try a different term or{' '}
+                No results for &quot;{searchValue}&quot;. Try a different term or{' '}
               </Text>
               <AnimatedPressable onPress={clearSearch}>
                 <Text style={styles.emptySearchLink}>clear search</Text>

@@ -1,12 +1,3 @@
-import React from 'react';
-import { ComingSoonScreen } from '@/components/purchases/ComingSoonScreen';
+import { PurchaseReportsScreen } from '@/components/purchases/PurchaseReportsScreen';
 
-export default function PurchaseReports() {
-  return (
-    <ComingSoonScreen
-      icon="bar-chart-outline"
-      title="Purchase Reports"
-      subtitle="Procurement analytics and cost breakdowns are coming soon."
-    />
-  );
-}
+export default PurchaseReportsScreen;

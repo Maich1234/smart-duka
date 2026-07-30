@@ -28,8 +28,13 @@ import { BorderRadius } from '@/constants/BorderRadius';
  * argument. Play's requirement is satisfied by an initiated deletion with a
  * stated completion date; a recovery window is expressly permitted.
  *
+ * Staff take one extra step: the request goes to the shop owner first
+ * (`requiresOwnerApproval`), because a cashier's account carries the shop's
+ * books rather than personal property. Three states, not two — nothing filed,
+ * waiting on the owner, or approved and counting down.
+ *
  * Getting *in* is deliberately effortful (password + typed DELETE); getting
- * back out is deliberately trivial.
+ * back out is deliberately trivial, at every one of those states.
  */
 export const DeleteAccountSection: React.FC = () => {
   const { toast } = useAlert();
@@ -47,6 +52,8 @@ export const DeleteAccountSection: React.FC = () => {
   });
 
   const scheduledAt = preview?.deletionScheduledAt ?? null;
+  const awaitingApproval = preview?.awaitingOwnerApproval ?? false;
+  const requiresApproval = preview?.requiresOwnerApproval ?? false;
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteAccount(password),
@@ -107,6 +114,33 @@ export const DeleteAccountSection: React.FC = () => {
     );
   }
 
+  // ── Filed, waiting on the owner ─────────────────────────────────────────
+  // Deliberately not styled as danger: nothing has happened to the account,
+  // and it may never — the owner can decline.
+  if (awaitingApproval) {
+    return (
+      <View style={styles.awaitingCard}>
+        <View style={styles.pendingHeader}>
+          <Ionicons name="hourglass-outline" size={18} color={Colors.warning} />
+          <Text style={styles.awaitingTitle}>Waiting for your shop owner</Text>
+        </View>
+        <Text style={styles.pendingBody}>
+          You asked to close your account
+          {preview?.deletionRequestedAt ? ` on ${formatDate(preview.deletionRequestedAt)}` : ''}. Your
+          shop owner has to approve it first. Nothing changes until they do, and you can still use the
+          app normally.
+        </Text>
+        <Button
+          title="Withdraw my request"
+          variant="outline"
+          onPress={() => cancelMutation.mutate()}
+          loading={cancelMutation.isPending}
+          style={styles.keepBtn}
+        />
+      </View>
+    );
+  }
+
   return (
     <>
       <AnimatedPressable
@@ -122,16 +156,36 @@ export const DeleteAccountSection: React.FC = () => {
 
       <BottomSheet visible={open} onClose={close}>
         <View style={styles.sheet}>
-          <Text style={styles.title}>Delete your account?</Text>
+          <Text style={styles.title}>
+            {requiresApproval ? 'Request account closure?' : 'Delete your account?'}
+          </Text>
 
           {isLoading ? (
             <ActivityIndicator color={Colors.primary} style={styles.loading} />
           ) : (
             <>
-              <Text style={styles.body}>
-                Your account will stay open for {preview?.graceDays ?? 14} more days. Nothing is deleted
-                until then, and you can cancel any time. After that it&apos;s permanent.
-              </Text>
+              {requiresApproval ? (
+                <Text style={styles.body}>
+                  Your shop owner has to approve this first. Once they do, your account stays open for
+                  another {preview?.graceDays ?? 14} days and you can still cancel. After that it&apos;s
+                  permanent.
+                </Text>
+              ) : (
+                <Text style={styles.body}>
+                  Your account will stay open for {preview?.graceDays ?? 14} more days. Nothing is
+                  deleted until then, and you can cancel any time. After that it&apos;s permanent.
+                </Text>
+              )}
+
+              {requiresApproval && (
+                <View style={styles.infoBox}>
+                  <Ionicons name="information-circle-outline" size={18} color={Colors.info} />
+                  <Text style={styles.infoText}>
+                    Your sales and shift records stay with the shop either way — they&apos;re the
+                    owner&apos;s books, not part of your personal profile.
+                  </Text>
+                </View>
+              )}
 
               {preview?.cascades && (
                 <View style={styles.warnBox}>
@@ -167,7 +221,7 @@ export const DeleteAccountSection: React.FC = () => {
               />
 
               <Button
-                title="Schedule closure"
+                title={requiresApproval ? 'Request closure' : 'Schedule closure'}
                 variant="danger"
                 onPress={() => deleteMutation.mutate()}
                 loading={deleteMutation.isPending}
@@ -205,12 +259,25 @@ const styles = StyleSheet.create({
     margin: Spacing.md,
     gap: Spacing.xs,
   },
+  awaitingCard: {
+    backgroundColor: Colors.warningSubtle,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    margin: Spacing.md,
+    gap: Spacing.xs,
+  },
   pendingHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   pendingTitle: {
     flex: 1,
     fontSize: Typography.size.body,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.danger,
+  },
+  awaitingTitle: {
+    flex: 1,
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
   },
   pendingBody: {
     fontSize: Typography.size.small,
@@ -246,6 +313,22 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.danger,
+    lineHeight: 20,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginVertical: Spacing.xs,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
     lineHeight: 20,
   },
   footnote: {

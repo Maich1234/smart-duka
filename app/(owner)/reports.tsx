@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
@@ -7,7 +6,6 @@ import {
   RefreshControl,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,8 +32,6 @@ import { ReportsSkeleton } from '@/components/reports/ReportsSkeleton';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { BorderRadius } from '@/constants/BorderRadius';
-import { Shadows } from '@/constants/Shadows';
 import { Motion } from '@/constants/Motion';
 
 // ─── page header ──────────────────────────────────────────────────────────────
@@ -47,13 +43,6 @@ function ReportsHeader() {
         <Text style={h.title}>Reports</Text>
         <Text style={h.subtitle}>Track performance and grow your business</Text>
       </View>
-      <AnimatedPressable
-        style={[h.iconBtn, h.iconBtnDisabled]}
-        accessibilityLabel="Report options (coming soon)"
-        accessibilityState={{ disabled: true }}
-      >
-        <Ionicons name="options-outline" size={18} color={Colors.border} />
-      </AnimatedPressable>
     </Animated.View>
   );
 }
@@ -81,21 +70,6 @@ const h = StyleSheet.create({
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
     lineHeight: 20,
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    ...Shadows.sm,
-  },
-  iconBtnDisabled: {
-    opacity: 0.45,
   },
 });
 

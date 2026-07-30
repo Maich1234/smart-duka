@@ -77,7 +77,7 @@ export function SmartDukaAiSection({ state, aiEnabled, toggling, loadingShop, on
             </View>
             <View style={s.text}>
               <Text style={s.title}>What data does Gemini see?</Text>
-              <Text style={s.sub}>Review what's shared and how it's stored</Text>
+              <Text style={s.sub}>Review what&apos;s shared and how it&apos;s stored</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </AnimatedPressable>
@@ -105,7 +105,7 @@ export function SmartDukaAiSection({ state, aiEnabled, toggling, loadingShop, on
       <BottomSheet visible={showPrivacy} onClose={() => setShowPrivacy(false)}>
         <Text style={p.title}>Smart Duka AI & your data</Text>
         <Text style={p.body}>
-          Smart Duka AI (powered by Google Gemini) reads a summary of your shop's sales, inventory, expenses, and aggregated staff performance to answer questions and generate insights. It never sees customer personal data.
+          Smart Duka AI (powered by Google Gemini) reads a summary of your shop&apos;s sales, inventory, expenses, and aggregated staff performance to answer questions and generate insights. It never sees customer personal data.
           {'\n\n'}
           Conversations are stored securely and linked to your shop so you can revisit them later.
           {'\n\n'}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
@@ -16,29 +16,53 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 
+interface StaffForm {
+  name: string;
+  email: string;
+  phone: string;
+  isActive: boolean;
+}
+
 export default function EditStaffScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
   const tabBarHeight = useBottomTabBarHeight();
   const { permissions, setPermissions, reset } = useStaffDraftStore();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', isActive: true });
-  const [seeded, setSeeded] = useState(false);
+  // Only the owner's edits are state; the rest is read straight off the server
+  // response. Seeding local state from a fetch in an effect meant one render
+  // where the data had arrived but the fields were still blank — the cascading
+  // render react-hooks/set-state-in-effect exists to catch.
+  const [edits, setEdits] = useState<Partial<StaffForm>>({});
   const { toast } = useAlert();
 
   const { data, isLoading } = useQuery({
     queryKey: ['staff', id],
     queryFn: () => getStaffById(id),
   });
+  const staff = data?.data;
 
+  const form: StaffForm = {
+    name: edits.name ?? staff?.name ?? '',
+    email: edits.email ?? staff?.email ?? '',
+    phone: edits.phone ?? staff?.phone ?? '',
+    // ?? not ||, so toggling this off isn't overwritten by the server value.
+    isActive: edits.isActive ?? staff?.isActive ?? true,
+  };
+  const updateForm = (patch: Partial<StaffForm>) => setEdits((e) => ({ ...e, ...patch }));
+
+  // Permissions live in the shared draft store, so this one really is an
+  // external-store sync rather than local state catching up. Guarded by id so
+  // it seeds once per staff member, not on every refetch.
+  const seededFor = useRef<string | null>(null);
   useEffect(() => {
-    if (data?.data && !seeded) {
-      const staff = data.data;
-      setForm({ name: staff.name, email: staff.email, phone: staff.phone || '', isActive: staff.isActive });
+    if (staff && seededFor.current !== staff._id) {
+      seededFor.current = staff._id;
       setPermissions(staff.permissions || []);
-      setSeeded(true);
     }
-    return () => reset();
-  }, [data]);
+  }, [staff, setPermissions]);
+
+  // Cleared on the way out so the next staff member doesn't inherit these.
+  useEffect(() => reset, [reset]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -66,7 +90,7 @@ export default function EditStaffScreen() {
     saveMutation.mutate();
   };
 
-  if (isLoading || !seeded) {
+  if (isLoading || !staff) {
     return <LoadingState />;
   }
 
@@ -79,9 +103,9 @@ export default function EditStaffScreen() {
       >
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>BASIC INFORMATION</Text>
-          <Input label="Full Name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} />
-          <Input label="Email" value={form.email} onChangeText={(t) => setForm({ ...form, email: t })} autoCapitalize="none" keyboardType="email-address" />
-          <Input label="Phone (optional)" value={form.phone} onChangeText={(t) => setForm({ ...form, phone: t })} keyboardType="phone-pad" />
+          <Input label="Full Name" value={form.name} onChangeText={(t) => updateForm({ name: t })} />
+          <Input label="Email" value={form.email} onChangeText={(t) => updateForm({ email: t })} autoCapitalize="none" keyboardType="email-address" />
+          <Input label="Phone (optional)" value={form.phone} onChangeText={(t) => updateForm({ phone: t })} keyboardType="phone-pad" />
         </View>
 
         <View style={styles.section}>
@@ -95,7 +119,7 @@ export default function EditStaffScreen() {
             </View>
             <Switch
               value={form.isActive}
-              onValueChange={(v) => setForm({ ...form, isActive: v })}
+              onValueChange={(v) => updateForm({ isActive: v })}
               trackColor={{ false: Colors.border, true: Colors.primary }}
               thumbColor={Colors.white}
             />

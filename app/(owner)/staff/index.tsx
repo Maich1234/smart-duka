@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, RefreshControl, StyleSheet, Text } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -14,12 +14,15 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getStaff } from '@/services/staff';
+import { useStaffDeletionRequests } from '@/hooks/useStaffDeletionRequests';
+import { formatDate as formatRequestDate } from '@/utils/formatters';
 import { StaffCard } from '@/components/staff/StaffCard';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useSearch } from '@/hooks/useSearch';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 import { Motion } from '@/constants/Motion';
 import { QueryError } from '@/components/ui/QueryError';
 
@@ -37,14 +40,25 @@ export default function OwnerStaffList() {
     clearRecent,
   } = useSearch('staff');
 
-  const [page, setPage] = useState(1);
-
-  useEffect(() => { setPage(1); }, [searchQuery]);
+  // Page is stored together with the term it belongs to, so a new search
+  // *derives* page 1 rather than setting it from an effect — the effect version
+  // rendered page 2 of the new term once before correcting itself, which is the
+  // cascading render react-hooks/set-state-in-effect flags.
+  const [paging, setPaging] = useState({ term: searchQuery, page: 1 });
+  const page = paging.term === searchQuery ? paging.page : 1;
+  const setPage = (next: number | ((current: number) => number)) =>
+    setPaging({ term: searchQuery, page: typeof next === 'function' ? next(page) : next });
 
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['staff', searchQuery, page],
     queryFn: () => getStaff({ search: searchQuery, page, limit: 10 }),
   });
+
+  // Independent of the paginated/searched list: a request must not disappear
+  // from view just because the owner typed something in the search box.
+  const { data: deletionRequestData } = useStaffDeletionRequests();
+  const deletionRequests = deletionRequestData?.data ?? [];
+  const approvalWindowDays = deletionRequestData?.meta?.approvalWindowDays;
 
   const staffList = data?.data || [];
   const totalPages = data?.pagination?.pages ?? 1;
@@ -110,6 +124,45 @@ export default function OwnerStaffList() {
           </View>
         </LinearGradient>
       </Animated.View>
+
+      {/* ── Pending account-closure requests ───────────────────────── */}
+      {/* Unanswered requests go through on their own after the approval
+          window, so they need to be visible without opening each profile. */}
+      {deletionRequests.length > 0 && (
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.requestsBanner}>
+          <View style={styles.requestsHeader}>
+            <Ionicons name="person-remove-outline" size={16} color={Colors.warning} />
+            <Text style={styles.requestsTitle}>
+              {deletionRequests.length === 1
+                ? '1 account closure request'
+                : `${deletionRequests.length} account closure requests`}
+            </Text>
+          </View>
+          {!!approvalWindowDays && (
+            <Text style={styles.requestsHint}>
+              Requests you don&apos;t answer within {approvalWindowDays} days go ahead on their own.
+            </Text>
+          )}
+          {deletionRequests.map((request) => (
+            <AnimatedPressable
+              key={request._id}
+              style={styles.requestRow}
+              onPress={() => router.push(`/(owner)/staff/${request._id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`Review ${request.name}'s account closure request`}
+            >
+              <View style={styles.requestText}>
+                <Text style={styles.requestName} numberOfLines={1}>{request.name}</Text>
+                <Text style={styles.requestMeta} numberOfLines={1}>
+                  Approves on its own by {formatRequestDate(request.autoApprovesAt)}
+                </Text>
+              </View>
+              <Text style={styles.requestAction}>Review</Text>
+              <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
+            </AnimatedPressable>
+          ))}
+        </Animated.View>
+      )}
 
       {/* ── Section header ─────────────────────────────────────────── */}
       <View style={styles.sectionHeader}>
@@ -342,6 +395,57 @@ const styles = StyleSheet.create({
     width: 1,
     height: 36,
     backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+
+  // ── Pending closure requests
+  requestsBanner: {
+    backgroundColor: Colors.warningSubtle,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  requestsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  requestsHint: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+    marginTop: -2,
+  },
+  requestsTitle: {
+    flex: 1,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  requestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 10,
+    minHeight: 48,
+  },
+  requestText: { flex: 1, gap: 2 },
+  requestName: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  requestMeta: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+  },
+  requestAction: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
   },
 
   // ── Section header

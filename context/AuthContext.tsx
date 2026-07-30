@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect } from 'react';
 import { router } from 'expo-router';
 import axios from 'axios';
 import * as Haptics from 'expo-haptics';
@@ -70,7 +70,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
     initAuth();
-  }, []);
+    // Both deps are zustand actions, created once by the store, so declaring
+    // them keeps this mount-only rather than silencing the rule.
+  }, [setLoading, storeLogout]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -99,7 +101,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = async () => {
+  // Stable identity: SessionExpiredHandler in app/_layout.tsx depends on this
+  // inside an effect, and an identity that changed on every provider render
+  // would re-run it. Nothing reactive is captured — the store is read through
+  // getState(), and storeLogout is a zustand action.
+  const logout = useCallback(async () => {
     if (logoutInProgress) return;
     logoutInProgress = true;
     try {
@@ -125,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Reset after navigation settles so a fresh login can log out again.
       setTimeout(() => { logoutInProgress = false; }, 2000);
     }
-  };
+  }, [storeLogout]);
 
   const refreshUser = async () => {
     try {

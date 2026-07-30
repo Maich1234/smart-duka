@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { AnimatedPressable } from './AnimatedPressable';
 import {
   View,
@@ -39,7 +39,11 @@ export const Input: React.FC<InputProps> = ({
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const focusAnim = useRef(new Animated.Value(0)).current;
+  // Lazy useState, not useRef: this value is interpolated during render,
+  // and reading a ref there is what react-hooks/refs forbids. useState's
+  // initialiser runs once and its identity is guaranteed stable, so the
+  // animation is never recreated mid-flight.
+  const [focusAnim] = useState(() => new Animated.Value(0));
 
   const handleFocus = (e: any) => {
     setIsFocused(true);

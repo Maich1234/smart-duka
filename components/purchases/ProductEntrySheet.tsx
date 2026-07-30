@@ -49,17 +49,30 @@ export const ProductEntrySheet: React.FC<ProductEntrySheetProps> = ({
   initial,
 }) => {
   const { toast } = useAlert();
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const calc = usePurchaseLineCalc();
 
+  // Each open of the sheet for a given product is its own session. The chosen
+  // variant is stored against that session key, so re-opening derives the
+  // default again instead of being reset from an effect — which is what let a
+  // stale variant show for one render before correcting itself.
+  const sessionKey = visible ? product?._id ?? '' : '';
+  const defaultVariantId =
+    product?.productType === 'configurable'
+      ? initial?.variantId ?? product.variants?.[0]?._id ?? null
+      : null;
+
+  const [variantChoice, setVariantChoice] = useState<{ key: string; id: string | null }>({
+    key: '',
+    id: null,
+  });
+  const selectedVariantId =
+    variantChoice.key === sessionKey ? variantChoice.id : defaultVariantId;
+  const setSelectedVariantId = (id: string | null) => setVariantChoice({ key: sessionKey, id });
+
+  // calc holds the quantity/cost draft in its own hook, so clearing it on open
+  // is a genuine external reset rather than local state catching up.
   useEffect(() => {
-    if (!visible) return;
-    calc.reset(initial ?? undefined);
-    if (product?.productType === 'configurable') {
-      setSelectedVariantId(initial?.variantId ?? product.variants?.[0]?._id ?? null);
-    } else {
-      setSelectedVariantId(null);
-    }
+    if (visible) calc.reset(initial ?? undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, product?._id]);
 

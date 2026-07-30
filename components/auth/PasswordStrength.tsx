@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -39,7 +39,11 @@ const SEGMENTS = 4;
 
 export const PasswordStrength: React.FC<PasswordStrengthProps> = ({ password }) => {
   const { level, label, color } = getStrength(password);
-  const widthAnim = useRef(new Animated.Value(0)).current;
+  // Lazy useState, not useRef: this value is interpolated during render,
+  // and reading a ref there is what react-hooks/refs forbids. useState's
+  // initialiser runs once and its identity is guaranteed stable, so the
+  // animation is never recreated mid-flight.
+  const [widthAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(widthAnim, {
@@ -47,7 +51,8 @@ export const PasswordStrength: React.FC<PasswordStrengthProps> = ({ password }) 
       duration: 220,
       useNativeDriver: false,
     }).start();
-  }, [level]);
+    // widthAnim is a stable lazy-initialised value; declared for honesty.
+  }, [level, widthAnim]);
 
   if (!password) return null;
 

@@ -38,20 +38,18 @@ export function storeVerificationToken(token: string) {
 type ConfigView = 'locked' | 'loading' | 'no_config' | 'configured' | 'form';
 
 export const PaymentsSection: React.FC = () => {
-  const [view, setView] = useState<ConfigView>('locked');
+  // Lazily 'loading' when a stored session exists, so the mount effect below
+  // has no state to set — it used to open on 'locked' and immediately correct
+  // itself, which both flashed the wrong panel and cascaded a render.
+  const [view, setView] = useState<ConfigView>(() =>
+    getStoredVerificationToken() ? 'loading' : 'locked',
+  );
   const [verificationVisible, setVerificationVisible] = useState(false);
   const [config, setConfig] = useState<MpesaConfigDetails | null>(null);
   const [saving, setSaving] = useState(false);
   const { alert, toast } = useAlert();
 
-  // Check if we already have a valid verification session
-  useEffect(() => {
-    const token = getStoredVerificationToken();
-    if (token) loadConfig(token);
-  }, []);
-
-  const loadConfig = async (token: string) => {
-    setView('loading');
+  const fetchConfig = async (token: string) => {
     try {
       const res = await getPaymentConfig(token);
       setConfig(res.data.mpesa);
@@ -65,6 +63,25 @@ export const PaymentsSection: React.FC = () => {
         setView('no_config');
       }
     }
+  };
+
+  // Mount-only: resumes an existing verification session on first paint.
+  // Calls fetchConfig, not loadConfig — `view` is already initialised to
+  // 'loading' above, so nothing is set synchronously here.
+  //
+  // set-state-in-effect still fires: it traces into fetchConfig and counts the
+  // setState calls there, but every one of them sits behind `await
+  // getPaymentConfig(...)`, so none runs in the effect's synchronous pass.
+  // The rule can't see past the await.
+  useEffect(() => {
+    const token = getStoredVerificationToken();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (token) fetchConfig(token);
+  }, []);
+
+  const loadConfig = async (token: string) => {
+    setView('loading');
+    await fetchConfig(token);
   };
 
   const handleVerified = (token: string) => {

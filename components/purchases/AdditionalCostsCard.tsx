@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Animated, { FadeIn, FadeOut, LinearTransition, useSharedValue, useAnimatedStyle, withSpring, interpolate } from 'react-native-reanimated';
@@ -12,22 +12,12 @@ import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { formatCurrency } from '@/utils/formatters';
 import type { PurchaseCostDraft } from '@/store/purchaseCartStore';
+import {
+  PURCHASE_COST_CATEGORIES,
+  purchaseCostCategoryMeta,
+} from '@/constants/purchaseCostCategories';
 import type { PurchaseCostCategory } from '@/services/purchases';
 
-const CATEGORY_OPTIONS: { value: PurchaseCostCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: 'transport', label: 'Transport', icon: 'car-outline' },
-  { value: 'delivery', label: 'Delivery', icon: 'bicycle-outline' },
-  { value: 'fuel', label: 'Fuel', icon: 'flame-outline' },
-  { value: 'loading', label: 'Loading', icon: 'arrow-up-circle-outline' },
-  { value: 'offloading', label: 'Offloading', icon: 'arrow-down-circle-outline' },
-  { value: 'packaging', label: 'Packaging', icon: 'cube-outline' },
-  { value: 'market_fee', label: 'Market Fee', icon: 'storefront-outline' },
-  { value: 'brokerage', label: 'Brokerage', icon: 'briefcase-outline' },
-  { value: 'insurance', label: 'Insurance', icon: 'shield-checkmark-outline' },
-  { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline' },
-];
-
-const categoryMeta = (value: string) => CATEGORY_OPTIONS.find((c) => c.value === value) ?? CATEGORY_OPTIONS[CATEGORY_OPTIONS.length - 1];
 
 interface AdditionalCostsCardProps {
   costs: PurchaseCostDraft[];
@@ -105,7 +95,7 @@ export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs,
     alert({
       type: 'confirm',
       title: 'Remove this cost?',
-      message: `${categoryMeta(cost.category).label} · ${formatCurrency(cost.amount)} will be removed from this purchase.`,
+      message: `${purchaseCostCategoryMeta(cost.category).label} · ${formatCurrency(cost.amount)} will be removed from this purchase.`,
       buttons: [
         { label: 'Cancel', variant: 'ghost' },
         { label: 'Remove', variant: 'danger', onPress: () => onRemove(cost.key) },
@@ -135,7 +125,7 @@ export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs,
       {expanded && (
         <View style={styles.content}>
           {costs.map((cost, index) => {
-            const meta = categoryMeta(cost.category);
+            const meta = purchaseCostCategoryMeta(cost.category);
             return (
               <Animated.View
                 key={cost.key}
@@ -170,7 +160,7 @@ export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs,
           ) : (
             <Animated.View entering={FadeIn.duration(180)} style={styles.form}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
-                {CATEGORY_OPTIONS.map((opt) => {
+                {PURCHASE_COST_CATEGORIES.map((opt) => {
                   const active = category === opt.value;
                   return (
                     <AnimatedPressable

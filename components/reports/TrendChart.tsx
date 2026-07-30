@@ -4,10 +4,22 @@ import Svg, { Path, Circle, Line, Defs, LinearGradient as SvgLinearGradient, Sto
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import type { ReportBucket } from '@/services/reports';
+/**
+ * The minimum a bucket needs to be plottable. Deliberately narrower than
+ * ReportBucket (which it structurally accepts) so the purchase-analytics
+ * series can be charted here too without pretending its landed costs are
+ * cash/M-Pesa splits.
+ */
+export interface TrendPoint {
+  label: string;
+  date: string;
+  total: number;
+}
 
 interface TrendChartProps {
-  series: ReportBucket[];
+  series: TrendPoint[];
+  /** Shown when every bucket is zero — this chart isn't only sales any more. */
+  emptyMessage?: string;
 }
 
 const COLUMN_WIDTH = 56;
@@ -53,13 +65,16 @@ const smoothLinePath = (points: Point[]): string => {
  * value label — similar to how Stripe/Square dashboards draw the eye to a
  * standout data point instead of weighting every point equally.
  */
-export const TrendChart: React.FC<TrendChartProps> = ({ series }) => {
+export const TrendChart: React.FC<TrendChartProps> = ({
+  series,
+  emptyMessage = 'No sales in this period',
+}) => {
   const hasData = series.some((b) => b.total > 0);
 
   if (!hasData) {
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyText}>No sales in this period</Text>
+        <Text style={styles.emptyText}>{emptyMessage}</Text>
       </View>
     );
   }

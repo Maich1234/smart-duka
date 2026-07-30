@@ -407,7 +407,7 @@ export function AiDisabledCard() {
       </View>
       <Text style={uc.title}>Smart Duka AI is off</Text>
       <Text style={uc.body}>
-        You've turned this off for your shop. Turn it back on from Profile → Smart Duka AI to use it again.
+        You&apos;ve turned this off for your shop. Turn it back on from Profile → Smart Duka AI to use it again.
       </Text>
       <View style={uc.cta}>
         <Text style={uc.ctaText}>Go to Profile</Text>

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   ScrollView,
@@ -9,6 +9,7 @@ import {
   TextInput,
   type LayoutChangeEvent,
 } from 'react-native';
+import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -107,18 +108,32 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 }) => {
   const update = (patch: Partial<ProductFormData>) => setForm({ ...form, ...patch });
 
+  // Both screens that host this form live inside the owner tab group, whose
+  // tab bar is absolutely positioned over the content — a fixed bottom pad
+  // left Save/Add Product sitting underneath it.
+  const tabBarHeight = useBottomTabBarHeight();
+
   // ── Field-level validation ──
   // Tracks each required field's Y offset inside the ScrollView (captured via
   // onLayout) so a failed save can scroll straight to the first problem
   // instead of leaving the user to hunt for a generic "fill out all fields"
   // toast.
   const scrollRef = useRef<ScrollView>(null);
-  const fieldY = useRef<Record<string, number>>({}).current;
+  // Held as a ref, not unwrapped to `.current` here — reading a ref during
+  // render is what the react-hooks/refs rule forbids, and both accesses below
+  // happen inside callbacks (onLayout, and save) where it's legitimate.
+  const fieldY = useRef<Record<string, number>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [commissionModalIndex, setCommissionModalIndex] = useState<number | null>(null);
-  const registerFieldY = (key: string) => (e: LayoutChangeEvent) => {
-    fieldY[key] = e.nativeEvent.layout.y;
-  };
+  // Written through one stable callback rather than a per-field factory. The
+  // factory was invoked during render to build each onLayout handler, which is
+  // indistinguishable to react-hooks/refs from reading the ref during render;
+  // here only the key and the measured y cross that boundary.
+  const setFieldY = useCallback((key: string, y: number) => {
+    fieldY.current[key] = y;
+  }, []);
+  const registerFieldY = (key: string) => (e: LayoutChangeEvent) =>
+    setFieldY(key, e.nativeEvent.layout.y);
 
   const validate = (): Record<string, string> => {
     const errs: Record<string, string> = {};
@@ -149,7 +164,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     const firstErrorKey = Object.keys(errs)[0];
     if (firstErrorKey) {
       haptics.error();
-      const y = fieldY[firstErrorKey];
+      const y = fieldY.current[firstErrorKey];
       if (y !== undefined) {
         scrollRef.current?.scrollTo({ y: Math.max(0, y - Spacing.lg), animated: true });
       }
@@ -254,7 +269,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.xl }]}
       >
         {/* ── Product Type ── */}
         <View style={styles.sectionLabelRow}>
@@ -517,7 +532,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   </View>
                 </View>
               </View>
-              <Text style={styles.hint}>You'll be notified when stock reaches this level.</Text>
+              <Text style={styles.hint}>You&apos;ll be notified when stock reaches this level.</Text>
             </View>
           </>
         )}
@@ -844,7 +859,8 @@ const styles = StyleSheet.create({
   },
 
   // ── Scroll content ──
-  content: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+  // paddingBottom is applied inline from the live tab-bar height.
+  content: { padding: Spacing.md },
 
   // ── Section labels ──
   sectionLabel: {

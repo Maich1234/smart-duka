@@ -9,8 +9,31 @@ export interface Staff {
   role: 'staff';
   isActive: boolean;
   permissions: string[];
+  /**
+   * Set when this member has asked to close their account. With
+   * `deletionScheduledAt` still null it's waiting on the owner's approval;
+   * once both are set the closure is approved and counting down.
+   */
+  deletionRequestedAt?: string | null;
+  deletionScheduledAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StaffDeletionRequest {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  deletionRequestedAt: string;
+  /** The request proceeds on its own if the owner never answers by this date. */
+  autoApprovesAt: string;
+}
+
+export interface StaffDeletionRequestsResponse {
+  success: boolean;
+  data: StaffDeletionRequest[];
+  meta: { graceDays: number; approvalWindowDays: number };
 }
 
 export interface StaffResponse {
@@ -190,6 +213,39 @@ export const getStaffCommission = async (id: string, params?: {
  */
 export const updateStaffPermissions = async (id: string, permissions: string[]): Promise<SingleStaffResponse> => {
   const response = await api.put(`/staff/${id}/permissions`, { permissions });
+  return response.data;
+};
+
+/**
+ * Staff account-closure requests waiting on the owner (Owner only).
+ *
+ * A staff member's records are the shop's books, so closing their account is
+ * the owner's call — but only for as long as `meta.approvalWindowDays`, after
+ * which an unanswered request goes ahead by itself. Surfaced as a banner on
+ * the team list so it can't sit unnoticed until that happens.
+ */
+export const getStaffDeletionRequests = async (): Promise<StaffDeletionRequestsResponse> => {
+  const response = await api.get('/staff/deletion-requests');
+  return response.data;
+};
+
+/** Owner approves a closure request, which starts the 14-day cooling-off window. */
+export const approveStaffDeletion = async (
+  id: string,
+): Promise<{ success: boolean; message: string; data?: { deletionScheduledAt: string; graceDays: number } }> => {
+  const response = await api.post(`/staff/${id}/deletion-request/approve`, {});
+  return response.data;
+};
+
+/**
+ * Owner declines a closure request. The reason is relayed verbatim to the
+ * staff member, who is free to ask again.
+ */
+export const declineStaffDeletion = async (
+  id: string,
+  reason?: string,
+): Promise<{ success: boolean; message: string }> => {
+  const response = await api.post(`/staff/${id}/deletion-request/decline`, { reason: reason ?? '' });
   return response.data;
 };
 

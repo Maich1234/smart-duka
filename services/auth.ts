@@ -172,6 +172,13 @@ export interface AccountDeletionPreview {
   graceDays: number;
   /** Set when a closure is already scheduled. */
   deletionScheduledAt: string | null;
+  /** True for staff: the shop owner signs off before the closure is scheduled. */
+  requiresOwnerApproval: boolean;
+  /** How long the owner has to answer before the request proceeds anyway. */
+  approvalWindowDays: number;
+  /** A staff request is recorded and sitting with the owner. */
+  awaitingOwnerApproval: boolean;
+  deletionRequestedAt: string | null;
 }
 
 /**
@@ -192,17 +199,32 @@ export const previewAccountDeletion = async (): Promise<AccountDeletionPreview> 
  * 14-day cooling-off window and can be restored with cancelAccountDeletion.
  * Password-gated plus a typed confirmation — a borrowed unlocked phone must
  * not be able to destroy a business.
+ *
+ * For staff this only *files* the request: the shop owner approves it before
+ * the cooling-off clock starts, signalled by `awaitingOwnerApproval` and a
+ * null `deletionScheduledAt` in the response.
  */
 export const deleteAccount = async (
   password: string,
-): Promise<{ success: boolean; message: string; data: { deletionScheduledAt: string; graceDays: number } }> => {
+): Promise<{
+  success: boolean;
+  message: string;
+  data: {
+    deletionScheduledAt: string | null;
+    graceDays: number;
+    awaitingOwnerApproval?: boolean;
+    deletionRequestedAt?: string;
+    approvalWindowDays?: number;
+  };
+}> => {
   const response = await api.delete('/auth/me', { data: { password, confirm: 'DELETE' } });
   return response.data;
 };
 
 /**
- * Calls off a scheduled closure. No password: the user is already signed in,
- * and backing out of a destructive action should be effortless.
+ * Calls off a scheduled closure, or withdraws a staff request the owner
+ * hasn't answered yet. No password: the user is already signed in, and
+ * backing out of a destructive action should be effortless.
  */
 export const cancelAccountDeletion = async (): Promise<{ success: boolean; message: string }> => {
   const response = await api.post('/auth/me/restore');

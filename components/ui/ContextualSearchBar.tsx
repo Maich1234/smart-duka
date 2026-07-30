@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState } from 'react';
 import { AnimatedPressable } from './AnimatedPressable';
 import {
   View,
@@ -63,16 +63,19 @@ export const ContextualSearchBar: React.FC<ContextualSearchBarProps> = ({
 
   const showDropdown = isFocused && value.length === 0 && recentSearches.length > 0;
 
-  const handleFocus = useCallback(() => {
+  // Plain functions: these write a Reanimated shared value, which the React
+  // Compiler's immutability rule treats as frozen once captured by a memoised
+  // callback. Neither is a dependency or passed to a memoised child.
+  const handleFocus = () => {
     setIsFocused(true);
     focusAnim.value = withTiming(1, { duration: Motion.duration.fast });
-  }, [focusAnim]);
+  };
 
-  const handleBlur = useCallback(() => {
+  const handleBlur = () => {
     setIsFocused(false);
     focusAnim.value = withTiming(0, { duration: Motion.duration.fast });
     if (value.trim() && onSubmit) onSubmit();
-  }, [focusAnim, value, onSubmit]);
+  };
 
   const containerAnim = useAnimatedStyle(() => ({
     borderColor: interpolateColor(focusAnim.value, [0, 1], [Colors.border, Colors.primary]),

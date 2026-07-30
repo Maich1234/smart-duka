@@ -63,8 +63,13 @@ export function NewPurchaseScreen() {
     selectRecent, recentSearches, clearRecent,
   } = useSearch('purchase_products');
 
-  const [productsPage, setProductsPage] = useState(1);
-  useEffect(() => setProductsPage(1), [searchQuery]);
+  // Page is stored with the term it belongs to, so a new search derives page 1
+  // instead of setting it from an effect — the effect version briefly queried
+  // page N of the new term before correcting itself, wasting a request.
+  const [productPaging, setProductPaging] = useState({ term: searchQuery, page: 1 });
+  const productsPage = productPaging.term === searchQuery ? productPaging.page : 1;
+  const setProductsPage = (next: number | ((current: number) => number)) =>
+    setProductPaging({ term: searchQuery, page: typeof next === 'function' ? next(productsPage) : next });
 
   const { data: productsData, refetch: refetchProducts } = useQuery({
     queryKey: ['products', searchQuery, productsPage, EXCLUDE_TYPES],
