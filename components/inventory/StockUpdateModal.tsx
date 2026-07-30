@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '../ui/AnimatedPressable';
 import { Input } from '../ui/Input';
@@ -21,8 +21,18 @@ interface StockUpdateModalProps {
 
 type Mode = 'add' | 'set';
 
-export const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
-  visible,
+/**
+ * The body mounts only while open, so its useState defaults *are* the per-open
+ * reset — replacing an effect that cleared the fields on `visible` after first
+ * rendering the previous product's entry.
+ */
+export const StockUpdateModal: React.FC<StockUpdateModalProps> = ({ visible, onClose, ...rest }) => (
+  <BottomSheet visible={visible} onClose={onClose}>
+    {visible && <StockUpdateModalBody onClose={onClose} {...rest} />}
+  </BottomSheet>
+);
+
+const StockUpdateModalBody: React.FC<Omit<StockUpdateModalProps, 'visible'>> = ({
   onClose,
   onConfirm,
   currentStock,
@@ -34,13 +44,6 @@ export const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
   // compute currentStock + 500 themselves.
   const [mode, setMode] = useState<Mode>('add');
   const [amount, setAmount] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      setMode('add');
-      setAmount('');
-    }
-  }, [visible, currentStock]);
 
   const parsedAmount = parseInt(amount, 10);
   const resultingStock =
@@ -55,7 +58,7 @@ export const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <>
       <Text style={styles.title}>Update Stock</Text>
       <Text style={styles.productName}>{productName}</Text>
       <Text style={styles.currentStock}>Current stock: {currentStock}</Text>
@@ -101,7 +104,7 @@ export const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
         <Button title="Update" onPress={handleConfirm} loading={loading} disabled={resultingStock === null} style={styles.flexBtn} />
       </View>
-    </BottomSheet>
+    </>
   );
 };
 

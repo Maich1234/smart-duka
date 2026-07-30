@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, { FadeInUp, LinearTransition } from 'react-native-reanimated';
@@ -50,17 +50,26 @@ export const PaymentMethodsScreen: React.FC = () => {
   });
   const mpesaConfigured = paymentStatus?.data?.mpesa?.isConfigured ?? false;
 
-  const [methods, setMethods] = useState<ShopPaymentMethod[]>([]);
-  const [dirty, setDirty] = useState(false);
+  // null means "untouched, follow the server". Once the owner edits anything
+  // the draft takes over, so a background refetch can't wipe unsaved changes.
+  //
+  // Derived rather than seeded from an effect: the effect version rendered an
+  // empty list on first paint and filled it in on the next, which flashed the
+  // "no methods" state over a shop that has them.
+  const [draft, setDraft] = useState<ShopPaymentMethod[] | null>(null);
   const [newLabel, setNewLabel] = useState('');
 
-  // Server state seeds the editor once; after that the local list is the draft
-  // being edited, so a background refetch must not wipe unsaved changes.
-  useEffect(() => {
-    if (dirty) return;
+  const serverMethods = useMemo(() => {
     const stored = shopConfig?.data?.paymentMethods;
-    setMethods((stored?.length ? stored : DEFAULT_SALE_METHODS).map((m) => ({ ...m })));
-  }, [shopConfig, dirty]);
+    return (stored?.length ? stored : DEFAULT_SALE_METHODS).map((m) => ({ ...m }));
+  }, [shopConfig]);
+
+  const methods = draft ?? serverMethods;
+  const dirty = draft !== null;
+
+  /** Edits always branch from what's on screen, server-backed or not. */
+  const setMethods = (update: (prev: ShopPaymentMethod[]) => ShopPaymentMethod[]) =>
+    setDraft((prev) => update(prev ?? serverMethods));
 
   const saveMutation = useMutation({
     mutationFn: (next: ShopPaymentMethod[]) =>
@@ -74,7 +83,7 @@ export const PaymentMethodsScreen: React.FC = () => {
         })),
       }),
     onSuccess: (res) => {
-      setDirty(false);
+      setDraft(null);
       queryClient.setQueryData(['shopConfig'], res);
       queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
       haptics.success();
@@ -89,7 +98,6 @@ export const PaymentMethodsScreen: React.FC = () => {
   });
 
   const update = (key: string, patch: Partial<ShopPaymentMethod>) => {
-    setDirty(true);
     setMethods((prev) => prev.map((m) => (m.key === key ? { ...m, ...patch } : m)));
   };
 
@@ -97,7 +105,6 @@ export const PaymentMethodsScreen: React.FC = () => {
     const target = index + delta;
     if (target < 0 || target >= methods.length) return;
     haptics.light();
-    setDirty(true);
     setMethods((prev) => {
       const next = prev.slice();
       [next[index], next[target]] = [next[target], next[index]];
@@ -115,7 +122,6 @@ export const PaymentMethodsScreen: React.FC = () => {
       return;
     }
     haptics.light();
-    setDirty(true);
     setMethods((prev) => [...prev, { ...method, enabled: true }]);
   };
 
@@ -149,7 +155,6 @@ export const PaymentMethodsScreen: React.FC = () => {
           variant: 'danger',
           onPress: () => {
             haptics.light();
-            setDirty(true);
             setMethods((prev) => prev.filter((m) => m.key !== method.key));
           },
         },

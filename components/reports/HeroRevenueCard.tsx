@@ -24,7 +24,8 @@ import { formatCurrency } from '@/utils/formatters';
 function useCountUp(target: number, duration = 1000): number {
   const [current, setCurrent] = useState(0);
   useEffect(() => {
-    if (target === 0) { setCurrent(0); return; }
+    // A zero target has nothing to animate; the return below derives it.
+    if (target === 0) return;
     let rafId: number;
     let startTime: number | null = null;
     const tick = (ts: number) => {
@@ -37,7 +38,9 @@ function useCountUp(target: number, duration = 1000): number {
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
   }, [target, duration]);
-  return current;
+  // Derived, not stored: a zero target short-circuits to 0 so the effect
+  // above never has to set it synchronously.
+  return target === 0 ? 0 : current;
 }
 
 // ─── embedded mini chart ──────────────────────────────────────────────────────

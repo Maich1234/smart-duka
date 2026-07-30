@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams } from 'expo-router';
@@ -56,7 +56,7 @@ export default function AiChatScreen() {
 
   const { alert, toast } = useAlert();
 
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>(undefined);
   // Set while the owner has explicitly started a fresh thread — blocks the
   // latest-conversation effect below from immediately reloading the old one
   // it still has cached. Cleared once a real conversation id exists again
@@ -69,9 +69,13 @@ export default function AiChatScreen() {
   const [historyVisible, setHistoryVisible] = useState(false);
 
   const { data: history, isLoading: isLoadingLatest } = useConversationHistory(hasAiChat);
-  useEffect(() => {
-    if (!conversationId && !skipAutoLoad && history?.latest?._id) setConversationId(history.latest._id);
-  }, [history, conversationId, skipAutoLoad]);
+
+  // Derived, not synced from an effect: with nothing explicitly selected (and
+  // the user hasn't asked for a blank thread) the most recent conversation is
+  // the one on screen. The effect version rendered an empty thread for a frame
+  // before catching up, which read as "your history is gone".
+  const conversationId =
+    selectedConversationId ?? (skipAutoLoad ? undefined : history?.latest?._id);
 
   const { data: thread, isLoading: isLoadingThread } = useConversationMessages(conversationId);
   const sendMutation = useSendChatMessage(conversationId);
@@ -100,7 +104,7 @@ export default function AiChatScreen() {
       onSuccess: (response) => {
         setPendingText(null);
         if (!conversationId) {
-          setConversationId(response.data.conversationId);
+          setSelectedConversationId(response.data.conversationId);
           setSkipAutoLoad(false);
         }
       },
@@ -126,7 +130,7 @@ export default function AiChatScreen() {
       });
       return;
     }
-    setConversationId(undefined);
+    setSelectedConversationId(undefined);
     setSkipAutoLoad(true);
     setPendingText(null);
     setInputText('');
@@ -147,7 +151,7 @@ export default function AiChatScreen() {
           onPress: () => {
             archiveMutation.mutate(idToDelete, {
               onSuccess: () => {
-                setConversationId(undefined);
+                setSelectedConversationId(undefined);
                 setSkipAutoLoad(false);
                 setPendingText(null);
                 setInputText('');
@@ -257,7 +261,7 @@ export default function AiChatScreen() {
           // the auto-load effect would fight the explicit choice.
           setSkipAutoLoad(false);
           setPendingText(null);
-          setConversationId(id);
+          setSelectedConversationId(id);
         }}
       />
     </Screen>

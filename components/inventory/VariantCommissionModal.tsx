@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Switch } from 'react-native';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -24,8 +24,18 @@ interface VariantCommissionModalProps {
   initialValue: VariantCommissionValue;
 }
 
-export const VariantCommissionModal: React.FC<VariantCommissionModalProps> = ({
-  visible,
+/**
+ * The body mounts only while open, so its useState defaults seed from
+ * `initialValue` on every open — replacing an effect that re-seeded on
+ * `visible` after first rendering the previous variant's figures.
+ */
+export const VariantCommissionModal: React.FC<VariantCommissionModalProps> = ({ visible, onClose, ...rest }) => (
+  <BottomSheet visible={visible} onClose={onClose}>
+    {visible && <VariantCommissionModalBody onClose={onClose} {...rest} />}
+  </BottomSheet>
+);
+
+const VariantCommissionModalBody: React.FC<Omit<VariantCommissionModalProps, 'visible'>> = ({
   onClose,
   onConfirm,
   variantName,
@@ -34,18 +44,10 @@ export const VariantCommissionModal: React.FC<VariantCommissionModalProps> = ({
 }) => {
   const [enabled, setEnabled] = useState(initialValue.enabled);
   const [basePrice, setBasePrice] = useState(initialValue.basePrice);
-  const [employeeSharePercent, setEmployeeSharePercent] = useState(initialValue.employeeSharePercent);
+  const [employeeSharePercent, setEmployeeSharePercent] = useState(
+    initialValue.employeeSharePercent || '100',
+  );
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      setEnabled(initialValue.enabled);
-      setBasePrice(initialValue.basePrice);
-      setEmployeeSharePercent(initialValue.employeeSharePercent || '100');
-      setError('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
 
   const parsedBase = parseFloat(basePrice);
   const parsedShare = parseFloat(employeeSharePercent);
@@ -78,7 +80,7 @@ export const VariantCommissionModal: React.FC<VariantCommissionModalProps> = ({
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <>
       <Text style={styles.title}>Employee Commission</Text>
       <Text style={styles.variantName}>{variantName || 'Variant'}</Text>
       <Text style={styles.hint}>Selling price: {formatCurrency(sellingPrice)}</Text>
@@ -122,7 +124,7 @@ export const VariantCommissionModal: React.FC<VariantCommissionModalProps> = ({
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
         <Button title="Save" onPress={handleConfirm} style={styles.flexBtn} />
       </View>
-    </BottomSheet>
+    </>
   );
 };
 

@@ -24,10 +24,8 @@ function useCountUp(target: number, duration = 1100) {
   const startRef = useRef(0);
 
   useEffect(() => {
-    if (target === 0) {
-      setDisplayed(0);
-      return;
-    }
+    // A zero target has nothing to animate; the return below derives it.
+    if (target === 0) return;
     startRef.current = Date.now();
     const id = setInterval(() => {
       const elapsed = Date.now() - startRef.current;
@@ -39,7 +37,9 @@ function useCountUp(target: number, duration = 1100) {
     return () => clearInterval(id);
   }, [target, duration]);
 
-  return displayed;
+  // Derived, not stored: a zero target short-circuits to 0 so the effect
+  // above never has to set it synchronously.
+  return target === 0 ? 0 : displayed;
 }
 
 function formatCompactValue(value: number): string {

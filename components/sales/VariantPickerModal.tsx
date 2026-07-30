@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
@@ -21,25 +21,30 @@ interface VariantPickerModalProps {
   loading?: boolean;
 }
 
-export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
-  visible,
+/**
+ * The body mounts only while open, so its useState defaults *are* the per-open
+ * reset — replacing an effect that re-picked the default variant on `visible`
+ * and rendered the previous product's selection for one frame first.
+ */
+export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({ visible, onClose, ...rest }) => (
+  <BottomSheet visible={visible} onClose={onClose}>
+    {visible && <VariantPickerModalBody onClose={onClose} {...rest} />}
+  </BottomSheet>
+);
+
+const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>> = ({
   onClose,
   onConfirm,
   productName,
   variants,
   loading = false,
 }) => {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // First variant with stock, else the first one at all.
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => variants.find((v) => v.quantity > 0)?._id ?? variants[0]?._id ?? null,
+  );
   const [quantity, setQuantity] = useState('1');
   const { toast } = useAlert();
-
-  useEffect(() => {
-    if (visible) {
-      setSelectedId(variants.find((v) => v.quantity > 0)?._id ?? variants[0]?._id ?? null);
-      setQuantity('1');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
 
   const selected = variants.find((v) => v._id === selectedId);
 
@@ -57,7 +62,7 @@ export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <>
       <Text style={styles.title}>Choose an Option</Text>
       <Text style={styles.productName}>{productName}</Text>
 
@@ -97,7 +102,7 @@ export const VariantPickerModal: React.FC<VariantPickerModalProps> = ({
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
         <Button title="Add" onPress={handleConfirm} loading={loading} style={styles.flexBtn} />
       </View>
-    </BottomSheet>
+    </>
   );
 };
 

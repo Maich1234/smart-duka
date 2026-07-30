@@ -57,8 +57,16 @@ const clampToRange = (d: Date, min: Date, max: Date) => {
  * calendar open (which let people pick unfulfillable future dates or dates
  * before the shop existed).
  */
-export const SalesDateRangeSheet: React.FC<SalesDateRangeSheetProps> = ({
-  visible,
+export const SalesDateRangeSheet: React.FC<SalesDateRangeSheetProps> = ({ visible, onClose, ...rest }) => (
+  <BottomSheet visible={visible} onClose={onClose} maxHeightPercent={85}>
+    {/* Mounted only while open, so the draft selection seeds from the applied
+        range on every open — this replaced an effect that reset it on
+        `visible` after first showing the previous draft. */}
+    {visible && <SalesDateRangeSheetBody onClose={onClose} {...rest} />}
+  </BottomSheet>
+);
+
+const SalesDateRangeSheetBody: React.FC<Omit<SalesDateRangeSheetProps, 'visible'>> = ({
   onClose,
   startDate,
   endDate,
@@ -73,14 +81,6 @@ export const SalesDateRangeSheet: React.FC<SalesDateRangeSheetProps> = ({
   const [pendingEnd, setPendingEnd] = useState<string | null>(
     endDate ? toDateString(endDate) : null
   );
-
-  // Reset draft selection to the applied range each time the sheet opens.
-  React.useEffect(() => {
-    if (visible) {
-      setPendingStart(startDate ? toDateString(startDate) : null);
-      setPendingEnd(endDate ? toDateString(endDate) : null);
-    }
-  }, [visible, startDate, endDate]);
 
   const minDateStr = toDateString(minDate);
   const maxDateStr = toDateString(maxDate);
@@ -155,7 +155,7 @@ export const SalesDateRangeSheet: React.FC<SalesDateRangeSheetProps> = ({
     : 'Select a date range';
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} maxHeightPercent={85}>
+    <>
       <Text style={styles.title}>Filter by Date</Text>
       <Text style={styles.rangeLabel}>{rangeLabel}</Text>
 
@@ -206,7 +206,7 @@ export const SalesDateRangeSheet: React.FC<SalesDateRangeSheetProps> = ({
         <Button title="Clear" variant="outline" onPress={handleClear} style={styles.flexBtn} />
         <Button title="Apply" onPress={handleApply} disabled={!pendingStart} style={styles.flexBtn} />
       </View>
-    </BottomSheet>
+    </>
   );
 };
 

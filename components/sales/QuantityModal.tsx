@@ -26,8 +26,19 @@ interface QuantityModalProps {
   maxPrice?: number;
 }
 
-export const QuantityModal: React.FC<QuantityModalProps> = ({
-  visible,
+/**
+ * The body is mounted only while the sheet is open, so its useState defaults
+ * *are* the per-open reset. That replaces an effect that re-set every field on
+ * `visible` — which rendered the previous sale's quantity for one frame before
+ * correcting itself, and is the cascading render set-state-in-effect flags.
+ */
+export const QuantityModal: React.FC<QuantityModalProps> = ({ visible, onClose, ...rest }) => (
+  <BottomSheet visible={visible} onClose={onClose}>
+    {visible && <QuantityModalBody onClose={onClose} {...rest} />}
+  </BottomSheet>
+);
+
+const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
   onClose,
   onConfirm,
   productName,
@@ -40,17 +51,9 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
   maxPrice,
 }) => {
   const isDecimal = unitOfMeasure !== 'unit';
-  const [quantity, setQuantity] = useState('1');
+  const [quantity, setQuantity] = useState(isDecimal ? '' : '1');
   const [price, setPrice] = useState(defaultPrice != null ? String(defaultPrice) : '');
   const { toast } = useAlert();
-
-  React.useEffect(() => {
-    if (visible) {
-      setQuantity(isDecimal ? '' : '1');
-      setPrice(defaultPrice != null ? String(defaultPrice) : '');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
 
   const handleConfirm = () => {
     const qty = isDecimal ? parseFloat(quantity) : parseInt(quantity, 10);
@@ -80,7 +83,7 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <>
       <Text style={styles.title}>Add to Cart</Text>
       <Text style={styles.productName}>{productName}</Text>
       {maxStock < Infinity && <Text style={styles.maxStock}>Available: {maxStock}</Text>}
@@ -106,7 +109,7 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
         <Button title="Add" onPress={handleConfirm} loading={loading} style={styles.flexBtn} />
       </View>
-    </BottomSheet>
+    </>
   );
 };
 

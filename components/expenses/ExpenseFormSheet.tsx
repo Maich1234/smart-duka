@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -33,30 +33,32 @@ const CATEGORY_OPTIONS: { value: ExpenseCategory; label: string; icon: keyof typ
   { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline' },
 ];
 
-export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
-  visible,
+/**
+ * The body mounts only while the sheet is open, so its useState defaults seed
+ * from `expense` on every open — replacing an effect that re-seeded on
+ * `visible`, which rendered the previously-edited expense for one frame before
+ * correcting itself.
+ */
+export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({ visible, onClose, ...rest }) => (
+  <BottomSheet visible={visible} onClose={onClose}>
+    {visible && <ExpenseFormSheetBody onClose={onClose} {...rest} />}
+  </BottomSheet>
+);
+
+const ExpenseFormSheetBody: React.FC<Omit<ExpenseFormSheetProps, 'visible'>> = ({
   onClose,
   onSave,
   expense,
   loading = false,
 }) => {
-  const [category, setCategory] = useState<ExpenseCategory>('other');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<MoneyOutMethod>('cash');
-  const [date, setDate] = useState(new Date());
+  const [category, setCategory] = useState<ExpenseCategory>(expense?.category || 'other');
+  const [amount, setAmount] = useState(expense ? String(expense.amount) : '');
+  const [description, setDescription] = useState(expense?.description || '');
+  // Expenses recorded before this field existed have no method — cash is the
+  // value the server defaulted them to.
+  const [paymentMethod, setPaymentMethod] = useState<MoneyOutMethod>(expense?.paymentMethod || 'cash');
+  const [date, setDate] = useState(() => (expense ? new Date(expense.date) : new Date()));
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  useEffect(() => {
-    if (!visible) return;
-    setCategory(expense?.category || 'other');
-    setAmount(expense ? String(expense.amount) : '');
-    setDescription(expense?.description || '');
-    // Expenses recorded before this field existed have no method — cash is the
-    // value the server defaulted them to.
-    setPaymentMethod(expense?.paymentMethod || 'cash');
-    setDate(expense ? new Date(expense.date) : new Date());
-  }, [visible, expense]);
 
   const handleSave = () => {
     const parsedAmount = parseFloat(amount);
@@ -71,7 +73,7 @@ export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
+    <>
       <Text style={styles.title}>{expense ? 'Edit Expense' : 'Add Expense'}</Text>
 
       <Text style={styles.sectionLabel}>Category</Text>
@@ -112,7 +114,7 @@ export const ExpenseFormSheet: React.FC<ExpenseFormSheetProps> = ({
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
         <Button title={expense ? 'Save Changes' : 'Add Expense'} onPress={handleSave} loading={loading} style={styles.flexBtn} />
       </View>
-    </BottomSheet>
+    </>
   );
 };
 

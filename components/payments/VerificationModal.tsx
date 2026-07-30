@@ -175,11 +175,19 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
       []
     );
 
+    // react-hooks/immutability treats a Reanimated shared value captured by a
+    // memoised callback as frozen, but mutating `.value` is the whole point of
+    // a shared value. Unlike the other sheets in the app, the memoisation here
+    // is load-bearing — `closeWith` is a dependency of `dismiss` and `verify`
+    // below, so dropping it would make those change identity every render and
+    // defeat their memoisation too. Scoped to the assignments themselves.
     const handleSheetLayout = useCallback(
       (e: LayoutChangeEvent) => {
+        // eslint-disable-next-line react-hooks/immutability
         sheetHeight.value = e.nativeEvent.layout.height;
         if (!entranceStarted.current) {
           entranceStarted.current = true;
+          // eslint-disable-next-line react-hooks/immutability
           progress.value = reducedMotion
             ? withTiming(1, { duration: 200 })
             : withSpring(1, { damping: 26, stiffness: 280, mass: 0.9 });
@@ -190,6 +198,7 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
 
     const closeWith = useCallback(
       (cb: () => void) => {
+        // eslint-disable-next-line react-hooks/immutability
         progress.value = withTiming(
           0,
           { duration: reducedMotion ? 150 : 220 },

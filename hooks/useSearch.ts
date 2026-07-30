@@ -34,13 +34,18 @@ export function useSearch(key: string) {
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (value === '') {
-      setQuery('');
-      return;
-    }
+    // An empty box is handled by the derivation below, not here — clearing it
+    // must feel instant, and setting state synchronously in an effect to do
+    // that is the cascading render set-state-in-effect flags.
+    if (value === '') return;
     timerRef.current = setTimeout(() => setQuery(value), DEBOUNCE_MS);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [value]);
+
+  // Emptying the input clears the query immediately, masking whatever the
+  // debounce last committed. onSubmit/selectRecent/clear still set `query`
+  // directly, which this passes straight through.
+  const effectiveQuery = value === '' ? '' : query;
 
   const persistRecent = useCallback(
     async (term: string, list: string[]) => {
@@ -92,7 +97,7 @@ export function useSearch(key: string) {
 
   return {
     value,
-    query,
+    query: effectiveQuery,
     onChange,
     onSubmit,
     selectRecent,
