@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { router } from 'expo-router';
 import { getSalesReport, type ReportPeriod } from '@/services/reports';
 import { getRatingsSummary } from '@/services/ratings';
 import { getDepletionAnalytics } from '@/services/analytics';
@@ -29,6 +30,10 @@ import {
   PeakActivitySection,
 } from '@/components/reports/ReportSections';
 import { ReportsSkeleton } from '@/components/reports/ReportsSkeleton';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { haptics } from '@/utils/haptics';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { BorderRadius } from '@/constants/BorderRadius';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -222,12 +227,66 @@ export default function OwnerReports() {
 
       {/* ── stock intelligence ─────────────────────────────────────── */}
       <StockIntelligence depletion={depletion} />
+
+      <View style={s.sectionGap} />
+
+      {/* ── financial records ──────────────────────────────────────── */}
+      {/* The books live on their own screen rather than inline: they're a
+          document you take away, not a figure you glance at. */}
+      <AnimatedPressable
+        onPress={() => { haptics.light(); router.push('/(owner)/books' as never); }}
+        style={s.booksLink}
+        accessibilityRole="button"
+        accessibilityLabel="Financial records"
+      >
+        <View style={s.booksIcon}>
+          <Ionicons name="document-text-outline" size={20} color={Colors.primary} />
+        </View>
+        <View style={s.booksText}>
+          <Text style={s.booksTitle}>Financial Records</Text>
+          <Text style={s.booksSub}>Cashbook, profit &amp; loss and registers — download as PDF or Excel</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+      </AnimatedPressable>
       </Animated.ScrollView>
     </>
   );
 }
 
 const s = StyleSheet.create({
+  booksLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    minHeight: 64,
+  },
+  booksIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  booksText: { flex: 1 },
+  booksTitle: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  booksSub: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 17,
+  },
   root: {
     flex: 1,
     backgroundColor: Colors.background,

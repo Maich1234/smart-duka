@@ -95,6 +95,7 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "./plugins/withNotificationIcon",
+      "expo-sharing",
       [
         "expo-build-properties",
         {

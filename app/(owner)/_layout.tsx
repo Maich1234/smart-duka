@@ -323,6 +323,13 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="books"
+        options={{
+          title: 'Financial Records',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="subscription"
         options={{
           title: 'Subscription',
