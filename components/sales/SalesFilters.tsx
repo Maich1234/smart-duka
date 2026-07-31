@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Picker } from '@react-native-picker/picker';
 import { Button } from '../ui/Button';

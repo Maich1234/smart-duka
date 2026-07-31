@@ -32,7 +32,8 @@ function BrandSpinner() {
       -1,
       false
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [rotation]);
 
   const spinStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
@@ -46,7 +47,8 @@ function BrandSpinner() {
       -1,
       true
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [pulse]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
@@ -101,7 +103,8 @@ export function LoadingOverlay({ visible, message }: LoadingOverlayProps) {
 
   useEffect(() => {
     opacity.value = withTiming(visible ? 1 : 0, { duration: 200 });
-  }, [visible]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [visible, opacity]);
 
   const overlayAnim = useAnimatedStyle(() => ({
     opacity: opacity.value,

@@ -34,7 +34,6 @@ import {
   CASH_METHOD_KEY,
   MPESA_METHOD_KEY,
   resolveSaleMethods,
-  saleMethodLabel,
 } from '@/constants/paymentMethods';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCartStore, cartKey } from '@/store/staffCartStore';
@@ -75,7 +74,7 @@ export function PosScreen() {
   } = useSearch('pos_products');
 
   const { cart, addItem, removeItem, clearCart, updateItem } = useCartStore();
-  const [paymentMethod, setPaymentMethod] = useState<string>(CASH_METHOD_KEY);
+  const [chosenMethod, setPaymentMethod] = useState<string>(CASH_METHOD_KEY);
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [variantModalVisible, setVariantModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -256,11 +255,13 @@ export function PosScreen() {
 
   // If the selected button is removed or switched off mid-session, fall back to
   // the first one rather than posting a method the shop no longer accepts.
-  useEffect(() => {
-    if (saleMethods.length > 0 && !saleMethods.some((m) => m.key === paymentMethod)) {
-      setPaymentMethod(saleMethods[0].key);
-    }
-  }, [saleMethods, paymentMethod]);
+  // Derived, not corrected from an effect: the effect version rendered one
+  // frame with the stale method still selected, and a fast till tap in that
+  // frame would have posted it.
+  const paymentMethod =
+    saleMethods.length === 0 || saleMethods.some((m) => m.key === chosenMethod)
+      ? chosenMethod
+      : saleMethods[0].key;
 
   const createSaleMutation = useMutation({
     mutationFn: createSale,

@@ -14,7 +14,6 @@ import { haptics } from '@/utils/haptics';
 import Animated, {
   FadeIn,
   FadeInDown,
-  FadeOut,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -50,8 +49,16 @@ const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_DURATION_MS = 120000; // 120 seconds
 const MAX_CONSECUTIVE_ERRORS = 5;
 
-export const MpesaPaymentModal: React.FC<Props> = ({
-  visible,
+/**
+ * Thin gate. The body below is mounted only while the modal is open, so every
+ * payment intent starts from freshly-initialised state — this replaced an
+ * effect that reset eight fields by hand on `visible` to stop the previous
+ * payment's terminal status flashing before the new STK push began.
+ */
+export const MpesaPaymentModal: React.FC<Props> = ({ visible, ...rest }) =>
+  visible ? <MpesaPaymentModalBody {...rest} /> : null;
+
+const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
   phoneNumber,
   amount,
   accountReference,
@@ -100,7 +107,8 @@ export const MpesaPaymentModal: React.FC<Props> = ({
     } else {
       pulseScale.value = withSpring(1);
     }
-  }, [status]);
+    // pulseScale is a Reanimated shared value — stable, declared for honesty.
+  }, [status, pulseScale]);
 
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
@@ -226,23 +234,9 @@ export const MpesaPaymentModal: React.FC<Props> = ({
     }
   }, [phoneNumber, amount, accountReference, beginPolling]);
 
-  // Start the STK Push when the modal opens — generate a fresh idempotency key for this intent
+  // Start the STK Push on mount. Mounting *is* the open, and every field above
+  // is already at its initial value, so there is nothing to reset first.
   useEffect(() => {
-    if (!visible) {
-      stopPolling();
-      return;
-    }
-    // Reset all state synchronously so there is no flash of a previous payment's
-    // terminal status (failed/timeout) before sendSTKPush begins.
-    setStatus('initiating');
-    setTransactionId(null);
-    setReceiptNumber(null);
-    setErrorMessage(null);
-    setIsOfflineEntry(false);
-    setShowVerifyInput(false);
-    setVerifyCode('');
-    setCountdown(0);
-    consecutiveErrorsRef.current = 0;
     // New payment intent → new idempotency key
     idempotencyKeyRef.current = randomUUID();
     sendSTKPush(idempotencyKeyRef.current);
@@ -250,7 +244,8 @@ export const MpesaPaymentModal: React.FC<Props> = ({
     return () => {
       stopPolling();
     };
-  }, [visible]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Retry: reuses the SAME idempotency key so the server knows this is a retry
@@ -305,8 +300,6 @@ export const MpesaPaymentModal: React.FC<Props> = ({
   const handleSuccess = () => {
     onSuccess(transactionId, receiptNumber);
   };
-
-  if (!visible) return null;
 
   const maskedPhone = formatKenyanPhone(phoneNumber);
   const isTerminal = status === 'failed' || status === 'cancelled' || status === 'timeout';

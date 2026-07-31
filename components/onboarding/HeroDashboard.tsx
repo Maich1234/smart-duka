@@ -43,7 +43,9 @@ const Bar: React.FC<{ target: number; index: number; bump: number }> = ({ target
     } else if (index === BAR_TARGETS.length - 1) {
       h.value = withSpring(Math.min(1, target + bump * 0.035), { damping: 13, stiffness: 180 });
     }
-  }, [bump]);
+    // Shared values and per-instance constants — stable for this
+    // element's lifetime, so declaring them keeps the animation mount-only.
+  }, [bump, h, index, target]);
 
   const style = useAnimatedStyle(() => ({ height: h.value * BAR_MAX_H }));
   const isToday = index === BAR_TARGETS.length - 1;
@@ -65,7 +67,8 @@ const LiveDot: React.FC = () => {
       ),
       -1
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [pulse]);
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
   return <Animated.View style={[styles.liveDot, style]} />;
 };
@@ -90,7 +93,9 @@ const FloatingChip: React.FC<{
         true
       )
     );
-  }, []);
+    // Shared values and per-instance constants — stable for this
+    // element's lifetime, so declaring them keeps the animation mount-only.
+  }, [delay, duration, dy, ty]);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }));
   return (
     <Animated.View

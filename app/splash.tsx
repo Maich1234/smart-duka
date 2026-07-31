@@ -108,7 +108,9 @@ function FloatingNode({
         )
       )
     );
-  }, []);
+    // Shared values and per-instance constants — stable for this
+    // element's lifetime, so declaring them keeps the animation mount-only.
+  }, [duration, dx, dy, opacity, tx, ty]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -147,7 +149,9 @@ function Letter({
     opacity.value = withDelay(delay, withTiming(1, config));
     translateY.value = withDelay(delay, withTiming(0, config));
     rotate.value = withDelay(delay, withTiming(0, config));
-  }, []);
+    // Shared values and per-instance constants — stable for this
+    // element's lifetime, so declaring them keeps the animation mount-only.
+  }, [index, opacity, rotate, translateY]);
 
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -226,7 +230,8 @@ export default function SplashScreen() {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [titleWidth]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [titleWidth, bgOpacity, footerBlur, footerOpacity, footerTranslateY, glowRadius, penOpacity, penX]);
 
   const backgroundStyle = useAnimatedStyle(() => ({ opacity: bgOpacity.value }));
 

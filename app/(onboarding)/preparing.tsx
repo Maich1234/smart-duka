@@ -66,7 +66,10 @@ export default function Preparing() {
         setDone(true);
       }, 500 + items.length * ITEM_INTERVAL_MS + 500)
     );
-    return () => timersRef.current.forEach(clearTimeout);
+    // Captured now: by the time cleanup runs, timersRef.current may point at
+    // a different array, and we must clear the timers *this* run created.
+    const timers = timersRef.current;
+    return () => timers.forEach(clearTimeout);
   }, [items]);
 
   const progress = done ? 1 : revealed / (items.length + 1);

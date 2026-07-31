@@ -26,7 +26,8 @@ export const JourneyProgress: React.FC<JourneyProgressProps> = ({ step, total, o
 
   useEffect(() => {
     progress.value = withSpring(step / total, Motion.spring.enter);
-  }, [step, total]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [step, total, progress]);
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${Math.min(1, Math.max(0, progress.value)) * 100}%`,

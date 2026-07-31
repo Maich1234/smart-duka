@@ -15,7 +15,6 @@ import NetInfo from '@react-native-community/netinfo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { onQueueCountChange, onSyncStateChange, getPendingCount } from '@/utils/offlineQueue';
 import { Typography } from '@/constants/Typography';
-import { Spacing } from '@/constants/Spacing';
 
 // ─── Colour tokens ─────────────────────────────────────────────────────────────
 
@@ -39,7 +38,8 @@ const PulsingDot: React.FC = () => {
     pulse();
     const id = setInterval(pulse, 1000);
     return () => clearInterval(id);
-  }, []);
+    // opacity is a Reanimated shared value — stable identity, declared for honesty.
+  }, [opacity]);
 
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
@@ -64,7 +64,8 @@ type ToastPhase = 'offline' | 'syncing' | 'done' | 'hidden';
 
 export const OfflineIndicator: React.FC = () => {
   const [online, setOnline]           = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
+  // Seeded lazily so the subscribe effect below has nothing to set on mount.
+  const [pendingCount, setPendingCount] = useState(() => getPendingCount());
   const [syncing, setSyncing]         = useState(false);
   const [phase, setPhase]             = useState<ToastPhase>('hidden');
 
@@ -73,7 +74,7 @@ export const OfflineIndicator: React.FC = () => {
   // Refs used to drive auto-dismiss timers without stale closures
   const dismissTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doneTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevPendingRef   = useRef<number>(0);
+  const prevPendingRef   = useRef<number>(getPendingCount());
 
   const clearDismiss = () => {
     if (dismissTimerRef.current) { clearTimeout(dismissTimerRef.current); dismissTimerRef.current = null; }
@@ -84,10 +85,8 @@ export const OfflineIndicator: React.FC = () => {
 
   // Subscribe to reactive data sources
   useEffect(() => {
-    const initial = getPendingCount();
-    setPendingCount(initial);
-    // Seed the ref so the "queue just drained" logic works on the very first sync
-    prevPendingRef.current = initial;
+    // pendingCount and prevPendingRef are both seeded from getPendingCount()
+    // at declaration, so there is nothing to set here — only subscriptions.
 
     // Only an explicit false means offline — null is "no reading yet" and
     // must not flash the offline banner (matches api.ts/offlineManager policy).
@@ -103,13 +102,22 @@ export const OfflineIndicator: React.FC = () => {
     return () => { unsubNet(); unsubCount(); unsubSync(); };
   }, []);
 
-  // Drive the phase state machine
+  // Drive the phase state machine.
+  //
+  // set-state-in-effect is suppressed deliberately. This is a genuine external
+  // state machine: it reacts to connectivity and queue events, and two of its
+  // transitions are timed (offline auto-hides after 6s, "All synced" after 2s),
+  // so the phase cannot be derived from the inputs alone. Rewriting it as
+  // derived state needs an episode identity to tell one outage from the next,
+  // which reintroduces exactly the bookkeeping this replaces. It runs only when
+  // connectivity actually changes, not on every render.
   useEffect(() => {
     clearDismiss();
     clearDone();
 
     if (!online) {
       // Offline: show orange toast, auto-dismiss after 6 s
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('offline');
       dismissTimerRef.current = setTimeout(() => setPhase('hidden'), 6000);
       return;

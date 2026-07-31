@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { router } from 'expo-router';
@@ -75,7 +75,9 @@ export default function ForgotPasswordScreen() {
     defaultValues: { newPassword: '', confirmPassword: '' },
   });
 
-  const newPassword = resetForm.watch('newPassword') || '';
+  // useWatch, not watch(): watch() returns a fresh function each render, which
+  // makes the React Compiler skip optimising this screen entirely.
+  const newPassword = useWatch({ control: resetForm.control, name: 'newPassword' }) || '';
 
   const headlineMap: Record<Step, { headline: string; description: string }> = {
     request: {

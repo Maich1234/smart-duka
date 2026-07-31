@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { router } from 'expo-router';
@@ -59,7 +59,6 @@ export default function RegisterScreen() {
   const {
     control,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -75,7 +74,9 @@ export default function RegisterScreen() {
     },
   });
 
-  const password = watch('password') || '';
+  // useWatch, not watch(): watch() returns a fresh function each render, which
+  // makes the React Compiler skip optimising this screen entirely.
+  const password = useWatch({ control, name: 'password' }) || '';
 
   const onSubmit = async (data: RegisterForm) => {
     setLoading(true);

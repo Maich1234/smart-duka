@@ -259,7 +259,16 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
     );
 
     // Single available method → skip the chooser and send immediately.
+    //
+    // set-state-in-effect is accurate here, not a false positive: send() marks
+    // `sendingMethod` and clears `error` before it awaits, so opening the sheet
+    // costs one extra render. Suppressed rather than restructured — the fix
+    // would mean splitting send() into a "mark" and a "dispatch" half purely to
+    // serve this one call site, and send() is also the resend and
+    // method-choice path, which is not worth destabilising for one render on
+    // an already-animating modal.
     useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (phase === 'boot' && methods.length === 1) void send(methods[0].method);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

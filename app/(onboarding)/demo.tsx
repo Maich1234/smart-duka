@@ -49,7 +49,8 @@ const PulsingHint: React.FC<{ text: string }> = ({ text }) => {
       ),
       -1
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [scale]);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Animated.View style={[styles.hint, style]} entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>

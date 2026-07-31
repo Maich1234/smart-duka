@@ -3,7 +3,6 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { haptics } from '@/utils/haptics';
 import {
   View,
-  Text,
   StyleSheet,
   Platform,
   Dimensions,
@@ -15,10 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
   withSpring,
-  interpolate,
-  Extrapolation,
 } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/hooks/useSubscription';

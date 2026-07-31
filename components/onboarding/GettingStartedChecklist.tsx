@@ -46,7 +46,8 @@ const ProgressBar: React.FC<{ fraction: number }> = ({ fraction }) => {
   const width = useSharedValue(0);
   useEffect(() => {
     width.value = withSpring(fraction, Motion.spring.enter);
-  }, [fraction]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [fraction, width]);
   const style = useAnimatedStyle(() => ({ width: `${width.value * 100}%` }));
   return (
     <View style={styles.track}>

@@ -40,7 +40,8 @@ function ErrorMark() {
         withTiming(0, { duration: 133 })
       )
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [scale, shift]);
 
   const markStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shift.value }, { scale: scale.value }],

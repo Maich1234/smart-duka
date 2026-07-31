@@ -37,7 +37,8 @@ function Dot({ diameter, delay }: { diameter: number; delay: number }) {
         -1
       )
     );
-  }, [delay]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [delay, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

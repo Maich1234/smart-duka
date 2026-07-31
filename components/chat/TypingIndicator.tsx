@@ -34,7 +34,8 @@ function Dot({ delay }: { delay: number }) {
         -1
       )
     );
-  }, [delay]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [delay, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return <Animated.View style={[s.dot, animatedStyle]} />;

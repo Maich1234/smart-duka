@@ -43,7 +43,9 @@ const Piece: React.FC<{ spec: PieceSpec }> = ({ spec }) => {
       spec.delay,
       withTiming(1, { duration: spec.duration, easing: Easing.in(Easing.quad) })
     );
-  }, []);
+    // Shared values and per-instance constants — stable for this
+    // element's lifetime, so declaring them keeps the animation mount-only.
+  }, [spec.delay, spec.duration, t]);
 
   const style = useAnimatedStyle(() => ({
     opacity: t.value < 0.85 ? 1 : 1 - (t.value - 0.85) / 0.15,

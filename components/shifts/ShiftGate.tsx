@@ -62,7 +62,8 @@ export const ActiveShiftBar: React.FC = () => {
       ),
       -1
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [pulse]);
   const dotStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
   if (!enabled || !shift) return null;

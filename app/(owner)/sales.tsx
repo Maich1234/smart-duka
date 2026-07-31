@@ -57,7 +57,7 @@ export default function OwnerSales() {
 
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [staffId, setStaffId] = useState('');
+  const [staffId] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
@@ -69,7 +69,6 @@ export default function OwnerSales() {
     selectRecent,
     recentSearches,
     clearRecent,
-    clear: clearSearch,
   } = useSearch('sales');
   const [showDateSheet, setShowDateSheet] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -130,21 +129,27 @@ export default function OwnerSales() {
   const shopMotto = shopConfigData?.data.motto;
   // Bounds for the date-range picker: sales can't predate the shop or land
   // in the future, so neither is worth letting the user select.
+  //
+  // Read into a local first: memoising on `shopConfigData?.data.createdAt`
+  // directly gave the React Compiler a dependency narrower than the one it
+  // infers from the body (`shopConfigData`), so it bailed out of optimising
+  // this component entirely.
+  const shopCreatedAtRaw = shopConfigData?.data.createdAt;
   const shopCreatedAt = useMemo(
-    () => (shopConfigData?.data.createdAt ? new Date(shopConfigData.data.createdAt) : new Date(0)),
-    [shopConfigData?.data.createdAt]
+    () => (shopCreatedAtRaw ? new Date(shopCreatedAtRaw) : new Date(0)),
+    [shopCreatedAtRaw]
   );
   const today = useMemo(() => new Date(), []);
 
-  const allSales = salesData?.pages.flatMap((p) => p.data) ?? [];
   const totalCount = salesData?.pages[0]?.pagination.total ?? 0;
 
   // Search happens server-side (invoice number + cashier name); this only
-  // applies the display sort order.
-  const sales = useMemo(
-    () => (sortOrder === 'asc' ? [...allSales].reverse() : allSales),
-    [allSales, sortOrder],
-  );
+  // applies the display sort order. Flattening lives inside the memo so the
+  // array isn't rebuilt (and the memo invalidated) on every render.
+  const sales = useMemo(() => {
+    const allSales = salesData?.pages.flatMap((p) => p.data) ?? [];
+    return sortOrder === 'asc' ? [...allSales].reverse() : allSales;
+  }, [salesData, sortOrder]);
 
   const voidMutation = useMutation({
     mutationFn: (saleId: string) => voidSale(saleId),

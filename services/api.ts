@@ -6,6 +6,10 @@ import { refreshAuthToken } from '@/utils/tokenRefresh';
 import { randomUUID } from '@/utils/uuid';
 import NetInfo from '@react-native-community/netinfo';
 
+// axios also exports a bare `create`, which makes import/no-named-as-default-member
+// flag this — but `axios.create` on the default export is the documented way to
+// build a configured instance, and the bare export is not equivalent.
+// eslint-disable-next-line import/no-named-as-default-member
 const api = axios.create({
   baseURL: API_BASE_URL,
   // 12 s — short enough that users don't wait forever on a dead connection,

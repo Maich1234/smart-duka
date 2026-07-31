@@ -40,7 +40,8 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
       duration,
       easing: Easing.out(Easing.cubic),
     });
-  }, [progress, duration]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [progress, duration, animated]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - animated.value),

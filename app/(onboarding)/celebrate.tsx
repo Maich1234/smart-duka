@@ -45,7 +45,8 @@ const Halo: React.FC = () => {
       ),
       -1
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [opacity, scale]);
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: scale.value }],
@@ -66,7 +67,8 @@ export default function Celebrate() {
       setShowConfetti(true);
     }, 400);
     return () => clearTimeout(t);
-  }, []);
+    // markCompleted is a zustand action — stable, declared for honesty.
+  }, [markCompleted]);
 
   // Quietly apply what they told us during the journey — currency and
   // location land in the shop config without another form.
@@ -81,6 +83,10 @@ export default function Celebrate() {
     updateShopConfig(patch)
       .then(() => queryClient.invalidateQueries({ queryKey: ['shopConfig'] }))
       .catch(() => {});
+    // Deliberately keyed on `user` alone: this fires once the owner is known
+    // and PATCHes the shop. Re-running it whenever a draft field changes would
+    // re-issue that write for no reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Owners flow into the trial-activation moment ("your shop is ready —

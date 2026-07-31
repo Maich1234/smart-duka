@@ -26,7 +26,8 @@ function EmptyBox() {
       -1,
       true
     );
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [progress]);
 
   const boxStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: progress.value * 14 }],

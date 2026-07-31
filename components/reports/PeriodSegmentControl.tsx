@@ -33,7 +33,8 @@ export const PeriodSegmentControl: React.FC<Props> = ({ value, onChange }) => {
         overshootClamping: false,
       });
     }
-  }, [activeIndex, containerWidth]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [activeIndex, containerWidth, pillX]);
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: pillX.value }],

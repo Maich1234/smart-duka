@@ -15,7 +15,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { haptics } from '@/utils/haptics';
@@ -71,7 +71,8 @@ function SuccessCheckmark({ color }: { color: string }) {
       duration: 420,
       easing: Easing.out(Easing.cubic),
     });
-  }, []);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [progress]);
 
   // strokeDasharray total ≈ 34 for this path at 40×40 viewBox
   const DASH_LENGTH = 34;
@@ -107,7 +108,8 @@ function AlertIcon({ type }: { type: AlertConfig['type'] }) {
         pulse.value = withSpring(1, { damping: 12, stiffness: 200 });
       });
     }
-  }, [type]);
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [type, pulse]);
 
   const iconScale = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
@@ -215,8 +217,17 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
     dismissTimerRef.current = setTimeout(callback, 155);
   };
 
+  // set-state-in-effect is accurate but the pattern is deliberate: localConfig
+  // and modalMounted exist to keep the alert's content on screen through its
+  // exit animation, which means remembering a value after the prop that
+  // supplied it has gone. Deriving that is not possible without holding the
+  // previous config somewhere, and this runs once per alert open, not per
+  // render. Removing the buffer would mean lifting config ownership into
+  // AlertProvider — a rewrite of the app's global alert primitive for one
+  // render, which isn't a trade worth making here.
   useEffect(() => {
     if (visible && config) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalConfig(config);
       setModalMounted(true);
       // Small delay so modal mounts before animation starts
@@ -254,6 +265,11 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
     return () => {
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
+    // Deliberately keyed on the open/close transition only. The animation
+    // helpers are recreated every render and `modalMounted` is written inside,
+    // so declaring them would replay the entrance animation (or loop on the
+    // exit) on every re-render of an open alert.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const overlayAnim = useAnimatedStyle(() => ({

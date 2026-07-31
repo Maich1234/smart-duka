@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { router } from 'expo-router';
@@ -59,14 +59,15 @@ export default function OnboardingSignup() {
   const {
     control,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
     defaultValues: { name: draft.ownerName, email: '', password: '', confirmPassword: '' },
   });
 
-  const password = watch('password') || '';
+  // useWatch, not watch(): watch() returns a fresh function each render, which
+  // makes the React Compiler skip optimising this screen entirely.
+  const password = useWatch({ control, name: 'password' }) || '';
 
   const onSubmit = async (data: SignupForm) => {
     setLoading(true);

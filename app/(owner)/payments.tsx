@@ -57,7 +57,6 @@ export default function PaymentsScreen() {
     data,
     isLoading,
     isRefetching,
-    isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
     refetch,

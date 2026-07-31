@@ -22,7 +22,7 @@ export interface SupplierStats {
 
 export interface SupplierDetail extends Supplier {
   stats: SupplierStats;
-  recentPurchases: Array<{ _id: string; grandTotal: number; createdAt: string; status: string }>;
+  recentPurchases: { _id: string; grandTotal: number; createdAt: string; status: string }[];
 }
 
 export interface SuppliersResponse {
