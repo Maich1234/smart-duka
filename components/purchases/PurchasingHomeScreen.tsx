@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -62,7 +62,7 @@ const ActionTile: React.FC<ActionTileProps> = ({ icon, title, onPress }) => (
 export function PurchasingHomeScreen() {
   const role = useAuthStore((s: AuthState) => s.user?.role);
   const base = purchasingBasePath(role);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const canView = usePermission('view_purchases');
   const canCreate = usePermission('create_purchases');
 

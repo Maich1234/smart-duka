@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useAuth } from '@/context/AuthContext';
 import { changePassword } from '@/services/auth';
 import { AccountInfo } from '@/components/profile/AccountInfo';
@@ -17,7 +17,7 @@ import { Spacing } from '@/constants/Spacing';
 
 export default function StaffProfile() {
   const { user, logout } = useAuth();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const { toast, alert } = useAlert();
 

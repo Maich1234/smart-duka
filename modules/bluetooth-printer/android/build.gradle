@@ -3,7 +3,7 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
-group = 'com.wabunifu.smartduka'
+group = 'com.nifulabs.dukana'
 version = '0.1.0'
 
 android {

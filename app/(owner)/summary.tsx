@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { QueryError } from '@/components/ui/QueryError';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { getDailySummary } from '@/services/shifts';
 import { formatCurrency } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
@@ -57,6 +58,7 @@ const Section: React.FC<{ title: string; delay?: number; children: React.ReactNo
 );
 
 export default function DailySummaryScreen() {
+  const tabBarHeight = useTabBarHeight();
   const params = useLocalSearchParams<{ date?: string }>();
   const [date, setDate] = useState(
     params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : isoDay(new Date())
@@ -91,7 +93,7 @@ export default function DailySummaryScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} colors={[Colors.primary]} />
@@ -275,7 +277,7 @@ export default function DailySummaryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+  content: { padding: Spacing.md },
   dayRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md },
   dayBtn: {
     width: 38,

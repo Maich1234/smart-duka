@@ -1,12 +1,12 @@
-# Smart Duka — Design Reference
+# Dukana — Design Reference
 
-A reference for designers working on Smart Duka, a mobile app (Expo / React Native) for shop owners and staff to manage inventory, sales, expenses, and staff. This document describes the current implemented UI: design tokens, components, screens, and key flows — so designs stay consistent with what's already built and easy for engineering to implement.
+A reference for designers working on Dukana, a mobile app (Expo / React Native) for shop owners and staff to manage inventory, sales, expenses, and staff. This document describes the current implemented UI: design tokens, components, screens, and key flows — so designs stay consistent with what's already built and easy for engineering to implement.
 
 ---
 
 ## 1. App overview
 
-Smart Duka has two parallel experiences sharing the same visual language but different navigation and permissions:
+Dukana has two parallel experiences sharing the same visual language but different navigation and permissions:
 
 - **Owner** — full access: dashboard, inventory, sales, staff management, reports, expenses, profile/shop settings.
 - **Staff** — scoped subset: dashboard, inventory, sales, expenses, profile. No staff management or reports tab.

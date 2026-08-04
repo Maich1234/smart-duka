@@ -83,7 +83,7 @@ export async function buildReceiptHtml(
   <h2 style="text-align:center;margin:0 0 2px;font-size:16px">${escapeHtml(shopName)}</h2>
   ${mottoLine}
   ${phoneLine}
-  <p style="text-align:center;margin:0 0 10px;font-size:9px;color:#666">Smart Duka POS</p>
+  <p style="text-align:center;margin:0 0 10px;font-size:9px;color:#666">Dukana POS</p>
   <hr style="border:none;border-top:1px dashed #000;margin:8px 0">
   <table style="width:100%;font-size:10px;margin-bottom:4px">
     <tr><td><b>Invoice</b></td><td style="text-align:right">${escapeHtml(sale.invoiceNumber)}</td></tr>

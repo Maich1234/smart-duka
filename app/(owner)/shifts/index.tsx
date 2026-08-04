@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { getShifts, type Shift } from '@/services/shifts';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
@@ -49,6 +50,7 @@ const DiscrepancyBadge: React.FC<{ value: number | null | undefined }> = ({ valu
 };
 
 export default function ShiftsList() {
+  const tabBarHeight = useTabBarHeight();
   const [page, setPage] = useState(1);
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ['shifts', page],
@@ -65,7 +67,9 @@ export default function ShiftsList() {
       data={shifts}
       keyExtractor={(item) => item._id}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.list}
+      // The floating tab bar overlaps the list — without this the last shift
+      // card sits underneath it.
+      contentContainerStyle={{ ...styles.list, paddingBottom: tabBarHeight + Spacing.lg }}
       refreshControl={
         <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} colors={[Colors.primary]} />
       }
@@ -145,7 +149,7 @@ export default function ShiftsList() {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+  list: { padding: Spacing.md },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,

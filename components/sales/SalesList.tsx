@@ -1,7 +1,7 @@
 import React from 'react';
 import { RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { SaleCard } from './SaleCard';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -30,7 +30,7 @@ export const SalesList: React.FC<SalesListProps> = ({
   isFetchingNextPage = false,
   listHeader,
 }) => {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
 
   if (isLoading && sales.length === 0) {
     return <LoadingState fullscreen={false} />;

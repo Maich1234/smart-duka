@@ -6,6 +6,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { QueryError } from '@/components/ui/QueryError';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { getShiftById, type ShiftSummary } from '@/services/shifts';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
@@ -40,6 +41,7 @@ const Section: React.FC<{ title: string; delay?: number; children: React.ReactNo
 );
 
 export default function ShiftReport() {
+  const tabBarHeight = useTabBarHeight();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['shift', id],
@@ -74,7 +76,7 @@ export default function ShiftReport() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Verdict banner */}
@@ -159,7 +161,7 @@ export default function ShiftReport() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+  content: { padding: Spacing.md },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -66,6 +66,12 @@ export interface CommissionSummary {
   totalRevenue: number;
   salesCount: number;
   byProduct: CommissionBreakdownEntry[];
+  /**
+   * Whether this person is on commission at all. Lets the UI distinguish
+   * "not set up to earn commission" from "earned nothing yet" — a bare zero
+   * for the former reads as a broken feature rather than a setting.
+   */
+  eligible?: boolean;
 }
 
 export interface CommissionSummaryResponse {

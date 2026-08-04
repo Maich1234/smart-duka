@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSubscription, useInvalidateSubscription } from '@/hooks/useSubscription';
 import { type SubscriptionPlan } from '@/services/subscription';
 import { Colors } from '@/constants/Colors';
@@ -10,6 +11,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { formatDate } from '@/utils/formatters';
+import { describeSubscription } from '@/utils/subscriptionStatus';
 
 const STATE_META = {
   none: { label: 'Not activated', color: Colors.textSecondary, bg: Colors.background, icon: 'gift-outline' as const },
@@ -38,6 +40,7 @@ const STATE_META = {
  * linking to checkout is permitted and where the renewal funnel now lives.
  */
 export default function SubscriptionScreen() {
+  const tabBarHeight = useTabBarHeight();
   const { subscription, access, isLoading, refetch } = useSubscription();
   const invalidate = useInvalidateSubscription();
   const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +48,11 @@ export default function SubscriptionScreen() {
   const plan = (subscription?.plan ?? null) as SubscriptionPlan | null;
   const state = access?.state ?? 'none';
   const meta = STATE_META[state];
+  // A zero-priced tier is a free *plan*, not a countdown to a purchase —
+  // calling it a "trial" makes free-tier shops think they are about to lose
+  // the app. The date still matters, so the countdown copy stays.
+  const status = describeSubscription(access, plan);
+  const trialLabel = status?.isFree ? 'free plan' : 'free trial';
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -61,22 +69,27 @@ export default function SubscriptionScreen() {
   return (
     <ScrollView
       style={styles.flex}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
     >
       <Animated.View entering={FadeInUp.duration(360)} style={styles.card}>
         <View style={[styles.statusChip, { backgroundColor: meta.bg }]}>
           <Ionicons name={meta.icon} size={14} color={meta.color} />
-          <Text style={[styles.statusChipText, { color: meta.color }]}>{meta.label}</Text>
+          <Text style={[styles.statusChipText, { color: meta.color }]}>
+            {state === 'trialing' && status?.isFree ? 'Free plan' : meta.label}
+          </Text>
         </View>
 
         <Text style={styles.planName}>{plan?.name ?? 'No plan yet'}</Text>
         {plan?.tagline ? <Text style={styles.planTagline}>{plan.tagline}</Text> : null}
 
-        {state === 'trialing' && access?.expiresAt && (
+        {state === 'trialing' && access?.expiresAt && status && (
           <Text style={styles.detail}>
-            Your free trial runs until {formatDate(access.expiresAt)} — {access.daysLeft} day
-            {access.daysLeft === 1 ? '' : 's'} left.
+            Your {trialLabel} runs until {formatDate(access.expiresAt)} —{' '}
+            {status.daysLeft === 0
+              ? 'today is the last day'
+              : `${status.daysLeft} day${status.daysLeft === 1 ? '' : 's'} left`}
+            .
           </Text>
         )}
         {state === 'active' && access?.expiresAt && (

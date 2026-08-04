@@ -1,6 +1,6 @@
-# Smart Duka — Full App Documentation
+# Dukana — Full App Documentation
 
-Smart Duka is a mobile-first Point-of-Sale (POS) system for Kenyan small businesses. It runs on Android and iOS via Expo, with a companion web export for receipt verification. The backend is a Node.js/Express REST API deployed on Vercel with MongoDB Atlas.
+Dukana is a mobile-first Point-of-Sale (POS) system for Kenyan small businesses. It runs on Android and iOS via Expo, with a companion web export for receipt verification. The backend is a Node.js/Express REST API deployed on Vercel with MongoDB Atlas.
 
 ---
 
@@ -144,7 +144,7 @@ smart-duka-backend/             # Backend (Express)
 API_BASE_URL  = 'https://smart-duka-backend-iota.vercel.app/api/v1'
 PUBLIC_WEB_URL = 'https://smart-duka.vercel.app'   // receipt QR base URL
 HELP_CENTER_URL = 'https://smart-duka--01nm282g2e.expo.app/'
-APP_SCHEME    = 'smartduka'                        // deep-link scheme
+APP_SCHEME    = 'dukana'                        // deep-link scheme
 ```
 
 ### Backend — `.env`
@@ -322,7 +322,7 @@ Track business running costs.
 
 #### Overview
 
-Each Smart Duka business connects their own **Lipa Na M-Pesa Business** account. Customers pay via STK Push (prompt on their phone) directly from the staff checkout screen. No shared Safaricom credentials — every shop owns their keys.
+Each Dukana business connects their own **Lipa Na M-Pesa Business** account. Customers pay via STK Push (prompt on their phone) directly from the staff checkout screen. No shared Safaricom credentials — every shop owns their keys.
 
 **Refunds (Transaction Reversal):** the config form has an optional "Refund Credentials" section — the **Initiator Name** (Daraja API operator username) and **Security Credential** (the RSA-encrypted initiator password generated on the Daraja portal). With these saved, M-Pesa sales can be refunded straight back to the customer's phone from the sale detail modal. Without them, refunds fall back to cash-over-the-counter. Both are stored encrypted like the other credentials.
 

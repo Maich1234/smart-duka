@@ -48,8 +48,19 @@ const PRESETS: { label: string; range: () => { from: string; to: string } }[] = 
   },
 ];
 
-const FORMATS: { value: BookFormat; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: 'pdf', label: 'PDF', icon: 'document-text-outline' },
+/**
+ * PDF first and on its own row: it is the format an accountant, a landlord or
+ * a loan officer actually asks for, and it is the only one most phones can
+ * open without another app installed. Excel and CSV are for the minority who
+ * will work the numbers themselves.
+ */
+const PRIMARY_FORMAT: { value: BookFormat; label: string; icon: keyof typeof Ionicons.glyphMap } = {
+  value: 'pdf',
+  label: 'Download PDF',
+  icon: 'document-text-outline',
+};
+
+const SECONDARY_FORMATS: { value: BookFormat; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: 'xlsx', label: 'Excel', icon: 'grid-outline' },
   { value: 'csv', label: 'CSV', icon: 'list-outline' },
 ];
@@ -105,6 +116,8 @@ export default function BooksScreen() {
     [doc]
   );
 
+  const downloadDisabled = isEmpty || downloading !== null;
+
   const handleDownload = async (format: BookFormat) => {
     if (!doc || !activeKey) return;
     haptics.selection();
@@ -118,13 +131,17 @@ export default function BooksScreen() {
     }
   };
 
+  // The tab bar floats over this screen and the header above it already
+  // carries the title, so the top inset belongs to neither.
+  const screenProps = { edges: ['left', 'right'] as const, tabBarSpacing: true };
+
   if (catalogueQuery.isLoading) {
-    return <Screen><ListSkeleton rows={4} /></Screen>;
+    return <Screen {...screenProps}><ListSkeleton rows={4} /></Screen>;
   }
 
   if (catalogueQuery.isError) {
     return (
-      <Screen>
+      <Screen {...screenProps}>
         <QueryError
           message="Couldn't load your records. They're prepared on our servers, so this needs a connection."
           onRetry={() => catalogueQuery.refetch()}
@@ -134,8 +151,7 @@ export default function BooksScreen() {
   }
 
   return (
-    <Screen>
-      <Text style={s.title}>Financial Records</Text>
+    <Screen {...screenProps}>
       <Text style={s.subtitle}>
         Your books, ready to share with your accountant or your bank.
       </Text>
@@ -266,28 +282,54 @@ export default function BooksScreen() {
             </View>
           )}
 
-          <View style={s.downloadRow}>
-            {FORMATS.map(({ value, label, icon }) => (
-              <AnimatedPressable
-                key={value}
-                onPress={() => handleDownload(value)}
-                disabled={isEmpty || downloading !== null}
-                style={[s.downloadBtn, (isEmpty || downloading !== null) && s.downloadBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel={`Download as ${label}`}
-              >
-                {downloading === value ? (
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                ) : (
-                  <Ionicons name={icon} size={20} color={Colors.primary} />
-                )}
-                <Text style={s.downloadText}>{label}</Text>
-              </AnimatedPressable>
-            ))}
+          <View style={s.card}>
+            <Text style={s.sectionHeading}>Download</Text>
+
+            <AnimatedPressable
+              onPress={() => handleDownload(PRIMARY_FORMAT.value)}
+              disabled={downloadDisabled}
+              style={[s.primaryBtn, downloadDisabled && s.btnDisabled]}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: downloadDisabled, busy: downloading === PRIMARY_FORMAT.value }}
+              accessibilityLabel="Download this book as a PDF"
+            >
+              {downloading === PRIMARY_FORMAT.value ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Ionicons name={PRIMARY_FORMAT.icon} size={18} color={Colors.white} />
+              )}
+              <Text style={s.primaryBtnText}>
+                {downloading === PRIMARY_FORMAT.value ? 'Preparing…' : PRIMARY_FORMAT.label}
+              </Text>
+            </AnimatedPressable>
+
+            <View style={s.secondaryRow}>
+              {SECONDARY_FORMATS.map(({ value, label, icon }) => (
+                <AnimatedPressable
+                  key={value}
+                  onPress={() => handleDownload(value)}
+                  disabled={downloadDisabled}
+                  style={[s.secondaryBtn, downloadDisabled && s.btnDisabled]}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: downloadDisabled, busy: downloading === value }}
+                  accessibilityLabel={`Download this book as ${label}`}
+                >
+                  {downloading === value ? (
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  ) : (
+                    <Ionicons name={icon} size={17} color={Colors.primary} />
+                  )}
+                  <Text style={s.secondaryBtnText}>{label}</Text>
+                </AnimatedPressable>
+              ))}
+            </View>
+
+            <Text style={s.shareHint}>
+              {isEmpty
+                ? 'Nothing to download for this period yet.'
+                : 'Saves to your phone, or send straight to WhatsApp or email.'}
+            </Text>
           </View>
-          <Text style={s.shareHint}>
-            Saves to your phone, or send straight to WhatsApp or email.
-          </Text>
         </>
       )}
     </Screen>
@@ -295,12 +337,6 @@ export default function BooksScreen() {
 }
 
 const s = StyleSheet.create({
-  title: {
-    fontSize: Typography.size.h2,
-    fontFamily: Typography.fontFamilyBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.4,
-  },
   subtitle: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,
@@ -448,26 +484,41 @@ const s = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 4,
   },
-  downloadRow: { flexDirection: 'row', gap: Spacing.sm },
-  downloadBtn: {
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primary,
+    minHeight: 48,
+  },
+  primaryBtnText: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.white,
+  },
+  secondaryRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+  secondaryBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.xs,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
     borderRadius: BorderRadius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderWidth: 1,
+    borderColor: Colors.border,
     backgroundColor: Colors.surface,
-    minHeight: 48,
+    minHeight: 44,
   },
-  downloadBtnDisabled: { opacity: 0.4 },
-  downloadText: {
+  secondaryBtnText: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.primary,
   },
+  btnDisabled: { opacity: 0.45 },
   shareHint: {
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,

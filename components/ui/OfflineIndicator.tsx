@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from './AnimatedPressable';
 import Animated, {
   useSharedValue,
@@ -13,7 +13,15 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { onQueueCountChange, onSyncStateChange, getPendingCount } from '@/utils/offlineQueue';
+import {
+  onQueueCountChange,
+  onSyncStateChange,
+  getPendingCount,
+  getFailedCount,
+  retryAllFailed,
+  discardAllFailed,
+} from '@/utils/offlineQueue';
+import { useAlert } from '@/context/AlertContext';
 import { Typography } from '@/constants/Typography';
 
 // ─── Colour tokens ─────────────────────────────────────────────────────────────
@@ -21,6 +29,7 @@ import { Typography } from '@/constants/Typography';
 const OFFLINE_BG   = '#F97316'; // warm orange
 const SYNCING_BG   = '#0F766E'; // teal
 const DONE_BG      = '#15803D'; // green — brief "all synced" flash
+const FAILED_BG    = '#B91C1C'; // red — needs a decision from the user
 const PILL_TEXT    = '#FFFFFF';
 
 // ─── Pulsing dot for "syncing" state ──────────────────────────────────────────
@@ -58,7 +67,7 @@ const dot = StyleSheet.create({
 
 // ─── State machine ─────────────────────────────────────────────────────────────
 
-type ToastPhase = 'offline' | 'syncing' | 'done' | 'hidden';
+type ToastPhase = 'offline' | 'syncing' | 'done' | 'failed' | 'hidden';
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
@@ -66,10 +75,12 @@ export const OfflineIndicator: React.FC = () => {
   const [online, setOnline]           = useState(true);
   // Seeded lazily so the subscribe effect below has nothing to set on mount.
   const [pendingCount, setPendingCount] = useState(() => getPendingCount());
+  const [failedCount, setFailedCount]   = useState(() => getFailedCount());
   const [syncing, setSyncing]         = useState(false);
   const [phase, setPhase]             = useState<ToastPhase>('hidden');
 
   const insets = useSafeAreaInsets();
+  const { alert, toast } = useAlert();
 
   // Refs used to drive auto-dismiss timers without stale closures
   const dismissTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -91,9 +102,10 @@ export const OfflineIndicator: React.FC = () => {
     // Only an explicit false means offline — null is "no reading yet" and
     // must not flash the offline banner (matches api.ts/offlineManager policy).
     const unsubNet   = NetInfo.addEventListener(s => setOnline(s.isConnected !== false));
-    const unsubCount = onQueueCountChange(count => {
-      setPendingCount(count);
-      prevPendingRef.current = count;
+    const unsubCount = onQueueCountChange((pending, failed) => {
+      setPendingCount(pending);
+      setFailedCount(failed);
+      prevPendingRef.current = pending;
     });
     const unsubSync  = onSyncStateChange(setSyncing);
 
@@ -115,9 +127,18 @@ export const OfflineIndicator: React.FC = () => {
     clearDismiss();
     clearDone();
 
+    // Failures outrank every other state and never auto-dismiss: these are
+    // writes the server refused, so they are lost unless the user acts. They
+    // used to be marked failed and then never read by anything — the sale
+    // simply disappeared with no feedback and no way back.
+    if (failedCount > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPhase('failed');
+      return;
+    }
+
     if (!online) {
       // Offline: show orange toast, auto-dismiss after 6 s
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhase('offline');
       dismissTimerRef.current = setTimeout(() => setPhase('hidden'), 6000);
       return;
@@ -138,24 +159,79 @@ export const OfflineIndicator: React.FC = () => {
 
     // All clear
     setPhase('hidden');
-  }, [online, syncing, pendingCount]);
+  }, [online, syncing, pendingCount, failedCount]);
 
   // Cleanup on unmount
   useEffect(() => () => { clearDismiss(); clearDone(); }, []);
 
+  // Offers the only two honest options for a rejected write: try it again
+  // (the cause may have been fixed since — restocked, permission granted), or
+  // acknowledge it is gone. Discarding is destructive and irreversible, so it
+  // is the danger action behind a confirmation, never the default.
+  const openFailedActions = () => {
+    const noun = `${failedCount} change${failedCount > 1 ? 's' : ''}`;
+    alert({
+      type: 'warning',
+      title: 'Some changes could not sync',
+      message: `${failedCount > 1 ? `${noun} were` : `${noun} was`} rejected by the server — often because stock ran out or the item changed while you were offline. Retry to send ${failedCount > 1 ? 'them' : 'it'} again, or discard to remove ${failedCount > 1 ? 'them' : 'it'} for good.`,
+      buttons: [
+        {
+          label: 'Retry',
+          variant: 'primary',
+          onPress: () => {
+            const n = retryAllFailed();
+            toast({ type: 'info', message: `Retrying ${n} change${n === 1 ? '' : 's'}…` });
+          },
+        },
+        {
+          label: 'Discard',
+          variant: 'danger',
+          onPress: () => {
+            alert({
+              type: 'confirm',
+              title: 'Discard failed changes?',
+              message: 'They will be permanently removed from this device and will never reach the server. This cannot be undone.',
+              buttons: [
+                { label: 'Cancel', variant: 'ghost' },
+                {
+                  label: 'Discard',
+                  variant: 'danger',
+                  onPress: () => {
+                    const n = discardAllFailed();
+                    toast({ type: 'warning', message: `Discarded ${n} change${n === 1 ? '' : 's'}.` });
+                  },
+                },
+              ],
+            });
+          },
+        },
+        { label: 'Not now', variant: 'ghost' },
+      ],
+    });
+  };
+
   if (phase === 'hidden') return null;
 
-  const bg = phase === 'offline' ? OFFLINE_BG : phase === 'done' ? DONE_BG : SYNCING_BG;
+  const bg =
+    phase === 'failed' ? FAILED_BG
+      : phase === 'offline' ? OFFLINE_BG
+        : phase === 'done' ? DONE_BG
+          : SYNCING_BG;
 
   const label =
-    phase === 'offline'
-      ? `No internet${pendingCount > 0 ? ` · ${pendingCount} pending` : ''}`
-      : phase === 'done'
-        ? 'All synced'
-        : `Syncing${pendingCount > 0 ? ` ${pendingCount} item${pendingCount > 1 ? 's' : ''}` : ''}…`;
+    phase === 'failed'
+      ? `${failedCount} change${failedCount > 1 ? 's' : ''} failed to sync · Tap to fix`
+      : phase === 'offline'
+        ? `No internet${pendingCount > 0 ? ` · ${pendingCount} pending` : ''}`
+        : phase === 'done'
+          ? 'All synced'
+          : `Syncing${pendingCount > 0 ? ` ${pendingCount} item${pendingCount > 1 ? 's' : ''}` : ''}…`;
 
   const iconName: keyof typeof Ionicons.glyphMap =
-    phase === 'offline' ? 'cloud-offline-outline' : phase === 'done' ? 'checkmark-circle-outline' : 'sync-outline';
+    phase === 'failed' ? 'alert-circle-outline'
+      : phase === 'offline' ? 'cloud-offline-outline'
+        : phase === 'done' ? 'checkmark-circle-outline'
+          : 'sync-outline';
 
   return (
     <Animated.View
@@ -164,7 +240,15 @@ export const OfflineIndicator: React.FC = () => {
       style={[styles.wrapper, { top: insets.top + 10 }]}
       pointerEvents="box-none"
     >
-      <View style={[styles.pill, { backgroundColor: bg }]}>
+      <AnimatedPressable
+        style={[styles.pill, { backgroundColor: bg }]}
+        // Only the failed pill is interactive — the others are pure status.
+        onPress={phase === 'failed' ? openFailedActions : undefined}
+        disabled={phase !== 'failed'}
+        accessibilityRole={phase === 'failed' ? 'button' : 'text'}
+        accessibilityLabel={label}
+        accessibilityHint={phase === 'failed' ? 'Opens options to retry or discard the changes that failed to sync' : undefined}
+      >
         {phase === 'syncing' ? (
           <PulsingDot />
         ) : (
@@ -172,17 +256,21 @@ export const OfflineIndicator: React.FC = () => {
         )}
         <Text style={styles.label} numberOfLines={1}>{label}</Text>
 
-        {/* Close button — lets user dismiss the toast early */}
-        {phase !== 'done' && (
+        {/* Close button — lets user dismiss the toast early. Withheld while
+            changes have failed: dismissing would hide the only surface that
+            can recover them, and the pill would not come back on its own. */}
+        {phase !== 'done' && phase !== 'failed' && (
           <AnimatedPressable
             onPress={() => setPhase('hidden')}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={styles.close}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
           >
             <Ionicons name="close" size={14} color="rgba(255,255,255,0.75)" />
           </AnimatedPressable>
         )}
-      </View>
+      </AnimatedPressable>
     </Animated.View>
   );
 };

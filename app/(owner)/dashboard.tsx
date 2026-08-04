@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
@@ -81,7 +81,7 @@ const DashboardSkeleton = () => (
 
 export default function OwnerDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const insets = useSafeAreaInsets();
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['ownerDashboard'],
@@ -115,7 +115,7 @@ export default function OwnerDashboard() {
   }, []);
 
   const shopInitials = useMemo(
-    () => getShopInitials(user?.shop?.name ?? 'Smart Duka'),
+    () => getShopInitials(user?.shop?.name ?? 'Dukana'),
     [user?.shop?.name],
   );
 
@@ -169,7 +169,7 @@ export default function OwnerDashboard() {
           {/* 1 · Who and when */}
           <DashboardHeader
             greeting={timeContext.greeting}
-            shopName={user?.shop?.name ?? 'Smart Duka'}
+            shopName={user?.shop?.name ?? 'Dukana'}
             formattedDate={timeContext.formattedDate}
             shopInitials={shopInitials}
             unreadCount={unreadCount}

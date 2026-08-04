@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Button } from '@/components/ui/Button';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useAlert } from '@/context/AlertContext';
 import { getShopConfig, updateShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
@@ -37,6 +38,7 @@ const MAX_METHODS = 12;
  * (and only if) the shop has connected M-Pesa Business.
  */
 export const PaymentMethodsScreen: React.FC = () => {
+  const tabBarHeight = useTabBarHeight();
   const { toast, alert } = useAlert();
   const queryClient = useQueryClient();
 
@@ -190,7 +192,7 @@ export const PaymentMethodsScreen: React.FC = () => {
 
   return (
     <View style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]} keyboardShouldPersistTaps="handled">
         <Animated.View entering={FadeInUp.duration(320)}>
           <Text style={styles.intro}>
             These are the buttons your cashier sees when finishing a sale. Every one of them records
@@ -363,7 +365,7 @@ export const PaymentMethodsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
-  content: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+  content: { padding: Spacing.md },
   intro: {
     fontSize: Typography.size.small,
     color: Colors.textSecondary,

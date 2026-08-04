@@ -7,8 +7,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { getSalesReport, type ReportPeriod } from '@/services/reports';
@@ -30,6 +29,7 @@ import {
   PeakActivitySection,
 } from '@/components/reports/ReportSections';
 import { ReportsSkeleton } from '@/components/reports/ReportsSkeleton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { haptics } from '@/utils/haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -38,45 +38,6 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Motion } from '@/constants/Motion';
-
-// ─── page header ──────────────────────────────────────────────────────────────
-
-function ReportsHeader() {
-  return (
-    <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={h.container}>
-      <View style={h.left}>
-        <Text style={h.title}>Reports</Text>
-        <Text style={h.subtitle}>Track performance and grow your business</Text>
-      </View>
-    </Animated.View>
-  );
-}
-
-const h = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
-  left: {
-    flex: 1,
-    gap: 3,
-  },
-  title: {
-    fontSize: Typography.size.h1,
-    fontFamily: Typography.fontFamilyBold,
-    color: Colors.textPrimary,
-    letterSpacing: -0.6,
-    lineHeight: 36,
-  },
-  subtitle: {
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
-});
 
 // ─── screen ───────────────────────────────────────────────────────────────────
 
@@ -91,8 +52,7 @@ const EMPTY_SUMMARY = {
 };
 
 export default function OwnerReports() {
-  const tabBarHeight = useBottomTabBarHeight();
-  const insets = useSafeAreaInsets();
+  const tabBarHeight = useTabBarHeight();
   const user = useAuthStore((s: AuthState) => s.user);
   const currency = user?.shop?.currency;
   const [period, setPeriod] = useState<ReportPeriod>('daily');
@@ -130,13 +90,20 @@ export default function OwnerReports() {
   return (
     <>
       <StatusBar style="dark" />
+      <ScreenHeader
+        title="Reports"
+        subtitle="Track performance and grow your business"
+        bordered={false}
+        backgroundColor={Colors.background}
+        fallbackHref="/(owner)/dashboard"
+      />
       <Animated.ScrollView
         entering={FadeIn.duration(Motion.duration.slow)}
         style={s.root}
       contentContainerStyle={[
         s.content,
         {
-          paddingTop: insets.top + Spacing.lg,
+          paddingTop: Spacing.md,
           paddingBottom: tabBarHeight + Spacing.xl,
         },
       ]}
@@ -146,13 +113,9 @@ export default function OwnerReports() {
           refreshing={isRefetching}
           onRefresh={refetch}
           tintColor={Colors.primary}
-          progressViewOffset={insets.top}
         />
       }
     >
-      {/* ── dashboard header ───────────────────────────────────────── */}
-      <ReportsHeader />
-
       {/* ── period selector ────────────────────────────────────────── */}
       <Animated.View entering={FadeInDown.duration(340).delay(40)}>
         <PeriodSegmentControl value={period} onChange={setPeriod} />

@@ -10,5 +10,7 @@ import { PosScreen } from '@/components/sales/PosScreen';
  * for an owner to record a sale anywhere in the app.
  */
 export default function OwnerPos() {
-  return <PosScreen />;
+  // Pushed from the dashboard and from Sales, so unlike the cashier's Sales
+  // tab this one needs a way back.
+  return <PosScreen showBack />;
 }

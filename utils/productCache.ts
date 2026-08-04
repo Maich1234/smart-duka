@@ -118,6 +118,62 @@ export function searchCachedProducts(shopId: string, query: string, limit = 200)
   }
 }
 
+/** One sold line, as the till knows it before the server has seen the sale. */
+export type OfflineStockDelta = {
+  productId: string;
+  variantId?: string | null;
+  quantity: number;
+};
+
+/**
+ * Applies a queued sale's stock movement to the local catalogue.
+ *
+ * Without this the mirror kept showing pre-sale quantities for as long as the
+ * shop stayed offline, so the till would happily sell the same last unit over
+ * and over. Every one of those sales then failed server-side with
+ * "Insufficient stock" — a permanent 4xx — and was thrown away. The cashier
+ * saw nothing wrong until the day's takings came up short.
+ *
+ * Best-effort and deliberately not transactional with the queue write: a
+ * missed decrement is a stale number, while a missed queue row is a lost sale.
+ * The real quantity is restored on the next successful `syncProductCache`.
+ */
+export function applyOfflineStockDelta(shopId: string, deltas: OfflineStockDelta[]): void {
+  if (!isOfflineDbAvailable() || !shopId || !deltas.length) return;
+
+  try {
+    const db = getDb();
+    db.withTransactionSync(() => {
+      for (const delta of deltas) {
+        const row = db.getFirstSync<{ payload: string }>(
+          'SELECT payload FROM product_cache WHERE id = ? AND shop_id = ?',
+          [delta.productId, shopId],
+        );
+        if (!row) continue;
+
+        const product = JSON.parse(row.payload) as Product;
+        // Untracked products (services) have no stock to move.
+        if (product.trackInventory === false) continue;
+
+        if (delta.variantId) {
+          const variant = product.variants?.find((v) => v._id === delta.variantId);
+          if (!variant) continue;
+          variant.quantity = Math.max(0, (variant.quantity ?? 0) - delta.quantity);
+        } else {
+          product.quantity = Math.max(0, (product.quantity ?? 0) - delta.quantity);
+        }
+
+        db.runSync(
+          'UPDATE product_cache SET payload = ? WHERE id = ? AND shop_id = ?',
+          [JSON.stringify(product), delta.productId, shopId],
+        );
+      }
+    });
+  } catch (err) {
+    console.warn('[productCache] stock delta failed:', (err as Error).message);
+  }
+}
+
 /** Drops a shop's cached catalogue — used on sign-out. */
 export function clearProductCache(shopId?: string): void {
   if (!isOfflineDbAvailable()) return;

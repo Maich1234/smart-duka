@@ -15,7 +15,7 @@ import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -35,8 +35,10 @@ import { AccountInfo } from '@/components/profile/AccountInfo';
 import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { DeleteAccountSection } from '@/components/profile/DeleteAccountSection';
 import { LegalSection } from '@/components/profile/LegalSection';
-import { SmartDukaAiSection } from '@/components/profile/SmartDukaAiSection';
+import { DukanaAiSection } from '@/components/profile/DukanaAiSection';
 import { useAiAccess } from '@/hooks/useAiAccess';
+import { useSubscription } from '@/hooks/useSubscription';
+import { describeSubscription, type SubscriptionTone } from '@/utils/subscriptionStatus';
 import { usePrinterStore } from '@/store/printerStore';
 import { resolveSaleMethods } from '@/constants/paymentMethods';
 import { openHelp } from '@/utils/openHelp';
@@ -60,6 +62,24 @@ const getInitials = (name: string) =>
 
 const fmtCurrency = (n: number, currency = 'KES') =>
   `${currency} ${n.toLocaleString('en-KE', { maximumFractionDigits: 0 })}`;
+
+// Subscription tones, twice over: the hero sits on a near-black gradient and
+// needs light ink, the preferences row sits on white and needs dark ink.
+const HERO_TONE: Record<SubscriptionTone, { fg: string; bg: string; border: string }> = {
+  neutral: { fg: 'rgba(255,255,255,0.72)', bg: 'rgba(255,255,255,0.10)', border: 'rgba(255,255,255,0.16)' },
+  info: { fg: '#5EEAD4', bg: 'rgba(20,184,166,0.18)', border: 'rgba(94,234,212,0.22)' },
+  good: { fg: '#4ADE80', bg: 'rgba(21,128,61,0.18)', border: 'rgba(74,222,128,0.20)' },
+  warn: { fg: '#FCD34D', bg: 'rgba(245,158,11,0.18)', border: 'rgba(252,211,77,0.24)' },
+  urgent: { fg: '#FCA5A5', bg: 'rgba(220,38,38,0.20)', border: 'rgba(252,165,165,0.26)' },
+};
+
+const ROW_TONE: Record<SubscriptionTone, { fg: string; bg: string }> = {
+  neutral: { fg: Colors.primaryDark, bg: Colors.primarySubtle },
+  info: { fg: Colors.primaryDark, bg: Colors.primarySubtle },
+  good: { fg: Colors.success, bg: Colors.successSubtle },
+  warn: { fg: '#B45309', bg: Colors.warningSubtle },
+  urgent: { fg: Colors.danger, bg: Colors.dangerSubtle },
+};
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -180,7 +200,7 @@ const HELP_ITEMS: HelpItem[] = [
 
 export default function OwnerProfile() {
   const { user, logout } = useAuth();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const { toast, alert } = useAlert();
   const queryClient = useQueryClient();
 
@@ -188,7 +208,7 @@ export default function OwnerProfile() {
     alert({
       type: 'confirm',
       title: 'Sign out?',
-      message: 'You\'ll need to sign back in to access your Smart Duka account.',
+      message: 'You\'ll need to sign back in to access your Dukana account.',
       buttons: [
         { label: 'Cancel', variant: 'ghost' },
         { label: 'Sign out', variant: 'danger', onPress: logout },
@@ -345,6 +365,17 @@ export default function OwnerProfile() {
     }
   };
 
+  // Free-tier shops have no other running countdown, so the profile is where
+  // "how long do I have left?" gets answered — in the hero and on the
+  // subscription row. Recomputed each render so the day-count follows the
+  // clock even when the cached subscription is days old.
+  const {
+    access: subscriptionAccess,
+    plan: subscriptionPlan,
+    refetch: refetchSubscription,
+  } = useSubscription();
+  const subStatus = describeSubscription(subscriptionAccess, subscriptionPlan);
+
   const { state: aiAccessState, aiEnabled } = useAiAccess();
   const handleToggleAi = async (enabled: boolean) => {
     const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
@@ -359,7 +390,7 @@ export default function OwnerProfile() {
       queryClient.invalidateQueries({ queryKey: ['aiInsight'] });
       toast({
         type: 'success',
-        message: enabled ? 'Smart Duka AI is on' : 'Smart Duka AI is off — no data is sent to Gemini',
+        message: enabled ? 'Dukana AI is on' : 'Dukana AI is off — no data is sent to Gemini',
       });
     } catch (error: any) {
       queryClient.setQueryData(['shopConfig'], previous);
@@ -425,6 +456,9 @@ export default function OwnerProfile() {
   const handleRefresh = () => {
     refetchDash();
     refetchStaff();
+    // Pull-to-refresh is the obvious gesture after paying — the countdown
+    // shown here has to be able to clear itself without an app restart.
+    refetchSubscription();
   };
 
   const dashboard = dashData?.data;
@@ -490,13 +524,31 @@ export default function OwnerProfile() {
               <View style={styles.heroShopRow}>
                 <Ionicons name="storefront-outline" size={13} color="rgba(255,255,255,0.45)" />
                 <Text style={styles.heroShopName} numberOfLines={1}>
-                  {shop.name || user?.shop?.name || 'Smart Duka'}
+                  {shop.name || user?.shop?.name || 'Dukana'}
                 </Text>
               </View>
-              <View style={styles.activePill}>
-                <View style={styles.activeDot} />
-                <Text style={styles.activePillText}>Active</Text>
-              </View>
+              {/* Was a hardcoded "Active" chip. It now carries the real
+                  subscription countdown — the one number a free-tier owner
+                  needs to see without going looking for it. */}
+              {subStatus && (
+                <AnimatedPressable
+                  onPress={() => router.push('/(owner)/subscription')}
+                  style={[
+                    styles.activePill,
+                    {
+                      backgroundColor: HERO_TONE[subStatus.tone].bg,
+                      borderColor: HERO_TONE[subStatus.tone].border,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Subscription: ${subStatus.pill}. Opens subscription details.`}
+                >
+                  <View style={[styles.activeDot, { backgroundColor: HERO_TONE[subStatus.tone].fg }]} />
+                  <Text style={[styles.activePillText, { color: HERO_TONE[subStatus.tone].fg }]}>
+                    {subStatus.pill}
+                  </Text>
+                </AnimatedPressable>
+              )}
             </View>
           </LinearGradient>
         </Animated.View>
@@ -720,14 +772,36 @@ export default function OwnerProfile() {
               style={styles.prefRow}
               onPress={() => router.push('/(owner)/subscription')}
               accessibilityRole="button"
-              accessibilityLabel="Manage subscription"
+              accessibilityLabel={
+                subStatus ? `Subscription. ${subStatus.detail}` : 'Manage subscription'
+              }
             >
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
-                <Ionicons name="shield-checkmark-outline" size={17} color={Colors.primaryDark} />
+              <View
+                style={[
+                  styles.prefIconWrap,
+                  { backgroundColor: ROW_TONE[subStatus?.tone ?? 'neutral'].bg },
+                ]}
+              >
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={17}
+                  color={ROW_TONE[subStatus?.tone ?? 'neutral'].fg}
+                />
               </View>
               <View style={styles.prefText}>
                 <Text style={styles.prefTitle}>Subscription</Text>
-                <Text style={styles.prefSub}>Plan, free trial & M-PESA payments</Text>
+                <Text
+                  style={[
+                    styles.prefSub,
+                    subStatus?.tone === 'warn' || subStatus?.tone === 'urgent'
+                      ? { color: ROW_TONE[subStatus.tone].fg, fontFamily: Typography.fontFamilySemiBold }
+                      : null,
+                  ]}
+                >
+                  {/* Falls back to the old static line only while the
+                      subscription query is still in flight. */}
+                  {subStatus?.detail ?? 'Plan, free trial & M-PESA payments'}
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
             </AnimatedPressable>
@@ -737,7 +811,7 @@ export default function OwnerProfile() {
         {/* ── SMART DUKA AI ─────────────────────────────────────────────── */}
         <SectionLabel label="SMART DUKA AI" />
         <Animated.View entering={FadeInUp.duration(360).delay(130)} style={styles.sectionWrap}>
-          <SmartDukaAiSection
+          <DukanaAiSection
             state={aiAccessState}
             aiEnabled={aiEnabled}
             toggling={togglingAi}
@@ -784,7 +858,7 @@ export default function OwnerProfile() {
               <View style={styles.signOutIconWrap}>
                 <Ionicons name="log-out-outline" size={17} color={Colors.danger} />
               </View>
-              <Text style={styles.signOutText}>Sign out of Smart Duka</Text>
+              <Text style={styles.signOutText}>Sign out of Dukana</Text>
             </View>
             <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
           </AnimatedPressable>

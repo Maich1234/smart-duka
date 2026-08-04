@@ -58,6 +58,11 @@ export interface Product {
   bundleItems?: BundleItem[];
   variants?: ProductVariant[];
   promotions?: ProductPromotion[];
+  /** Product-level commission. Owner-facing responses only. */
+  commission?: VariantCommission;
+  /** Staff-facing derived value (per unit) — present only when the shop shows
+   * commission AND this staff member is on commission. */
+  commissionPreview?: number;
 }
 
 export interface ProductsResponse {
@@ -83,7 +88,12 @@ export interface CreateProductData {
   category: string;
   productType?: ProductType;
   sellingPrice: number;
-  costPrice: number;
+  /**
+   * Omitted by staff clients, which are never sent the stored value — updates
+   * are partial, so leaving the key out preserves it while a blank one would
+   * destroy it. The server drops it from a staff request regardless.
+   */
+  costPrice?: number;
   quantity?: number;
   lowStockAlert?: number;
   trackInventory?: boolean;
@@ -92,8 +102,19 @@ export interface CreateProductData {
   maxPrice?: number;
   allowPriceOverride?: boolean;
   bundleItems?: BundleItem[];
-  variants?: Omit<ProductVariant, '_id' | 'commissionPreview'>[];
+  /**
+   * `_id` is echoed for a saved variant so the server keeps its identity —
+   * without it the whole subdocument array is rebuilt with fresh ids and every
+   * past sale's `variantId` is orphaned. `costPrice` is optional for the same
+   * reason it is on the product: a staff client omits what it was never shown,
+   * and the server carries the stored value over.
+   */
+  variants?: (Omit<ProductVariant, '_id' | 'commissionPreview' | 'costPrice'> & {
+    _id?: string;
+    costPrice?: number;
+  })[];
   promotions?: ProductPromotion[];
+  commission?: VariantCommission;
 }
 
 export interface UpdateProductData {
@@ -111,8 +132,19 @@ export interface UpdateProductData {
   maxPrice?: number;
   allowPriceOverride?: boolean;
   bundleItems?: BundleItem[];
-  variants?: Omit<ProductVariant, '_id' | 'commissionPreview'>[];
+  /**
+   * `_id` is echoed for a saved variant so the server keeps its identity —
+   * without it the whole subdocument array is rebuilt with fresh ids and every
+   * past sale's `variantId` is orphaned. `costPrice` is optional for the same
+   * reason it is on the product: a staff client omits what it was never shown,
+   * and the server carries the stored value over.
+   */
+  variants?: (Omit<ProductVariant, '_id' | 'commissionPreview' | 'costPrice'> & {
+    _id?: string;
+    costPrice?: number;
+  })[];
   promotions?: ProductPromotion[];
+  commission?: VariantCommission;
 }
 
 /**

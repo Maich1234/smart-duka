@@ -48,7 +48,7 @@ export const sendChatMessage = async (params: { conversationId?: string; message
     return response.data;
   } catch (err: any) {
     if (err?.code === 'ECONNABORTED') {
-      throw { message: 'Smart Duka AI is taking longer than usual. Please try again.' };
+      throw { message: 'Dukana AI is taking longer than usual. Please try again.' };
     }
     throw err;
   }
@@ -59,7 +59,17 @@ export const getConversations = async (params?: { page?: number; limit?: number 
   return response.data;
 };
 
-export const getConversation = async (id: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<ConversationDetail>> => {
+/**
+ * A thread, opened at its newest turns.
+ *
+ * Page 1 is the newest page — see readThreadPage on the backend. `pagination`
+ * carries the thread's *total* turn count, which the screen uses to tell when
+ * the server has caught up with a message it is still showing locally.
+ */
+export const getConversation = async (
+  id: string,
+  params?: { page?: number; limit?: number }
+): Promise<PaginatedResponse<ConversationDetail>> => {
   const response = await api.get(`/ai/chat/conversations/${id}`, { params });
   return response.data;
 };

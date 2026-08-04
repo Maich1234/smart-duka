@@ -2,8 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
 import { getAiInsight } from '@/services/aiInsight';
@@ -21,6 +20,7 @@ import {
   UpsellCard,
   AiDisabledCard,
 } from '@/components/insights/InsightSections';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -29,13 +29,12 @@ import { Motion } from '@/constants/Motion';
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function OwnerInsights() {
-  const tabBarHeight = useBottomTabBarHeight();
-  const insets = useSafeAreaInsets();
+  const tabBarHeight = useTabBarHeight();
   const user = useAuthStore((s: AuthState) => s.user);
   const currency = user?.shop?.currency;
   const shopId = user?.shop?._id;
 
-  // Subscription state, plan feature, and the shop's own Smart Duka AI
+  // Subscription state, plan feature, and the shop's own Dukana AI
   // toggle. Matches the backend's requireActiveSubscription + requireFeature
   // + requireAiEnabled on GET /ai/insight.
   const { hasAiAccess: hasAiInsights, state: aiAccessState, isLoading: isSubscriptionLoading } = useAiAccess();
@@ -62,22 +61,24 @@ export default function OwnerInsights() {
   return (
     <>
       <StatusBar style="dark" />
+      <ScreenHeader
+        title="Insights"
+        subtitle="Your business, explained"
+        bordered={false}
+        backgroundColor={Colors.background}
+        fallbackHref="/(owner)/dashboard"
+      />
       <Animated.ScrollView
         entering={FadeIn.duration(Motion.duration.slow)}
         style={s.root}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl }]}
+        contentContainerStyle={[s.content, { paddingTop: Spacing.md, paddingBottom: tabBarHeight + Spacing.xl }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           hasAiInsights ? (
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} progressViewOffset={insets.top} />
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />
           ) : undefined
         }
       >
-        <View style={s.header}>
-          <Text style={s.title}>Insights</Text>
-          <Text style={s.subtitle}>Your business, explained</Text>
-        </View>
-
         {isSubscriptionLoading ? (
           <View style={s.loading}>
             <ActivityIndicator color={Colors.primary} />
@@ -122,9 +123,6 @@ export default function OwnerInsights() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: Spacing.lg },
-  header: { marginBottom: Spacing.lg, gap: 3 },
-  title: { fontSize: Typography.size.h1, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, letterSpacing: -0.6, lineHeight: 36 },
-  subtitle: { fontSize: Typography.size.small, fontFamily: Typography.fontFamily, color: Colors.textSecondary, lineHeight: 20 },
   gap: { height: Spacing.md },
   sectionGap: { height: Spacing.lg },
   loading: { paddingVertical: Spacing.xxl, alignItems: 'center' },

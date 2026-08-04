@@ -8,7 +8,7 @@ export { Colors, Spacing, Typography, Shadows };
 export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
 
 /**
- * The Smart Duka web front end (the `smart-duka-web` Next.js app on Vercel).
+ * The Dukana web front end (the `smart-duka-web` Next.js app on Vercel).
  *
  * One host serves everything the app links out to: the Help & Learning
  * Center (/help), public receipts (/r/<token>), the privacy policy, terms,
@@ -33,7 +33,7 @@ export const HELP_CENTER_URL = WEB_URL;
 // Matches app.json's "scheme" — used to deep-link from the web verification
 // page into the native app when it's installed (falls back to the web page
 // itself, which is already loaded, if it isn't).
-export const APP_SCHEME = 'smartduka';
+export const APP_SCHEME = 'dukana';
 
 // Founder's handwritten e-signature (transparent PNG) — shown under the
 // founder's note at the end of onboarding. The w_280,q_auto Cloudinary
@@ -42,7 +42,7 @@ export const APP_SCHEME = 'smartduka';
 export const CEO_SIGN_IMG_URL =
   'https://res.cloudinary.com/dwdhxgvsl/image/upload/w_280,q_auto/v1783716945/e-sign-removebg-preview_lvulz8.png';
 
-export const APP_NAME = 'Smart Duka';
+export const APP_NAME = 'Dukana';
 export const APP_VERSION = '1.0.0';
 
 export const PAYMENT_METHODS = [

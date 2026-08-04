@@ -12,7 +12,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -39,7 +39,7 @@ const STATUS_COLORS: Record<MpesaTransactionStatus, { bg: string; text: string; 
 };
 
 export default function PaymentsScreen() {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const [statusFilter, setStatusFilter] = useState<MpesaTransactionStatus | 'all'>('all');
   const [selectedTx, setSelectedTx] = useState<MpesaTransaction | null>(null);
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, RefreshControl, ScrollView, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -112,7 +112,7 @@ export function PurchaseHistoryScreen() {
   const role = useAuthStore((s: AuthState) => s.user?.role);
   const currency = useAuthStore((s: AuthState) => s.user?.shop?.currency);
   const base = purchasingBasePath(role);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const canView = usePermission('view_purchases');
 
   const [status, setStatus] = useState<StatusFilter>('all');

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -21,7 +21,7 @@ import {
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
 import { purchasingBasePath } from '@/utils/purchasingRoutes';
-import { isOfflineQueued } from '@/utils/errors';
+import { isOfflineQueued, mutationErrorMessage } from '@/utils/errors';
 import { purchaseCostCategoryMeta } from '@/constants/purchaseCostCategories';
 import { MONEY_OUT_METHOD_LABELS } from '@/constants/paymentMethods';
 import { Colors } from '@/constants/Colors';
@@ -77,7 +77,7 @@ export function PurchaseDetailsScreen() {
   const role = useAuthStore((s: AuthState) => s.user?.role);
   const currency = useAuthStore((s: AuthState) => s.user?.shop?.currency);
   const base = purchasingBasePath(role);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const queryClient = useQueryClient();
   const { alert, toast } = useAlert();
 
@@ -117,7 +117,7 @@ export function PurchaseDetailsScreen() {
       }
       toast({
         type: 'error',
-        message: error?.response?.data?.message || 'Could not approve this purchase.',
+        message: mutationErrorMessage(error, 'Could not approve this purchase.'),
       });
     },
   });
@@ -135,7 +135,7 @@ export function PurchaseDetailsScreen() {
       }
       toast({
         type: 'error',
-        message: error?.response?.data?.message || 'Could not cancel this purchase.',
+        message: mutationErrorMessage(error, 'Could not cancel this purchase.'),
       });
     },
   });

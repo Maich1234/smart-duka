@@ -9,8 +9,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ListRow } from '@/components/ui/ListRow';
 import { MONEY_OUT_METHOD_LABELS } from '@/constants/paymentMethods';
 import { Button } from '@/components/ui/Button';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
@@ -32,7 +33,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Motion } from '@/constants/Motion';
 import { formatCurrency, formatDate } from '@/utils/formatters';
-import { isOfflineQueued } from '@/utils/errors';
+import { isOfflineQueued, mutationErrorMessage } from '@/utils/errors';
 import { QueryError } from '@/components/ui/QueryError';
 
 const CATEGORY_ICONS: Record<ExpenseCategory, keyof typeof Ionicons.glyphMap> = {
@@ -48,7 +49,7 @@ const CATEGORY_ICONS: Record<ExpenseCategory, keyof typeof Ionicons.glyphMap> = 
 /** Shared expense list/form screen mounted from both (owner) and (staff) route
  * groups — owners implicitly have `manage_expenses`, staff need it granted. */
 export const ExpensesScreen: React.FC = () => {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const user = useAuthStore((s: AuthState) => s.user);
   const currency = user?.shop?.currency;
   const canManageExpenses = usePermission('manage_expenses');
@@ -99,7 +100,7 @@ export const ExpensesScreen: React.FC = () => {
         toast({ type: 'info', message: 'Expense saved offline — will sync when connected.' });
         return;
       }
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not save expense' });
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Could not save expense') });
     },
   });
 
@@ -115,7 +116,7 @@ export const ExpensesScreen: React.FC = () => {
         toast({ type: 'info', message: 'Deletion will sync when connected.' });
         return;
       }
-      toast({ type: 'error', message: error.response?.data?.message || 'Deletion failed' });
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Deletion failed') });
     },
   });
 
@@ -173,10 +174,14 @@ export const ExpensesScreen: React.FC = () => {
 
   return (
     <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Expenses</Text>
-        <Button title="Add Expense" onPress={openAdd} size="sm" />
-      </View>
+      {/* The navigator's header is switched off for this route so the screen
+          owns one header rather than stacking a second title under it. */}
+      <ScreenHeader
+        title="Expenses"
+        bordered={false}
+        backgroundColor={Colors.background}
+        right={<Button title="Add Expense" onPress={openAdd} size="sm" />}
+      />
 
       {/* Summary always visible — not affected by search */}
       {!isSearching && (
@@ -291,16 +296,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg },
   empty: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center' },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-  },
-  title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
 
   summary: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.sm },
   summaryLabel: { fontSize: Typography.size.small, color: Colors.textSecondary },

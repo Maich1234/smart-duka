@@ -16,7 +16,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
 /**
- * "Activate Smart Duka" — the last stop of the onboarding journey. The shop
+ * "Activate Dukana" — the last stop of the onboarding journey. The shop
  * is already set up and celebrated; this screen turns that investment into
  * an activated free trial. Plans, prices, and every line of offer copy come
  * from the backend. Activation never blocks a new shop: any failure still

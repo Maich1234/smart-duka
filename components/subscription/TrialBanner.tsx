@@ -8,6 +8,7 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { useSubscription } from '@/hooks/useSubscription';
+import { describeSubscription } from '@/utils/subscriptionStatus';
 
 /**
  * Owner-dashboard subscription nudge. Quiet by design: nothing during a
@@ -16,8 +17,9 @@ import { useSubscription } from '@/hooks/useSubscription';
  * ever activated. Tapping opens the subscription screen.
  */
 export const TrialBanner: React.FC = () => {
-  const { access, isLoading } = useSubscription();
-  if (isLoading || !access) return null;
+  const { access, plan, isLoading } = useSubscription();
+  const status = describeSubscription(access, plan);
+  if (isLoading || !access || !status) return null;
 
   let icon: keyof typeof Ionicons.glyphMap;
   let text: string;
@@ -25,12 +27,17 @@ export const TrialBanner: React.FC = () => {
 
   if (access.state === 'none') {
     icon = 'gift-outline';
-    text = 'Your free trial is waiting — activate Smart Duka.';
+    text = 'Your free trial is waiting — activate Dukana.';
     tone = 'info';
-  } else if (access.state === 'trialing' && access.daysLeft <= 7 && !access.cancelled) {
+  } else if (access.state === 'trialing' && status.daysLeft <= 7 && !access.cancelled) {
     icon = 'time-outline';
-    text = `${access.daysLeft} day${access.daysLeft === 1 ? '' : 's'} left in your free trial.`;
-    tone = access.daysLeft <= 3 ? 'warn' : 'info';
+    // Free-tier shops aren't "on trial" — they're on a plan that runs out.
+    const period = status.isFree ? 'free plan' : 'free trial';
+    text =
+      status.daysLeft === 0
+        ? `Today is the last day of your ${period}.`
+        : `${status.daysLeft} day${status.daysLeft === 1 ? '' : 's'} left in your ${period}.`;
+    tone = status.daysLeft <= 3 ? 'warn' : 'info';
   } else if (access.state === 'grace') {
     icon = 'alert-circle-outline';
     text = `Subscription expired — ${access.graceDaysLeft} day${access.graceDaysLeft === 1 ? '' : 's'} left before your shop pauses.`;

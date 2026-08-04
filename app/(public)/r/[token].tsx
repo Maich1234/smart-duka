@@ -72,7 +72,7 @@ export default function ReceiptVerificationScreen() {
           }}
         >
           <Ionicons name="phone-portrait-outline" size={16} color={Colors.primary} />
-          <Text style={styles.openAppText}>Open in Smart Duka App</Text>
+          <Text style={styles.openAppText}>Open in Dukana App</Text>
         </AnimatedPressable>
       )}
 

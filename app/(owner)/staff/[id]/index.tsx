@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { getStaffById, getStaffCommission, deleteStaff, resetStaffPassword, getAllPermissions, type Permission } from '@/services/staff';
+import { getStaffById, getStaffCommission, deleteStaff, resetStaffPassword, updateStaff, getAllPermissions, type Permission } from '@/services/staff';
 import { useStaffDeletionRequests } from '@/hooks/useStaffDeletionRequests';
 import { getShopConfig } from '@/services/shop';
 import { ResetPasswordModal } from '@/components/staff/ResetPasswordModal';
 import { StaffDeletionRequestCard } from '@/components/staff/StaffDeletionRequestCard';
 import { CommissionCard, getCommissionPeriodRange, type CommissionPeriod } from '@/components/sales/CommissionCard';
+import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -53,7 +54,7 @@ function timeAgo(iso: string) {
 export default function StaffDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [commissionPeriod, setCommissionPeriod] = useState<CommissionPeriod>('today');
   const { alert, toast } = useAlert();
@@ -77,10 +78,12 @@ export default function StaffDetailsScreen() {
   const { data: shopData } = useQuery({ queryKey: ['shop'], queryFn: getShopConfig });
   const currency = shopData?.data?.currency ?? 'KES';
 
+  const isOnCommission = data?.data?.commissionEligible === true;
   const { startDate, endDate } = getCommissionPeriodRange(commissionPeriod);
   const { data: commissionData, isLoading: isCommissionLoading } = useQuery({
     queryKey: ['staffCommission', id, commissionPeriod],
     queryFn: () => getStaffCommission(id, { startDate, endDate }),
+    enabled: isOnCommission,
   });
 
   const deleteMutation = useMutation({
@@ -91,6 +94,33 @@ export default function StaffDetailsScreen() {
     },
     onError: (error: any) =>
       toast({ type: 'error', message: error.response?.data?.message || 'Failed to delete staff' }),
+  });
+
+  // Optimistic so the switch responds instantly on a slow Kenyan connection;
+  // rolled back if the write fails so the UI never lies about what was saved.
+  const commissionMutation = useMutation({
+    mutationFn: (enabled: boolean) => updateStaff(id, { commissionEligible: enabled }),
+    onMutate: async (enabled) => {
+      await queryClient.cancelQueries({ queryKey: ['staff', id] });
+      const previous = queryClient.getQueryData<any>(['staff', id]);
+      queryClient.setQueryData<any>(['staff', id], (old: any) =>
+        old ? { ...old, data: { ...old.data, commissionEligible: enabled } } : old);
+      return { previous };
+    },
+    onError: (error: any, _enabled, context) => {
+      if (context?.previous) queryClient.setQueryData(['staff', id], context.previous);
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not update commission' });
+    },
+    onSuccess: (_res, enabled) => {
+      toast({
+        type: 'success',
+        message: enabled ? 'Now earning commission' : 'No longer earning commission',
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff', id] });
+      queryClient.invalidateQueries({ queryKey: ['staffCommission', id] });
+    },
   });
 
   const resetPasswordMutation = useMutation({
@@ -196,17 +226,39 @@ export default function StaffDetailsScreen() {
       {/* Sales & Commission */}
       <View style={styles.permissionsSection}>
         <Text style={styles.sectionTitle}>Sales & Commission</Text>
-        <Text style={styles.sectionSubtitle}>Commission earned from variant sales, always visible to you.</Text>
+        <Text style={styles.sectionSubtitle}>
+          Choose whether this person earns commission. Their earnings are always visible to you.
+        </Text>
         <View style={styles.permissionsCard}>
-          <View style={styles.categoryBlock}>
-            <CommissionCard
-              data={commissionData?.data}
-              isLoading={isCommissionLoading}
-              period={commissionPeriod}
-              onPeriodChange={setCommissionPeriod}
-              currency={currency}
+          <View style={styles.commissionToggleRow}>
+            <View style={styles.commissionToggleText}>
+              <Text style={styles.commissionToggleTitle}>Earns commission</Text>
+              <Text style={styles.commissionToggleSub}>
+                Pays a share of anything sold above your floor price on products that have commission set up.
+              </Text>
+            </View>
+            <Switch
+              value={isOnCommission}
+              onValueChange={(v) => { haptics.selection(); commissionMutation.mutate(v); }}
+              disabled={commissionMutation.isPending}
+              trackColor={{ false: Colors.border, true: Colors.primarySubtle }}
+              thumbColor={isOnCommission ? Colors.primary : Colors.textTertiary}
+              accessibilityLabel="Earns commission"
             />
           </View>
+
+          {isOnCommission && (
+            <View style={styles.categoryBlock}>
+              <CommissionCard
+                data={commissionData?.data}
+                isLoading={isCommissionLoading}
+                subject="staff"
+                period={commissionPeriod}
+                onPeriodChange={setCommissionPeriod}
+                currency={currency}
+              />
+            </View>
+          )}
         </View>
       </View>
 
@@ -370,6 +422,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: 'hidden',
+  },
+  commissionToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  commissionToggleText: { flex: 1 },
+  commissionToggleTitle: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  commissionToggleSub: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   categoryBlock: {
     padding: Spacing.md,

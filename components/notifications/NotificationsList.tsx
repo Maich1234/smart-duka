@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useInfiniteQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
@@ -23,7 +23,7 @@ import { Spacing } from '@/constants/Spacing';
 
 /** Shared inbox UI rendered by both the owner and staff Notifications screens. */
 export const NotificationsList: React.FC = () => {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const queryClient = useQueryClient();
   // Kept separate from `detailVisible` so the sheet still has content to
   // render while it slides out (same pattern as SaleDetailsModal).

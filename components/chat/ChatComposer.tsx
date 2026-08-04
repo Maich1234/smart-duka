@@ -27,7 +27,7 @@ export function ChatComposer({ value, onChangeText, onSend, disabled }: ChatComp
         multiline
         maxLength={2000}
         editable={!disabled}
-        accessibilityLabel="Message Smart Duka AI"
+        accessibilityLabel="Message Dukana AI"
       />
       <AnimatedPressable
         onPress={onSend}

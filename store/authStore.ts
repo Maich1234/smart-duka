@@ -16,6 +16,12 @@ export interface User {
     currency?: string;
   };
   permissions?: string[];
+  /**
+   * Whether this member earns commission. Owners always do. Staff are opted in
+   * individually by the owner — shops commonly put only part of the floor on
+   * commission, so the whole commission surface is hidden for everyone else.
+   */
+  commissionEligible?: boolean;
 }
 
 export interface AuthState {

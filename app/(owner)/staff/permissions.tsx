@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
@@ -15,7 +15,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
 export default function StaffPermissionsScreen() {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const { data, isLoading } = useQuery({
     queryKey: ['permissions'],
     queryFn: getAllPermissions,
@@ -85,7 +85,9 @@ export default function StaffPermissionsScreen() {
         ))}
       </ScrollView>
 
-      <View style={[styles.footer, Platform.OS === 'ios' && { paddingBottom: tabBarHeight + Spacing.sm }]}>
+      {/* The tab bar floats over every screen on both platforms — this used to
+          clear it on iOS only, leaving Android's Done button half-buried. */}
+      <View style={[styles.footer, { paddingBottom: tabBarHeight + Spacing.sm }]}>
         <Button title="Done" onPress={() => router.back()} />
       </View>
     </View>

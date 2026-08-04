@@ -9,13 +9,14 @@ import {
   TextInput,
   type LayoutChangeEvent,
 } from 'react-native';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SelectPicker, type PickerOption } from '../ui/SelectPicker';
 import { HelpLink } from '../help/HelpLink';
-import { VariantCommissionModal, type VariantCommissionValue } from './VariantCommissionModal';
+import { ScreenHeader } from '../ui/ScreenHeader';
+import { CommissionModal, type CommissionValue } from './CommissionModal';
 import { formatCurrency } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
@@ -31,6 +32,13 @@ export interface BundleItemForm {
 }
 
 export interface VariantForm {
+  /**
+   * Identity of a saved variant, echoed back on update. Without it the server
+   * mints fresh ids for the whole subdocument array, orphaning the `variantId`
+   * on every past sale — and a staff edit is matched to its stored row by it.
+   * Absent on a variant added in this session.
+   */
+  id?: string;
   name: string;
   sellingPrice: string;
   costPrice: string;
@@ -64,6 +72,11 @@ export interface ProductFormData {
   allowPriceOverride: boolean;
   bundleItems: BundleItemForm[];
   variants: VariantForm[];
+  // Product-level commission, honoured by every product type. Variants may
+  // override it individually; those that don't inherit these values.
+  commissionEnabled: boolean;
+  commissionBasePrice: string;
+  commissionEmployeeSharePercent: string;
   hasPromotions: boolean;
   promotions: PromotionForm[];
 }
@@ -77,6 +90,20 @@ interface ProductFormProps {
   loading?: boolean;
   availableProducts?: Product[];
   currency?: string;
+  /**
+   * Whether the viewer may set commission, and the cost of a *saved* variant.
+   * Owner-only: commission decides what the shop pays the seller, which is not
+   * the seller's call. Staff still maintain a variant's name, price, stock and
+   * SKU — the server carries the protected fields over from the stored row.
+   */
+  canManageMargins?: boolean;
+  /**
+   * Whether the cost price field is shown. Everyone on a create — the server
+   * requires it and there is no stored value to damage — but owner-only on an
+   * edit, where staff hold a blank that would overwrite the real figure.
+   * See MarginAccess in productPayload.ts.
+   */
+  canSetCostPrice?: boolean;
 }
 
 const TYPE_OPTIONS: {
@@ -105,13 +132,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   loading = false,
   availableProducts = [],
   currency = 'KES',
+  canManageMargins = true,
+  canSetCostPrice = true,
 }) => {
   const update = (patch: Partial<ProductFormData>) => setForm({ ...form, ...patch });
 
   // Both screens that host this form live inside the owner tab group, whose
   // tab bar is absolutely positioned over the content — a fixed bottom pad
   // left Save/Add Product sitting underneath it.
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
 
   // ── Field-level validation ──
   // Tracks each required field's Y offset inside the ScrollView (captured via
@@ -124,7 +153,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   // happen inside callbacks (onLayout, and save) where it's legitimate.
   const fieldY = useRef<Record<string, number>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [commissionModalIndex, setCommissionModalIndex] = useState<number | null>(null);
+  // null = closed, 'product' = the product-level config, a number = that variant's override.
+  const [commissionTarget, setCommissionTarget] = useState<'product' | number | null>(null);
   // Written through one stable callback rather than a per-field factory. The
   // factory was invoked during render to build each onLayout handler, which is
   // indistinguishable to react-hooks/refs from reading the ref during render;
@@ -144,10 +174,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     } else if (isNaN(parseFloat(form.sellingPrice)) || parseFloat(form.sellingPrice) < 0) {
       errs.sellingPrice = 'Enter a valid selling price';
     }
-    if (!form.costPrice.trim()) {
-      errs.costPrice = 'Cost price is required';
-    } else if (isNaN(parseFloat(form.costPrice)) || parseFloat(form.costPrice) < 0) {
-      errs.costPrice = 'Enter a valid cost price';
+    // Only demanded when the viewer can see it — staff are shown a blank
+    // field they have no way to fill correctly.
+    if (canSetCostPrice) {
+      if (!form.costPrice.trim()) {
+        errs.costPrice = 'Cost price is required';
+      } else if (isNaN(parseFloat(form.costPrice)) || parseFloat(form.costPrice) < 0) {
+        errs.costPrice = 'Enter a valid cost price';
+      }
     }
     if (form.productType === 'bundle' && form.bundleItems.length === 0) {
       errs.bundleItems = 'Add at least one item to the bundle';
@@ -237,7 +271,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const cost = parseFloat(form.costPrice) || 0;
   const profit = selling - cost;
   const marginPct = selling > 0 ? (profit / selling) * 100 : 0;
-  const showProfitBadge = selling > 0 && form.costPrice !== '';
+  // Margin is derived from the cost price, which staff never receive — the
+  // badge would read as a 100% margin on a blank field.
+  const showProfitBadge = canSetCostPrice && selling > 0 && form.costPrice !== '';
   const marginClamped = Math.max(0, Math.min(100, marginPct));
   const barColor = marginPct >= 0 ? Colors.accent : Colors.danger;
 
@@ -245,25 +281,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   return (
     <View style={styles.wrapper}>
-      {/* Custom header */}
-      <View style={styles.header}>
-        <AnimatedPressable
-          style={styles.backBtn}
-          onPress={onCancel}
-          hitSlop={HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
-        </AnimatedPressable>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>{isEditing ? 'Edit Product' : 'Add Product'}</Text>
-          <Text style={styles.headerSub} numberOfLines={1}>
-            {isEditing ? 'Update product details' : 'Create a new product for your inventory'}
-          </Text>
-        </View>
-        <HelpLink slug="product-types" label="Help" />
-      </View>
+      {/* The host Screen already applies the top inset, so this header must not. */}
+      <ScreenHeader
+        title={isEditing ? 'Edit Product' : 'Add Product'}
+        subtitle={isEditing ? 'Update product details' : 'Create a new product for your inventory'}
+        onBack={onCancel}
+        insetTop={false}
+        right={<HelpLink slug="product-types" label="Help" />}
+      />
 
       <ScrollView
         ref={scrollRef}
@@ -375,30 +400,34 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 </View>
               )}
             </View>
-            <View style={styles.priceSeparator} />
-            <View style={styles.priceBox}>
-              <Text style={[styles.priceLabel, errors.costPrice && styles.priceLabelError]}>Cost Price</Text>
-              <View style={[styles.priceInputRow, errors.costPrice && styles.priceInputRowError]}>
-                <Text style={styles.priceCurrency}>{currency}</Text>
-                <TextInput
-                  style={styles.priceValue}
-                  value={form.costPrice}
-                  onChangeText={(t) => { update({ costPrice: t }); if (errors.costPrice) setErrors((e) => ({ ...e, costPrice: '' })); }}
-                  keyboardType="numeric"
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.textTertiary}
-                />
-              </View>
-              {errors.costPrice && (
-                <View style={styles.priceErrorRow}>
-                  <Ionicons name="alert-circle-outline" size={12} color={Colors.danger} />
-                  <Text style={styles.priceErrorText}>{errors.costPrice}</Text>
+            {canSetCostPrice && (
+              <>
+                <View style={styles.priceSeparator} />
+                <View style={styles.priceBox}>
+                  <Text style={[styles.priceLabel, errors.costPrice && styles.priceLabelError]}>Cost Price</Text>
+                  <View style={[styles.priceInputRow, errors.costPrice && styles.priceInputRowError]}>
+                    <Text style={styles.priceCurrency}>{currency}</Text>
+                    <TextInput
+                      style={styles.priceValue}
+                      value={form.costPrice}
+                      onChangeText={(t) => { update({ costPrice: t }); if (errors.costPrice) setErrors((e) => ({ ...e, costPrice: '' })); }}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor={Colors.textTertiary}
+                    />
+                  </View>
+                  {errors.costPrice && (
+                    <View style={styles.priceErrorRow}>
+                      <Ionicons name="alert-circle-outline" size={12} color={Colors.danger} />
+                      <Text style={styles.priceErrorText}>{errors.costPrice}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
+              </>
+            )}
           </View>
 
-          {selling > 0 && (
+          {canSetCostPrice && selling > 0 && (
             <>
               <View style={styles.marginLabelRow}>
                 <Text style={styles.marginLabel}>Margin Preview</Text>
@@ -616,6 +645,46 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           </>
         )}
 
+        {/* ── Employee commission ──
+            Available on every product type. It used to exist only on
+            `configurable` variants, so an ordinary shop could switch
+            "show commission to staff" on and never generate any. Bundles are
+            included: staff push them, so they are worth incentivising.
+
+            Owner-only: the base price is the shop's floor, which never
+            reaches a staff device. */}
+        {canManageMargins && (
+        <>
+        <Text style={styles.sectionLabel}>Employee Commission</Text>
+        <View style={styles.card}>
+          <AnimatedPressable
+            style={styles.commissionRow}
+            onPress={() => setCommissionTarget('product')}
+            accessibilityRole="button"
+            accessibilityLabel="Set employee commission for this product"
+            accessibilityState={{ checked: form.commissionEnabled }}
+          >
+            <Ionicons
+              name={form.commissionEnabled ? 'cash' : 'cash-outline'}
+              size={20}
+              color={form.commissionEnabled ? Colors.primary : Colors.textSecondary}
+            />
+            <View style={styles.commissionRowText}>
+              <Text style={styles.commissionRowTitle}>
+                {form.commissionEnabled ? 'Commission enabled' : 'No commission'}
+              </Text>
+              <Text style={styles.commissionRowSub}>
+                {form.commissionEnabled
+                  ? `Employee gets ${form.commissionEmployeeSharePercent}% of anything above ${formatCurrency(parseFloat(form.commissionBasePrice) || 0, currency)}`
+                  : 'Pay staff a share of what they sell this above your floor price'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+          </AnimatedPressable>
+        </View>
+        </>
+        )}
+
         {/* ── Configurable variants ── */}
         {form.productType === 'configurable' && (
           <>
@@ -637,28 +706,37 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         onChangeText={(t) => updateVariant(i, { name: t })}
                       />
                     </View>
-                    <AnimatedPressable
-                      onPress={() => setCommissionModalIndex(i)}
-                      style={styles.removeBtn}
-                      hitSlop={HIT_SLOP}
-                      accessibilityLabel="Set employee commission"
-                      accessibilityRole="button"
-                    >
-                      <Ionicons
-                        name={v.commissionEnabled ? 'cash' : 'cash-outline'}
-                        size={18}
-                        color={v.commissionEnabled ? Colors.primary : Colors.textSecondary}
-                      />
-                    </AnimatedPressable>
-                    <AnimatedPressable
-                      onPress={() => removeVariant(i)}
-                      style={styles.removeBtn}
-                      hitSlop={HIT_SLOP}
-                      accessibilityLabel="Remove variant"
-                      accessibilityRole="button"
-                    >
-                      <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                    </AnimatedPressable>
+                    {/* Owner-only — the base price behind it is the shop's floor. */}
+                    {canManageMargins && (
+                      <AnimatedPressable
+                        onPress={() => setCommissionTarget(i)}
+                        style={styles.removeBtn}
+                        hitSlop={HIT_SLOP}
+                        accessibilityLabel="Set employee commission"
+                        accessibilityRole="button"
+                      >
+                        <Ionicons
+                          name={v.commissionEnabled ? 'cash' : 'cash-outline'}
+                          size={18}
+                          color={v.commissionEnabled ? Colors.primary : Colors.textSecondary}
+                        />
+                      </AnimatedPressable>
+                    )}
+                    {/* Removing a saved variant takes away its stock and the
+                        history hanging off it, so it stays an owner act — the
+                        server keeps any stored variant staff omit. A row added
+                        in this session was never saved, so it can go. */}
+                    {(canManageMargins || !v.id) && (
+                      <AnimatedPressable
+                        onPress={() => removeVariant(i)}
+                        style={styles.removeBtn}
+                        hitSlop={HIT_SLOP}
+                        accessibilityLabel="Remove variant"
+                        accessibilityRole="button"
+                      >
+                        <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                      </AnimatedPressable>
+                    )}
                   </View>
                   <View style={styles.row}>
                     <View style={styles.flexInput}>
@@ -669,14 +747,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                         keyboardType="numeric"
                       />
                     </View>
-                    <View style={styles.flexInput}>
-                      <Input
-                        placeholder="Cost"
-                        value={v.costPrice}
-                        onChangeText={(t) => updateVariant(i, { costPrice: t })}
-                        keyboardType="numeric"
-                      />
-                    </View>
+                    {(canManageMargins || !v.id) && (
+                      <View style={styles.flexInput}>
+                        <Input
+                          placeholder="Cost"
+                          value={v.costPrice}
+                          onChangeText={(t) => updateVariant(i, { costPrice: t })}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    )}
                     <View style={styles.flexInput}>
                       <Input
                         placeholder="Stock"
@@ -686,6 +766,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                       />
                     </View>
                   </View>
+                  {canManageMargins && !v.commissionEnabled && form.commissionEnabled && (
+                    <Text style={styles.commissionInherited}>
+                      Uses the product commission
+                    </Text>
+                  )}
                   {v.commissionEnabled && (
                     <Text style={styles.commissionBadge}>
                       Commission: employee gets {v.commissionEmployeeSharePercent}% of the excess over{' '}
@@ -699,24 +784,49 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           </>
         )}
 
-        {commissionModalIndex !== null && form.variants[commissionModalIndex] && (
-          <VariantCommissionModal
-            visible={commissionModalIndex !== null}
-            onClose={() => setCommissionModalIndex(null)}
-            variantName={form.variants[commissionModalIndex].name}
-            sellingPrice={parseFloat(form.variants[commissionModalIndex].sellingPrice) || 0}
+        {typeof commissionTarget === 'number' && form.variants[commissionTarget] && (
+          <CommissionModal
+            visible
+            onClose={() => setCommissionTarget(null)}
+            subjectName={form.variants[commissionTarget].name}
+            scopeLabel="this variant"
+            sellingPrice={parseFloat(form.variants[commissionTarget].sellingPrice) || 0}
             initialValue={{
-              enabled: form.variants[commissionModalIndex].commissionEnabled,
-              basePrice: form.variants[commissionModalIndex].commissionBasePrice,
-              employeeSharePercent: form.variants[commissionModalIndex].commissionEmployeeSharePercent,
+              enabled: form.variants[commissionTarget].commissionEnabled,
+              basePrice: form.variants[commissionTarget].commissionBasePrice,
+              employeeSharePercent: form.variants[commissionTarget].commissionEmployeeSharePercent,
             }}
-            onConfirm={(value: VariantCommissionValue) => {
-              updateVariant(commissionModalIndex, {
+            onConfirm={(value: CommissionValue) => {
+              updateVariant(commissionTarget, {
                 commissionEnabled: value.enabled,
                 commissionBasePrice: value.basePrice,
                 commissionEmployeeSharePercent: value.employeeSharePercent,
               });
-              setCommissionModalIndex(null);
+              setCommissionTarget(null);
+            }}
+          />
+        )}
+
+        {commissionTarget === 'product' && (
+          <CommissionModal
+            visible
+            onClose={() => setCommissionTarget(null)}
+            subjectName={form.name || 'This product'}
+            scopeLabel="this product"
+            sellingPrice={parseFloat(form.sellingPrice) || 0}
+            priceVaries={form.productType === 'variable' || (form.productType === 'service' && form.allowPriceOverride)}
+            initialValue={{
+              enabled: form.commissionEnabled,
+              basePrice: form.commissionBasePrice,
+              employeeSharePercent: form.commissionEmployeeSharePercent,
+            }}
+            onConfirm={(value: CommissionValue) => {
+              update({
+                commissionEnabled: value.enabled,
+                commissionBasePrice: value.basePrice,
+                commissionEmployeeSharePercent: value.employeeSharePercent,
+              });
+              setCommissionTarget(null);
             }}
           />
         )}
@@ -823,40 +933,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1, backgroundColor: Colors.background },
-
-  // ── Header ──
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: Spacing.sm,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surface,
-  },
-  headerCenter: { flex: 1 },
-  headerTitle: {
-    fontSize: Typography.size.h3,
-    fontFamily: Typography.fontFamilyBold,
-    color: Colors.textPrimary,
-  },
-  headerSub: {
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textSecondary,
-    marginTop: 1,
-  },
 
   // ── Scroll content ──
   // paddingBottom is applied inline from the live tab-bar height.
@@ -1195,6 +1271,28 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily,
     color: Colors.primary,
     marginTop: Spacing.xs,
+  },
+  commissionInherited: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textTertiary,
+    marginTop: Spacing.xs,
+  },
+  commissionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  commissionRowText: { flex: 1 },
+  commissionRowTitle: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  commissionRowSub: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 
   // ── Shared ──

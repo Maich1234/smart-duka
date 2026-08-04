@@ -7,6 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const clearAll = async (): Promise<void> => {
   await AsyncStorage.multiRemove([
     'auth-storage',    // Zustand persist key (authStore.ts)
-    'smartduka.cache', // React Query persist key (_layout.tsx)
+    'dukana.cache', // React Query persist key (_layout.tsx)
   ]);
 };

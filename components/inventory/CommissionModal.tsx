@@ -9,19 +9,25 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
-export interface VariantCommissionValue {
+export interface CommissionValue {
   enabled: boolean;
   basePrice: string;
   employeeSharePercent: string;
 }
 
-interface VariantCommissionModalProps {
+interface CommissionModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (value: VariantCommissionValue) => void;
-  variantName: string;
+  onConfirm: (value: CommissionValue) => void;
+  /** What the commission is being set on — a product name or a variant name. */
+  subjectName: string;
+  /** Wording for the enable switch, e.g. 'this product' or 'this variant'. */
+  scopeLabel: string;
   sellingPrice: number;
-  initialValue: VariantCommissionValue;
+  /** True when the cashier sets the price at the till, so the figures below
+   *  are an illustration at list price rather than a fixed outcome. */
+  priceVaries?: boolean;
+  initialValue: CommissionValue;
 }
 
 /**
@@ -29,17 +35,19 @@ interface VariantCommissionModalProps {
  * `initialValue` on every open — replacing an effect that re-seeded on
  * `visible` after first rendering the previous variant's figures.
  */
-export const VariantCommissionModal: React.FC<VariantCommissionModalProps> = ({ visible, onClose, ...rest }) => (
+export const CommissionModal: React.FC<CommissionModalProps> = ({ visible, onClose, ...rest }) => (
   <BottomSheet visible={visible} onClose={onClose}>
-    {visible && <VariantCommissionModalBody onClose={onClose} {...rest} />}
+    {visible && <CommissionModalBody onClose={onClose} {...rest} />}
   </BottomSheet>
 );
 
-const VariantCommissionModalBody: React.FC<Omit<VariantCommissionModalProps, 'visible'>> = ({
+const CommissionModalBody: React.FC<Omit<CommissionModalProps, 'visible'>> = ({
   onClose,
   onConfirm,
-  variantName,
+  subjectName,
+  scopeLabel,
   sellingPrice,
+  priceVaries = false,
   initialValue,
 }) => {
   const [enabled, setEnabled] = useState(initialValue.enabled);
@@ -82,11 +90,11 @@ const VariantCommissionModalBody: React.FC<Omit<VariantCommissionModalProps, 'vi
   return (
     <>
       <Text style={styles.title}>Employee Commission</Text>
-      <Text style={styles.variantName}>{variantName || 'Variant'}</Text>
+      <Text style={styles.subjectName}>{subjectName || 'Untitled'}</Text>
       <Text style={styles.hint}>Selling price: {formatCurrency(sellingPrice)}</Text>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Enable commission for this variant</Text>
+        <Text style={styles.toggleLabel}>Enable commission for {scopeLabel}</Text>
         <Switch
           value={enabled}
           onValueChange={(v) => { haptics.selection(); setEnabled(v); }}
@@ -114,6 +122,7 @@ const VariantCommissionModalBody: React.FC<Omit<VariantCommissionModalProps, 'vi
           {hasValidBase && hasValidShare && (
             <Text style={styles.preview}>
               At {formatCurrency(sellingPrice)}, employee earns {formatCurrency(employeeAmount)}, shop keeps {formatCurrency(shopAmount)}.
+              {priceVaries ? ' The price is set at the till, so the higher it is sold for, the more the employee earns.' : ''}
             </Text>
           )}
           {!!error && <Text style={styles.error}>{error}</Text>}
@@ -130,7 +139,7 @@ const VariantCommissionModalBody: React.FC<Omit<VariantCommissionModalProps, 'vi
 
 const styles = StyleSheet.create({
   title: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, marginBottom: Spacing.sm, color: Colors.textPrimary, textAlign: 'center' },
-  variantName: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, textAlign: 'center', marginBottom: Spacing.xs },
+  subjectName: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, textAlign: 'center', marginBottom: Spacing.xs },
   hint: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.md },
   toggleRow: {
     flexDirection: 'row',

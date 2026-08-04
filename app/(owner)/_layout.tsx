@@ -18,7 +18,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Typography } from '@/constants/Typography';
+import { TAB_BAR_BASE_HEIGHT } from '@/constants/Layout';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -39,6 +41,9 @@ const TAB_CONFIGS: TabConfig[] = [
 
 const TAB_COUNT = TAB_CONFIGS.length;
 const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
+
+/** Routes reachable from the tab bar — the only ones without a back button. */
+const TAB_ROUTE_NAMES = new Set(TAB_CONFIGS.map((tc) => tc.name));
 
 interface AnimatedTabIconProps {
   config: TabConfig;
@@ -116,7 +121,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
     transform: [{ translateX: indicatorX.value }],
   }));
 
-  const tabBarHeight = 58 + insets.bottom;
+  const tabBarHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
 
   return (
     <View style={[styles.tabBar, { height: tabBarHeight }]}>
@@ -199,30 +204,41 @@ export default function OwnerLayout() {
   // the paywall until an M-PESA payment lands. Derived server-side; while
   // offline the last-known (persisted) state applies, so a paid-up shop is
   // never locked by a network blip.
-  if (access?.state === 'locked' && !pathname.includes('subscription')) {
+  const isLocked = access?.state === 'locked';
+  if (isLocked && !pathname.includes('subscription')) {
     return <Redirect href="/(owner)/subscription" />;
   }
 
   return (
     <Tabs
       tabBar={(props) => <PremiumTabBar {...(props as unknown as PremiumTabBarProps)} />}
+      // `history`, not the default `firstRoute`: these screens are reached by
+      // `router.push` from wherever the owner happened to be, so back has to
+      // mean "the screen I came from" rather than "the home tab".
+      backBehavior="history"
       screenOptions={{
         headerShown: true,
-        headerStyle: {
-          backgroundColor: '#FFFFFF',
-        },
-        headerTintColor: '#0F172A',
-        headerTitleStyle: {
-          fontFamily: Typography.fontFamilySemiBold,
-          fontSize: Typography.size.body,
-        },
-        headerShadowVisible: false,
+        // One header for every screen in the app — see components/ui/ScreenHeader.
+        // Tab roots are the only screens without a back button; everything else
+        // here is pushed on top of one. The paywall is the other exception:
+        // the redirect above sends every route back to it, so a back button
+        // there would be a control that visibly does nothing.
+        header: ({ route, options }) => (
+          <ScreenHeader
+            title={options.title ?? route.name}
+            showBack={
+              !TAB_ROUTE_NAMES.has(route.name) &&
+              !(isLocked && route.name === 'subscription')
+            }
+            fallbackHref="/(owner)/dashboard"
+          />
+        ),
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Smart Duka',
+          title: 'Dukana',
           headerShown: false,
         }}
       />
@@ -276,7 +292,7 @@ export default function OwnerLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: 'Ask Smart Duka',
+          title: 'Ask Dukana',
           href: null,
           headerShown: false,
         }}
@@ -286,6 +302,8 @@ export default function OwnerLayout() {
         options={{
           title: 'Expenses',
           href: null,
+          // Draws its own ScreenHeader — it carries the Add Expense action.
+          headerShown: false,
         }}
       />
       <Tabs.Screen

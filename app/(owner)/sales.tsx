@@ -14,7 +14,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SalesDateRangeSheet } from '@/components/sales/SalesDateRangeSheet';
 import { getSales, getSalesStats, voidSale, refundSale, type Sale, type SalesResponse } from '@/services/sales';
 import { useAlert } from '@/context/AlertContext';
-import { isOfflineQueued } from '@/utils/errors';
+import { isOfflineQueued, mutationErrorMessage } from '@/utils/errors';
 import { getShopConfig } from '@/services/shop';
 import { SalesList } from '@/components/sales/SalesList';
 import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
@@ -166,7 +166,7 @@ export default function OwnerSales() {
         toast({ type: 'info', message: 'Void saved offline — will sync when connected.' });
         return;
       }
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not void this sale.' });
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Could not void this sale.') });
     },
   });
 
@@ -486,7 +486,7 @@ export default function OwnerSales() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         sale={selectedSale}
-        shopName={user?.shop?.name || 'Smart Duka'}
+        shopName={user?.shop?.name || 'Dukana'}
         shopPhone={user?.shop?.phone}
         currency={currency}
         thankYouNote={thankYouNote}

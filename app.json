@@ -1,25 +1,24 @@
 {
   "expo": {
-    "name": "Smart Duka",
-    "slug": "smart-duka",
+    "name": "Dukana",
+    "slug": "dukana",
     "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "smartduka",
+    "scheme": "dukana",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wabunifu.smartduka",
+      "bundleIdentifier": "com.nifulabs.dukana",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Smart Duka uses the camera to capture your business logo.",
-        "NSPhotoLibraryUsageDescription": "Smart Duka accesses your photo library to set a business logo.",
-        "NSPhotoLibraryAddUsageDescription": "Smart Duka saves images to your photo library.",
-        "NSBluetoothAlwaysUsageDescription": "Smart Duka connects to your Bluetooth receipt printer to print sale receipts."
+        "NSCameraUsageDescription": "Dukana uses the camera to capture your business logo.",
+        "NSPhotoLibraryUsageDescription": "Dukana accesses your photo library to set a business logo.",
+        "NSPhotoLibraryAddUsageDescription": "Dukana saves images to your photo library.",
+        "NSBluetoothAlwaysUsageDescription": "Dukana connects to your Bluetooth receipt printer to print sale receipts."
       },
       "associatedDomains": [
-        "applinks:smart-duka--fqsxcq2wom.expo.app",
-        "applinks:smart-duka.expo.app"
+        "applinks:dukana.expo.app"
       ]
     },
     "android": {
@@ -33,7 +32,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.wabunifu.smartduka",
+      "package": "com.nifulabs.dukana",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
@@ -42,21 +41,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "smart-duka--fqsxcq2wom.expo.app"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        },
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "smart-duka.expo.app"
+              "host": "dukana.expo.app"
             }
           ],
           "category": [
@@ -116,8 +101,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Smart Duka to access your photos to set a business logo.",
-          "cameraPermission": "Allow Smart Duka to use the camera to capture a business logo."
+          "photosPermission": "Allow Dukana to access your photos to set a business logo.",
+          "cameraPermission": "Allow Dukana to use the camera to capture a business logo."
         }
       ],
       [
@@ -125,7 +110,7 @@
         {
           "isBackgroundEnabled": false,
           "neverForLocation": true,
-          "bluetoothAlwaysPermission": "Smart Duka connects to your Bluetooth receipt printer to print sale receipts."
+          "bluetoothAlwaysPermission": "Dukana connects to your Bluetooth receipt printer to print sale receipts."
         }
       ]
     ],

@@ -1,4 +1,4 @@
-# Smart Duka — Pre-Launch System Changes
+# Dukana — Pre-Launch System Changes
 
 **Status:** All changes implemented and verified — see §2 for the deploy order
 and §5 for the three things that still need a human decision.
@@ -10,7 +10,7 @@ and §5 for the three things that still need a human decision.
 
 ## 0 · Why this document exists
 
-Smart Duka is about to be submitted to the Google Play Store. An audit of the
+Dukana is about to be submitted to the Google Play Store. An audit of the
 QA report plus an independent sweep of all three repos found:
 
 - one **product gap that makes the app unusable for its largest user segment**,
@@ -204,7 +204,7 @@ the web, on a phone-sized viewport.
 `Linking.openURL` call, a "Manage online" button, a QR code, or copy naming
 the website.
 
-**Done when:** grep for `smartduka.` / `http` in the subscription surface
+**Done when:** grep for `dukana.` / `http` in the subscription surface
 returns nothing, and no purchase affordance exists in either app build.
 
 **Blocked by:** 3.2.
@@ -300,7 +300,7 @@ location.
 
 **Must also be declared:** business data is sent to **Google Gemini**
 (`services/ai/geminiClient.js`) — a third-party data share. The in-app privacy
-sheet at `components/profile/SmartDukaAiSection.tsx:105` is good practice but
+sheet at `components/profile/DukanaAiSection.tsx:105` is good practice but
 is not a substitute for either the policy or the Data Safety form.
 
 **Fix.** Write `/privacy` and `/terms` pages, wire up every dead link,
@@ -528,7 +528,7 @@ with no consent at all. Both paths now carry the checkbox.
 
 ### 3.20 — One front end, one URL · **P0** · mobile, web
 
-The Smart Duka front end is **`https://smart-duka-web-delta.vercel.app`** (the
+The Dukana front end is **`https://smart-duka-web-delta.vercel.app`** (the
 `smart-duka-web` Next.js app on Vercel). Everything the mobile app links out to
 now resolves there, replacing two separate Expo web export hosts.
 
@@ -560,7 +560,7 @@ Vercel host, `sitemap.xml` lists all 12 help articles, `robots.txt` carries the
 disallow rules.
 
 **Known difference:** the Expo web export's receipt page offered an "open in
-the app" deep link (`smartduka://r/<token>`); the Next.js receipt page does
+the app" deep link (`dukana://r/<token>`); the Next.js receipt page does
 not. Receipt QRs are scanned by customers, who mostly don't have the app, so
 this was not worth porting. It does leave `app/(public)/r/[token].tsx` in the
 native bundle unreachable from any current QR code — a cleanup candidate once
@@ -610,7 +610,7 @@ Recorded so future audits don't re-litigate these:
    because `autoVerify` app links only work if the host serves proof of
    ownership:
    - Android: `/.well-known/assetlinks.json`, containing
-     `com.wabunifu.smartduka` and the **SHA-256 fingerprint of the release
+     `com.nifulabs.dukana` and the **SHA-256 fingerprint of the release
      signing key** (`eas credentials` → Android → Keystore).
    - iOS: `/.well-known/apple-app-site-association`, containing the Team ID +
      bundle ID.

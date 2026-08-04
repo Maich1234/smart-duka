@@ -1,221 +1,121 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, type DimensionValue } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Dimensions, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  useAnimatedProps,
-  withTiming,
-  withSequence,
-  withRepeat,
-  withDelay,
   Easing,
-  type SharedValue,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BRAND, DukanaMark, DukanaWordmark } from '@/components/brand/DukanaMark';
 import { Typography } from '@/constants/Typography';
 import { useAuthStore } from '@/store/authStore';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { waitForHydration } from '@/utils/hydration';
 
 const { height } = Dimensions.get('window');
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-const TITLE = 'Smart Duka';
 const FOOTER = 'Powered by Wabunifu Labs';
 
-// Cinematic dark-teal palette, kept within the brand's teal family but deepened for a premium feel.
-const SCENE = {
-  bgFrom: '#040E0C',
-  bgVia: '#091F1A',
-  bgTo: '#0E2C25',
-  glow: '#2DD4BF',
-  glowSoft: '#5EEAD4',
-  text: '#F8FAFC',
-  footerText: 'rgba(248,250,252,0.55)',
-};
+// Both marks are sized from their own viewBox ratios so neither distorts.
+const MARK_H = 132;
+const MARK_W = Math.round(MARK_H * (488 / 550));
+const WORD_W = 208;
+const WORD_H = Math.round(WORD_W * (166 / 814));
 
-// Letters assemble one at a time, alternating up/down like a hand tracing the word — quick and brief.
-const WRITE_START_DELAY = 200;
-const STAGGER = 55;
-const LETTER_DURATION = 260;
-const TITLE_SETTLE = WRITE_START_DELAY + (TITLE.length - 1) * STAGGER + LETTER_DURATION;
-const FOOTER_DELAY = TITLE_SETTLE + 60;
+// Beat sheet, mirroring the brand animation: the bag settles first, then the
+// word wipes in beneath it, then the footer.
+const MARK_DURATION = 620;
+const WORD_DELAY = 430;
+const WORD_DURATION = 560;
+const FOOTER_DELAY = WORD_DELAY + WORD_DURATION - 120;
 const FOOTER_DURATION = 420;
-const NAVIGATE_AT = FOOTER_DELAY + FOOTER_DURATION + 380;
+const HOLD = 420;
+const NAVIGATE_AT = FOOTER_DELAY + FOOTER_DURATION + HOLD;
 
-const NODES = [
-  { top: '15%', left: '12%', size: 14, dx: 10, dy: 16, duration: 9000 },
-  { top: '20%', left: '80%', size: 9, dx: -12, dy: 10, duration: 11000 },
-  { top: '68%', left: '16%', size: 11, dx: 14, dy: -10, duration: 10200 },
-  { top: '76%', left: '84%', size: 8, dx: -10, dy: -13, duration: 12500 },
-  { top: '42%', left: '6%', size: 6, dx: 8, dy: 11, duration: 8500 },
-  { top: '55%', left: '93%', size: 7, dx: -9, dy: 9, duration: 9800 },
-] as const;
-
-function FloatingNode({
-  top,
-  left,
-  size,
-  dx,
-  dy,
-  duration,
-}: {
-  top: DimensionValue;
-  left: DimensionValue;
-  size: number;
-  dx: number;
-  dy: number;
-  duration: number;
-}) {
-  const tx = useSharedValue(0);
-  const ty = useSharedValue(0);
-  const opacity = useSharedValue(0);
-
-  useEffect(() => {
-    tx.value = withRepeat(
-      withSequence(
-        withTiming(dx, { duration, easing: Easing.inOut(Easing.sin) }),
-        withTiming(-dx, { duration, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-    ty.value = withRepeat(
-      withSequence(
-        withTiming(dy, { duration: duration * 1.15, easing: Easing.inOut(Easing.sin) }),
-        withTiming(-dy, { duration: duration * 1.15, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-    // Fade in, then settle into a slow shimmer. Composed declaratively — chaining the
-    // repeat from a withTiming callback recurses infinitely on web when the OS has
-    // reduced motion enabled (animations complete synchronously → stack overflow).
-    opacity.value = withDelay(
-      300,
-      withSequence(
-        withTiming(1, { duration: 1200 }),
-        withRepeat(
-          withSequence(
-            withTiming(0.35, { duration: duration * 0.8, easing: Easing.inOut(Easing.ease) }),
-            withTiming(0.15, { duration: duration * 0.8, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        )
-      )
-    );
-    // Shared values and per-instance constants — stable for this
-    // element's lifetime, so declaring them keeps the animation mount-only.
-  }, [duration, dx, dy, opacity, tx, ty]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateX: tx.value }, { translateY: ty.value }],
-  }));
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.node,
-        { top, left, width: size, height: size, borderRadius: size / 2 },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-function Letter({
-  char,
-  index,
-  glowRadius,
-}: {
-  char: string;
-  index: number;
-  glowRadius: SharedValue<number>;
-}) {
-  const fromBelow = index % 2 === 0;
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(fromBelow ? 12 : -12);
-  const rotate = useSharedValue(fromBelow ? -7 : 7);
-
-  useEffect(() => {
-    const delay = WRITE_START_DELAY + index * STAGGER;
-    const config = { duration: LETTER_DURATION, easing: Easing.out(Easing.cubic) };
-    opacity.value = withDelay(delay, withTiming(1, config));
-    translateY.value = withDelay(delay, withTiming(0, config));
-    rotate.value = withDelay(delay, withTiming(0, config));
-    // Shared values and per-instance constants — stable for this
-    // element's lifetime, so declaring them keeps the animation mount-only.
-  }, [index, opacity, rotate, translateY]);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }, { rotate: `${rotate.value}deg` }],
-    textShadowRadius: glowRadius.value,
-  }));
-
-  return <Animated.Text style={[styles.logoText, style]}>{char}</Animated.Text>;
-}
+// Longest we will wait on the reduce-motion query before animating anyway.
+const ACCESSIBILITY_DEADLINE = 120;
 
 export default function SplashScreen() {
-  const [titleWidth, setTitleWidth] = useState(220);
+  // Motion here is purely decorative — the navigation timeout below is what
+  // advances the app — so honouring "reduce motion" costs nothing functionally.
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
 
-  const bgOpacity = useSharedValue(0);
-  const glowRadius = useSharedValue(0);
-  const penX = useSharedValue(0);
-  const penOpacity = useSharedValue(0);
+  const markOpacity = useSharedValue(0);
+  const markScale = useSharedValue(0.88);
+  const wordWidth = useSharedValue(0);
   const footerOpacity = useSharedValue(0);
-  const footerTranslateY = useSharedValue(14);
-  const footerBlur = useSharedValue(12);
+  const footerTranslateY = useSharedValue(10);
+
+  // Resolved before the animation is scheduled, so a reduced-motion user never
+  // sees a frame of movement. Raced against a short deadline: the navigation
+  // timeout below runs on a fixed schedule from mount, so a slow (or hung)
+  // accessibility query must not be able to hold the logo off-screen for the
+  // whole splash — after ACCESSIBILITY_DEADLINE we assume motion is fine.
+  useEffect(() => {
+    let cancelled = false;
+    const settle = (enabled: boolean) => {
+      if (!cancelled) {
+        cancelled = true;
+        setReduceMotion(enabled);
+      }
+    };
+    const deadline = setTimeout(() => settle(false), ACCESSIBILITY_DEADLINE);
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(settle)
+      .catch(() => settle(false));
+    return () => {
+      cancelled = true;
+      clearTimeout(deadline);
+    };
+  }, []);
 
   useEffect(() => {
-    bgOpacity.value = withTiming(1, { duration: 350, easing: Easing.out(Easing.ease) });
+    if (reduceMotion === null) return; // still resolving — hold on the first frame
 
-    // Pen-tip glow traces the baseline at the same pace the letters assemble.
-    penOpacity.value = withDelay(
-      WRITE_START_DELAY,
-      withSequence(
-        withTiming(1, { duration: 120 }),
-        withDelay(TITLE_SETTLE - WRITE_START_DELAY - 120 - 180, withTiming(0, { duration: 180 }))
-      )
-    );
-    penX.value = withDelay(
-      WRITE_START_DELAY,
-      withTiming(titleWidth, { duration: TITLE_SETTLE - WRITE_START_DELAY, easing: Easing.linear })
-    );
+    if (reduceMotion) {
+      markOpacity.value = 1;
+      markScale.value = 1;
+      wordWidth.value = WORD_W;
+      footerOpacity.value = 1;
+      footerTranslateY.value = 0;
+      return;
+    }
 
-    // One quick glow pulse once the word is fully written — no continuous loop, keeps it brief.
-    glowRadius.value = withDelay(
-      TITLE_SETTLE,
-      withSequence(
-        withTiming(14, { duration: 180, easing: Easing.out(Easing.ease) }),
-        withTiming(0, { duration: 300, easing: Easing.inOut(Easing.ease) })
-      )
+    markOpacity.value = withTiming(1, { duration: MARK_DURATION, easing: Easing.out(Easing.cubic) });
+    markScale.value = withTiming(1, {
+      duration: MARK_DURATION,
+      easing: Easing.out(Easing.back(1.4)),
+    });
+    wordWidth.value = withDelay(
+      WORD_DELAY,
+      withTiming(WORD_W, { duration: WORD_DURATION, easing: Easing.out(Easing.cubic) })
     );
-
     footerOpacity.value = withDelay(FOOTER_DELAY, withTiming(1, { duration: FOOTER_DURATION }));
     footerTranslateY.value = withDelay(
       FOOTER_DELAY,
       withTiming(0, { duration: FOOTER_DURATION, easing: Easing.out(Easing.cubic) })
     );
-    footerBlur.value = withDelay(
-      FOOTER_DELAY,
-      withTiming(0, { duration: FOOTER_DURATION, easing: Easing.out(Easing.cubic) })
-    );
+    // Shared values have stable identities; listed for honesty.
+  }, [reduceMotion, footerOpacity, footerTranslateY, markOpacity, markScale, wordWidth]);
 
-    // Routing must read the stores at fire time AND after hydration — the
-    // initial defaults (no user, onboarding not completed) would otherwise
-    // send an already-signed-in device back to the welcome journey whenever
-    // SecureStore/AsyncStorage is slow to hydrate.
+  // Navigation is deliberately independent of the animation: it runs on the
+  // same schedule whether or not motion is reduced, and is never chained off an
+  // animation callback (which would strand the user if a frame were dropped).
+  const navigated = useRef(false);
+  useEffect(() => {
     let cancelled = false;
     const timeout = setTimeout(async () => {
+      // Routing must read the stores at fire time AND after hydration — the
+      // initial defaults (no user, onboarding not completed) would otherwise
+      // send an already-signed-in device back to the welcome journey whenever
+      // SecureStore/AsyncStorage is slow to hydrate.
       await waitForHydration(useAuthStore, useOnboardingStore);
-      if (cancelled) return;
+      if (cancelled || navigated.current) return;
+      navigated.current = true;
       const { user } = useAuthStore.getState();
       if (user) {
         router.replace(user.role === 'owner' ? '/(owner)/dashboard' : '/(staff)/dashboard');
@@ -230,23 +130,20 @@ export default function SplashScreen() {
       cancelled = true;
       clearTimeout(timeout);
     };
-    // Reanimated shared values: stable identities, declared for honesty.
-  }, [titleWidth, bgOpacity, footerBlur, footerOpacity, footerTranslateY, glowRadius, penOpacity, penX]);
+  }, []);
 
-  const backgroundStyle = useAnimatedStyle(() => ({ opacity: bgOpacity.value }));
-
-  const penStyle = useAnimatedStyle(() => ({
-    opacity: penOpacity.value,
-    transform: [{ translateX: penX.value }],
+  const markStyle = useAnimatedStyle(() => ({
+    opacity: markOpacity.value,
+    transform: [{ scale: markScale.value }],
   }));
 
-  const footerWrapStyle = useAnimatedStyle(() => ({
+  // The word is revealed by growing a clipping window over a fixed-width
+  // wordmark, so the glyphs wipe in left-to-right instead of stretching.
+  const wordClipStyle = useAnimatedStyle(() => ({ width: wordWidth.value }));
+
+  const footerStyle = useAnimatedStyle(() => ({
     opacity: footerOpacity.value,
     transform: [{ translateY: footerTranslateY.value }],
-  }));
-
-  const footerBlurProps = useAnimatedProps(() => ({
-    intensity: footerBlur.value,
   }));
 
   return (
@@ -254,53 +151,38 @@ export default function SplashScreen() {
       <StatusBar style="light" />
 
       <LinearGradient
-        colors={[SCENE.bgFrom, SCENE.bgVia, SCENE.bgTo]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
+        colors={['#05563F', BRAND.green, '#00301F']}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, backgroundStyle]}>
-        <View style={[styles.gridLine, { top: '28%' }]} />
-        <View style={[styles.gridLine, { top: '72%' }]} />
-        <View style={[styles.gridLineVertical, { left: '22%' }]} />
-        <View style={[styles.gridLineVertical, { left: '78%' }]} />
-
-        {NODES.map((node, i) => (
-          <FloatingNode key={i} {...node} />
-        ))}
-      </Animated.View>
-
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0.4)', 'transparent']}
-        style={styles.vignetteTop}
-      />
-      <LinearGradient
-        pointerEvents="none"
-        colors={['transparent', 'rgba(0,0,0,0.45)']}
+        colors={['transparent', 'rgba(0,0,0,0.35)']}
         style={styles.vignetteBottom}
       />
 
-      <View style={styles.centerContent}>
-        <View
-          style={styles.titleRow}
-          onLayout={(e) => setTitleWidth(e.nativeEvent.layout.width)}
-        >
-          {TITLE.split('').map((char, i) => (
-            <Letter key={i} char={char} index={i} glowRadius={glowRadius} />
-          ))}
-          <Animated.View style={[styles.penDot, penStyle]} />
+      {/* One label for the lockup: a screen reader should hear the brand once,
+          not "image, image" for the bag and the word separately. */}
+      <View
+        style={styles.centerContent}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel="Dukana"
+      >
+        <Animated.View style={markStyle}>
+          <DukanaMark width={MARK_W} height={MARK_H} />
+        </Animated.View>
+
+        <View style={styles.wordTrack}>
+          <Animated.View style={[styles.wordClip, wordClipStyle]}>
+            <DukanaWordmark width={WORD_W} height={WORD_H} />
+          </Animated.View>
         </View>
       </View>
 
-      <Animated.View style={[styles.footerWrap, footerWrapStyle]}>
+      <Animated.View style={[styles.footerWrap, footerStyle]}>
         <Text style={styles.footerText}>{FOOTER}</Text>
-        <AnimatedBlurView
-          tint="dark"
-          animatedProps={footerBlurProps}
-          style={StyleSheet.absoluteFill}
-        />
       </Animated.View>
     </View>
   );
@@ -309,7 +191,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: SCENE.bgFrom,
+    backgroundColor: BRAND.green,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -319,71 +201,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  titleRow: {
-    flexDirection: 'row',
-    position: 'relative',
+  // Fixed-width, centred track. The clip window inside it grows from this
+  // track's left edge; animating the centred box directly would move its left
+  // edge every frame and the word would slide in rather than wipe.
+  wordTrack: {
+    width: WORD_W,
+    height: WORD_H,
+    marginTop: 26,
   },
-  logoText: {
-    fontFamily: Typography.fontFamilyBold,
-    fontSize: Typography.size.display,
-    color: SCENE.text,
-    letterSpacing: 1,
-    textShadowColor: SCENE.glow,
-    textShadowOffset: { width: 0, height: 0 },
-  },
-  penDot: {
-    position: 'absolute',
-    bottom: 2,
-    left: 0,
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: SCENE.glowSoft,
-    shadowColor: SCENE.glow,
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
+  wordClip: {
+    height: WORD_H,
+    overflow: 'hidden',
+    // Keeps the full-width wordmark anchored left while the window is narrow.
+    alignItems: 'flex-start',
   },
   footerWrap: {
     position: 'absolute',
     bottom: 48,
     alignSelf: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    overflow: 'hidden',
-    borderRadius: 4,
   },
   footerText: {
     fontFamily: Typography.fontFamily,
     fontSize: Typography.size.small,
-    color: SCENE.footerText,
+    color: 'rgba(248,250,252,0.55)',
     letterSpacing: 0.5,
     textAlign: 'center',
-  },
-  node: {
-    position: 'absolute',
-    backgroundColor: SCENE.glowSoft,
-  },
-  gridLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(94,234,212,0.04)',
-  },
-  gridLineVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: 'rgba(94,234,212,0.035)',
-  },
-  vignetteTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: height * 0.22,
   },
   vignetteBottom: {
     position: 'absolute',

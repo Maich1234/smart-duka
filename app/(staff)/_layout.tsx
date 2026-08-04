@@ -19,8 +19,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
 import { useCartStore } from '@/store/staffCartStore';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Typography } from '@/constants/Typography';
 import { Colors } from '@/constants/Colors';
+import { TAB_BAR_BASE_HEIGHT } from '@/constants/Layout';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -40,6 +42,9 @@ const TAB_CONFIGS: TabConfig[] = [
 
 const TAB_COUNT = TAB_CONFIGS.length;
 const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
+
+/** Routes reachable from the tab bar — the only ones without a back button. */
+const TAB_ROUTE_NAMES = new Set(TAB_CONFIGS.map((tc) => tc.name));
 
 interface AnimatedTabIconProps {
   config: TabConfig;
@@ -140,7 +145,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
     transform: [{ translateX: indicatorX.value }],
   }));
 
-  const tabBarHeight = 58 + insets.bottom;
+  const tabBarHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
 
   return (
     <View style={[styles.tabBar, { height: tabBarHeight }]}>
@@ -210,22 +215,26 @@ export default function StaffLayout() {
   return (
     <Tabs
       tabBar={(props) => <PremiumTabBar {...(props as unknown as PremiumTabBarProps)} />}
+      // See the owner layout: back has to return to the screen the cashier
+      // came from, not to the home tab.
+      backBehavior="history"
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: '#FFFFFF' },
-        headerTintColor: '#0F172A',
-        headerTitleStyle: {
-          fontFamily: Typography.fontFamilySemiBold,
-          fontSize: 16,
-        },
-        headerShadowVisible: false,
+        header: ({ route, options }) => (
+          <ScreenHeader
+            title={options.title ?? route.name}
+            showBack={!TAB_ROUTE_NAMES.has(route.name)}
+            fallbackHref="/(staff)/dashboard"
+          />
+        ),
       }}
     >
-      <Tabs.Screen name="dashboard" options={{ title: 'Smart Duka', headerShown: false }} />
+      <Tabs.Screen name="dashboard" options={{ title: 'Dukana', headerShown: false }} />
       <Tabs.Screen name="inventory" options={{ title: 'Stock', headerShown: false }} />
       <Tabs.Screen name="sales"     options={{ title: 'Sales',  headerShown: false }} />
       <Tabs.Screen name="profile"   options={{ title: 'Profile' }} />
-      <Tabs.Screen name="expenses"  options={{ title: 'Expenses', href: null }} />
+      {/* Draws its own ScreenHeader — it carries the Add Expense action. */}
+      <Tabs.Screen name="expenses"  options={{ title: 'Expenses', href: null, headerShown: false }} />
       <Tabs.Screen name="purchases" options={{ title: 'Purchases', href: null, headerShown: false }} />
       <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
       <Tabs.Screen name="commission" options={{ title: 'My Commission', href: null }} />

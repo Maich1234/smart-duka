@@ -76,7 +76,7 @@ const queryClient = new QueryClient({
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: 'smartduka.cache',
+  key: 'dukana.cache',
   throttleTime: 3000,
   // Hard cap: ~4 MB of JSON. Keeps the serialised cache manageable on
   // low-storage Android devices (2 GB RAM, 16 GB ROM tier).
@@ -86,7 +86,7 @@ const asyncStoragePersister = createAsyncStoragePersister({
     // ~4 MB safety valve — if serialised cache exceeds this, clear persisted
     // cache so the app never fills up small-storage devices.
     if (json.length > 4 * 1024 * 1024) {
-      AsyncStorage.removeItem('smartduka.cache').catch(() => {});
+      AsyncStorage.removeItem('dukana.cache').catch(() => {});
       return '{}';
     }
     return json;

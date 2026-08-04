@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
@@ -48,7 +48,7 @@ const getInitials = (name: string) =>
 
 export default function StaffDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const insets = useSafeAreaInsets();
   const canManageExpenses = usePermission('manage_expenses');
   const canViewPurchases = usePermission('view_purchases');
@@ -61,6 +61,11 @@ export default function StaffDashboard() {
     queryFn: getShopConfig,
   });
   const showPurchasesTile = canViewPurchases && (shopConfigData?.data?.purchasingEnabled ?? false);
+  // Commission is hidden outright for anyone not on it — both when the shop
+  // doesn't publish commission at all, and when this person specifically isn't
+  // earning any. A tile leading to a permanent zero reads as a broken feature.
+  const showCommissionTile =
+    (shopConfigData?.data?.showStaffCommission ?? false) && user?.commissionEligible === true;
 
   const [timeContext, setTimeContext] = useState({
     greeting: getGreeting(),
@@ -89,9 +94,11 @@ export default function StaffDashboard() {
     if (showPurchasesTile) {
       list.unshift({ id: 'purchases', title: 'Purchases', icon: 'cart-outline', tint: Colors.primary, tintBg: Colors.primarySubtle, route: '/(staff)/purchases' });
     }
-    list.push({ id: 'commission', title: 'My Commission', icon: 'cash-outline', tint: Colors.success, tintBg: Colors.primarySubtle, route: '/(staff)/commission' });
+    if (showCommissionTile) {
+      list.push({ id: 'commission', title: 'My Commission', icon: 'cash-outline', tint: Colors.success, tintBg: Colors.primarySubtle, route: '/(staff)/commission' });
+    }
     return list;
-  }, [canManageExpenses, showPurchasesTile]);
+  }, [canManageExpenses, showPurchasesTile, showCommissionTile]);
 
   const unreadCount = useUnreadNotificationsCount();
 

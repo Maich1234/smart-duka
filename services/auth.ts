@@ -1,6 +1,14 @@
 import api from './api';
 import { getDeviceInfo } from '../utils/deviceId';
 
+// The two endpoints that hold the connection open while an SMTP handoff
+// completes. The client default (12s) is sized for a normal API round trip and
+// cuts these off mid-send — the account is created but the app reports a
+// network failure, so the user retries onto "email already registered".
+// Registration and resend are one-off, deliberate actions, so they can afford
+// to wait out a slow mail host rather than lie about the outcome.
+const MAIL_TIMEOUT_MS = 45000;
+
 export interface LoginResponse {
   success: boolean;
   data: {
@@ -36,6 +44,12 @@ export interface RegisterData {
 
 export interface RegisterResponse {
   success: boolean;
+  /**
+   * False when the account was created but the verification email could not be
+   * handed to the mail server. The code still exists server-side, so "resend"
+   * is the recovery path — not re-registering.
+   */
+  emailSent?: boolean;
   message?: string;
 }
 
@@ -93,7 +107,7 @@ export const login = async (email: string, password: string): Promise<LoginRespo
  * Register a new owner with shop
  */
 export const register = async (data: RegisterData): Promise<RegisterResponse> => {
-  const response = await api.post('/auth/register', data);
+  const response = await api.post('/auth/register', data, { timeout: MAIL_TIMEOUT_MS });
   return response.data;
 };
 
@@ -157,7 +171,7 @@ export const verifyEmail = async (email: string, code: string) => {
  * Resend the email verification code
  */
 export const resendVerificationEmail = async (email: string) => {
-  const response = await api.post('/auth/resend-verification-email', { email });
+  const response = await api.post('/auth/resend-verification-email', { email }, { timeout: MAIL_TIMEOUT_MS });
   return response.data;
 };
 

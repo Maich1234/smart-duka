@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -28,7 +28,7 @@ import {
 import { formatCurrency, formatDate, formatRelativeTime } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
 import { purchasingBasePath } from '@/utils/purchasingRoutes';
-import { isOfflineQueued } from '@/utils/errors';
+import { isOfflineQueued, mutationErrorMessage } from '@/utils/errors';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -69,7 +69,7 @@ export function SuppliersScreen() {
   const role = useAuthStore((s: AuthState) => s.user?.role);
   const currency = useAuthStore((s: AuthState) => s.user?.shop?.currency);
   const base = purchasingBasePath(role);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const queryClient = useQueryClient();
   const { alert, toast } = useAlert();
 
@@ -158,7 +158,7 @@ export function SuppliersScreen() {
         toast({ type: 'info', message: 'Supplier saved offline — will sync when connected.' });
         return;
       }
-      toast({ type: 'error', message: error?.response?.data?.message || 'Could not save supplier' });
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Could not save supplier') });
     },
   });
 
@@ -178,7 +178,7 @@ export function SuppliersScreen() {
         toast({ type: 'info', message: 'Removal will sync when connected.' });
         return;
       }
-      toast({ type: 'error', message: error?.response?.data?.message || 'Could not remove supplier' });
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Could not remove supplier') });
     },
   });
 

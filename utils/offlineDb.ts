@@ -23,6 +23,25 @@ export const getDb = (): SQLiteDatabase => {
  */
 export const isOfflineDbAvailable = (): boolean => _available;
 
+/**
+ * Adds columns to tables that already exist on devices from an earlier build.
+ *
+ * `CREATE TABLE IF NOT EXISTS` above is a no-op once the table exists, so any
+ * column added later has to be applied here too or existing installs keep the
+ * old shape. SQLite has no `ADD COLUMN IF NOT EXISTS`, hence the PRAGMA check.
+ */
+const migrate = (db: SQLiteDatabase): void => {
+  const hasColumn = (table: string, column: string) =>
+    db.getAllSync<{ name: string }>(`PRAGMA table_info(${table})`)
+      .some((c) => c.name === column);
+
+  // Added when the queue became per-account: rows written before this stay
+  // NULL and are claimed by the next signed-in user (see adoptLegacyRows).
+  if (!hasColumn('offline_queue', 'user_id')) {
+    db.execSync(`ALTER TABLE offline_queue ADD COLUMN user_id TEXT`);
+  }
+};
+
 export const initOfflineDb = (): void => {
   if (Platform.OS === 'web' && typeof window === 'undefined') {
     _available = false;
@@ -42,6 +61,7 @@ export const initOfflineDb = (): void => {
     db.execSync(`
       CREATE TABLE IF NOT EXISTS offline_queue (
         id TEXT PRIMARY KEY,
+        user_id TEXT,
         idempotency_key TEXT UNIQUE NOT NULL,
         method TEXT NOT NULL,
         url TEXT NOT NULL,
@@ -53,7 +73,7 @@ export const initOfflineDb = (): void => {
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_queue_ready
-        ON offline_queue(status, next_attempt_at);
+        ON offline_queue(status, user_id, next_attempt_at);
 
       CREATE TABLE IF NOT EXISTS ai_insight_cache (
         shop_id TEXT NOT NULL,
@@ -83,6 +103,7 @@ export const initOfflineDb = (): void => {
       CREATE INDEX IF NOT EXISTS idx_product_cache_search
         ON product_cache(shop_id, search_blob);
     `);
+    migrate(db);
   } catch (err) {
     _available = false;
     _db = null;

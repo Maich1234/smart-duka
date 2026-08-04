@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
@@ -25,7 +25,7 @@ type Availability = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
 export default function NewStaffScreen() {
   const queryClient = useQueryClient();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const { permissions, setPermissions, reset } = useStaffDraftStore();
   const shopName = useAuthStore((s) => s.user?.shop?.name) ?? '';
   const domain = useMemo(() => buildSystemEmailDomain(shopName), [shopName]);

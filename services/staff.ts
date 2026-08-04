@@ -9,6 +9,8 @@ export interface Staff {
   role: 'staff';
   isActive: boolean;
   permissions: string[];
+  /** Whether this member earns commission on the lines they sell. */
+  commissionEligible?: boolean;
   /**
    * Set when this member has asked to close their account. With
    * `deletionScheduledAt` still null it's waiting on the owner's approval;
@@ -91,6 +93,7 @@ export interface UpdateStaffData {
   phone?: string;
   isActive?: boolean;
   permissions?: string[];
+  commissionEligible?: boolean;
 }
 
 export interface StaffSalesResponse {

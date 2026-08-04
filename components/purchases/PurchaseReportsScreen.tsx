@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -78,7 +78,7 @@ const RankRow: React.FC<RankRowProps> = ({ rank, title, subtitle, amount, share,
  */
 export function PurchaseReportsScreen() {
   const currency = useAuthStore((s: AuthState) => s.user?.shop?.currency);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const canView = usePermission('view_purchases');
   // Every figure here is a cost, so the screen is meaningless without it.
   const canViewPrices = usePermission('view_purchase_prices');

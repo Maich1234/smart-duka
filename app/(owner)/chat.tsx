@@ -1,17 +1,19 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '@/components/ui/Screen';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { SuggestedPrompts } from '@/components/chat/SuggestedPrompts';
 import { UpsellCard, AiDisabledCard } from '@/components/insights/InsightSections';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useAiAccess } from '@/hooks/useAiAccess';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAlert } from '@/context/AlertContext';
@@ -23,7 +25,6 @@ import {
 } from '@/hooks/useAiChat';
 import { ChatHistorySheet } from '@/components/chat/ChatHistorySheet';
 import { Colors } from '@/constants/Colors';
-import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 
 interface DisplayMessage {
@@ -34,7 +35,22 @@ interface DisplayMessage {
 }
 
 /**
- * Ask Smart Duka. Auto-opens the latest non-archived conversation and
+ * Turns shown from local state because the server hasn't been re-read yet.
+ *
+ * `sentAt` is the thread's turn count at the moment of sending: once the
+ * refetched thread holds that many plus these turns, the server has caught up
+ * and the local copies are dropped in the same render the real ones appear.
+ * `conversationId` is undefined only for the first message of a new thread,
+ * before the server has named it.
+ */
+interface OptimisticBatch {
+  conversationId: string | undefined;
+  sentAt: number;
+  turns: DisplayMessage[];
+}
+
+/**
+ * Ask Dukana. Auto-opens the latest non-archived conversation and
  * auto-creates one on the first message.
  *
  * Past threads are reachable from the history sheet. They previously were
@@ -46,10 +62,10 @@ interface DisplayMessage {
  */
 export default function AiChatScreen() {
   const { seed } = useLocalSearchParams<{ seed?: string }>();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
 
   // Same gate as /(owner)/insights.tsx — subscription state, plan feature,
-  // and the shop's own Smart Duka AI toggle. Matches the backend's
+  // and the shop's own Dukana AI toggle. Matches the backend's
   // requireActiveSubscription + requireFeature + requireAiEnabled on POST /ai/chat.
   const { hasAiAccess: hasAiChat, state: aiAccessState, isLoading: isSubscriptionLoading } = useAiAccess();
   const { plan } = useSubscription();
@@ -63,8 +79,21 @@ export default function AiChatScreen() {
   // (a message was sent, or a deletion fell back to an older thread).
   const [skipAutoLoad, setSkipAutoLoad] = useState(false);
   const [inputText, setInputText] = useState(typeof seed === 'string' ? seed : '');
-  const [pendingText, setPendingText] = useState<string | null>(null);
+  const [optimistic, setOptimistic] = useState<OptimisticBatch | null>(null);
   const listRef = useRef<FlatList<DisplayMessage>>(null);
+
+  // "Ask why" on the Insights screen pushes here with a question in the URL.
+  // Chat is a tab route, so arriving a second time re-uses the mounted screen
+  // and the `useState` initialiser above never runs again — without this the
+  // second tap would land on an empty composer. Applied once per distinct
+  // seed so it can't overwrite what the owner is typing on every re-render.
+  const appliedSeed = useRef(typeof seed === 'string' ? seed : null);
+  useEffect(() => {
+    if (typeof seed === 'string' && seed && seed !== appliedSeed.current) {
+      appliedSeed.current = seed;
+      setInputText(seed);
+    }
+  }, [seed]);
 
   const [historyVisible, setHistoryVisible] = useState(false);
 
@@ -81,28 +110,70 @@ export default function AiChatScreen() {
   const sendMutation = useSendChatMessage(conversationId);
   const archiveMutation = useArchiveConversation();
 
-  // The API only returns the model's turn per exchange — a local optimistic
-  // bubble stands in for the user's own message until the mutation resolves
-  // and the thread refetches with the persisted version.
-  const messages: DisplayMessage[] = useMemo(() => {
-    const persisted: DisplayMessage[] = (thread?.data.messages ?? []).map((m) => ({
-      _id: m._id,
-      role: m.role,
-      text: m.text,
-      toolsUsed: m.toolsUsed,
-    }));
-    if (pendingText) persisted.push({ _id: 'pending', role: 'user', text: pendingText });
-    return persisted;
-  }, [thread, pendingText]);
+  const persisted: DisplayMessage[] = useMemo(
+    () =>
+      (thread?.data.messages ?? []).map((m) => ({
+        _id: m._id,
+        role: m.role,
+        text: m.text,
+        toolsUsed: m.toolsUsed,
+      })),
+    [thread]
+  );
 
-  const handleSend = () => {
+  // Turns the server holds for this thread, across every page — the count
+  // `persisted` is compared against. `persisted.length` can't stand in for it:
+  // a thread that spills onto a new page comes back shorter than before.
+  const serverTurnCount = thread?.pagination?.total ?? 0;
+
+  // The exchange stays on screen from the moment it is sent until the server's
+  // copy replaces it, with no gap in between.
+  //
+  // Sending used to clear the local user bubble the instant the mutation
+  // resolved and wait for an invalidated query to refetch. For a brand-new
+  // thread that also swapped in a fresh `conversationId`, so the whole screen
+  // fell back to the loading state: the question vanished, the screen blanked,
+  // and it read as the chat reloading and losing the message. Both the
+  // question and the answer are known locally the moment the reply lands —
+  // they are rendered from here until the server has caught up.
+  const messages: DisplayMessage[] = useMemo(() => {
+    if (!optimistic) return persisted;
+    // A batch belongs to the thread it was sent in. Without this check, opening
+    // another conversation while one is in flight would append its turns to the
+    // wrong transcript.
+    const belongsHere =
+      optimistic.conversationId === undefined || optimistic.conversationId === conversationId;
+    if (!belongsHere) return persisted;
+    if (serverTurnCount >= optimistic.sentAt + optimistic.turns.length) return persisted;
+    return [...persisted, ...optimistic.turns];
+  }, [persisted, optimistic, serverTurnCount, conversationId]);
+
+  const handleSend = useCallback(() => {
     const text = inputText.trim();
     if (!text || sendMutation.isPending) return;
     setInputText('');
-    setPendingText(text);
+    const sentAt = serverTurnCount;
+    setOptimistic({
+      conversationId,
+      sentAt,
+      turns: [{ _id: `local-user-${sentAt}`, role: 'user', text }],
+    });
     sendMutation.mutate(text, {
       onSuccess: (response) => {
-        setPendingText(null);
+        const reply = response.data.message;
+        setOptimistic({
+          conversationId: response.data.conversationId,
+          sentAt,
+          turns: [
+            { _id: `local-user-${sentAt}`, role: 'user', text },
+            {
+              _id: `local-model-${sentAt}`,
+              role: 'model',
+              text: reply.text,
+              toolsUsed: reply.toolsUsed,
+            },
+          ],
+        });
         if (!conversationId) {
           setSelectedConversationId(response.data.conversationId);
           setSkipAutoLoad(false);
@@ -110,7 +181,7 @@ export default function AiChatScreen() {
       },
       onError: (error: any) => {
         // Restore the draft so the owner doesn't lose what they typed.
-        setPendingText(null);
+        setOptimistic(null);
         setInputText(text);
         toast({
           type: 'error',
@@ -118,7 +189,7 @@ export default function AiChatScreen() {
         });
       },
     });
-  };
+  }, [conversationId, inputText, sendMutation, serverTurnCount, toast]);
 
   const handleNewChat = () => {
     if (sendMutation.isPending) return;
@@ -132,7 +203,7 @@ export default function AiChatScreen() {
     }
     setSelectedConversationId(undefined);
     setSkipAutoLoad(true);
-    setPendingText(null);
+    setOptimistic(null);
     setInputText('');
   };
 
@@ -142,7 +213,7 @@ export default function AiChatScreen() {
     alert({
       type: 'confirm',
       title: 'Delete this conversation?',
-      message: "It will be removed from Smart Duka AI. This can't be undone.",
+      message: "It will be removed from Dukana AI. This can't be undone.",
       buttons: [
         { label: 'Cancel', variant: 'ghost' },
         {
@@ -153,7 +224,7 @@ export default function AiChatScreen() {
               onSuccess: () => {
                 setSelectedConversationId(undefined);
                 setSkipAutoLoad(false);
-                setPendingText(null);
+                setOptimistic(null);
                 setInputText('');
               },
               onError: (error: any) => {
@@ -169,9 +240,12 @@ export default function AiChatScreen() {
     });
   };
 
+  // Both gate states are still pushed screens, so they carry the same header
+  // and clear the same tab bar as the thread itself.
   if (isSubscriptionLoading) {
     return (
-      <Screen scroll={false}>
+      <Screen scroll={false} padded={false} edges={['left', 'right']} tabBarSpacing>
+        <ScreenHeader title="Ask Dukana" fallbackHref="/(owner)/dashboard" />
         <LoadingState />
       </Screen>
     );
@@ -179,63 +253,87 @@ export default function AiChatScreen() {
 
   if (!hasAiChat) {
     return (
-      <Screen contentContainerStyle={s.upsellContent}>
-        {aiAccessState === 'disabled' ? <AiDisabledCard /> : <UpsellCard />}
+      <Screen scroll={false} padded={false} edges={['left', 'right']} tabBarSpacing>
+        <ScreenHeader title="Ask Dukana" fallbackHref="/(owner)/dashboard" />
+        <View style={s.upsellContent}>
+          {aiAccessState === 'disabled' ? <AiDisabledCard /> : <UpsellCard />}
+        </View>
       </Screen>
     );
   }
 
-  const showThreadLoading = isLoadingLatest || (!!conversationId && isLoadingThread);
+  // Sending before the thread's own turn count has arrived would make the
+  // optimistic batch clear against a stale total and blink the message away.
+  const isThreadSyncing = isLoadingLatest || (!!conversationId && isLoadingThread);
+
+  // Never blank the thread while there is something to show: mid-send the
+  // optimistic turns are the only copy of the exchange, and swapping them for
+  // a spinner is what made a successful send look like a failed reload.
+  const showThreadLoading = messages.length === 0 && isThreadSyncing;
 
   return (
-    <Screen scroll={false} padded={false} edges={['top', 'left', 'right']} contentContainerStyle={{ paddingBottom: tabBarHeight }}>
+    <Screen
+      scroll={false}
+      padded={false}
+      edges={['left', 'right']}
+      // The tab bar floats over the screen, so the composer has to be lifted
+      // clear of it — it used to sit directly underneath, flush against the tabs.
+      contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.sm }}
+    >
       <StatusBar style="dark" />
-      <View style={s.header}>
-        <View style={s.headerText}>
-          <Text style={s.title}>Ask Smart Duka</Text>
-          <Text style={s.subtitle}>Grounded answers about your business</Text>
-        </View>
-        <View style={s.headerActions}>
-          {(history?.conversations.length ?? 0) > 0 && (
+      <ScreenHeader
+        title="Ask Dukana"
+        subtitle="Grounded answers about your business"
+        fallbackHref="/(owner)/dashboard"
+        right={
+          <>
+            {(history?.conversations.length ?? 0) > 0 && (
+              <AnimatedPressable
+                onPress={() => setHistoryVisible(true)}
+                style={s.headerBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Past conversations"
+              >
+                <Ionicons name="time-outline" size={22} color={Colors.textPrimary} />
+              </AnimatedPressable>
+            )}
             <AnimatedPressable
-              onPress={() => setHistoryVisible(true)}
+              onPress={handleNewChat}
               style={s.headerBtn}
               accessibilityRole="button"
-              accessibilityLabel="Past conversations"
+              accessibilityLabel="Start a new conversation"
             >
-              <Ionicons name="time-outline" size={22} color={Colors.textPrimary} />
+              <Ionicons name="add-circle-outline" size={22} color={Colors.textPrimary} />
             </AnimatedPressable>
-          )}
-          <AnimatedPressable
-            onPress={handleNewChat}
-            style={s.headerBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Start a new conversation"
-          >
-            <Ionicons name="add-circle-outline" size={22} color={Colors.textPrimary} />
-          </AnimatedPressable>
-          {conversationId ? (
-            <AnimatedPressable
-              onPress={handleDelete}
-              style={s.headerBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Delete this conversation"
-            >
-              <Ionicons name="trash-outline" size={20} color={Colors.textPrimary} />
-            </AnimatedPressable>
-          ) : null}
-        </View>
-      </View>
+            {conversationId ? (
+              <AnimatedPressable
+                onPress={handleDelete}
+                style={s.headerBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Delete this conversation"
+              >
+                <Ionicons name="trash-outline" size={20} color={Colors.textPrimary} />
+              </AnimatedPressable>
+            ) : null}
+          </>
+        }
+      />
 
       {showThreadLoading ? (
         <LoadingState />
       ) : messages.length === 0 ? (
-        <View style={s.emptyWrap}>
+        <ScrollView
+          style={s.list}
+          contentContainerStyle={s.emptyContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <EmptyState
             title="Ask anything about your business"
-            subtitle={'Try "When is my shop busiest?" or "How are my staff doing this month?"'}
+            subtitle="Dukana reads your own sales, stock and expenses to answer."
           />
-        </View>
+          <SuggestedPrompts onSelect={setInputText} />
+        </ScrollView>
       ) : (
         <FlatList
           ref={listRef}
@@ -244,12 +342,18 @@ export default function AiChatScreen() {
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => <MessageBubble role={item.role} text={item.text} toolsUsed={item.toolsUsed} />}
           contentContainerStyle={s.listContent}
+          keyboardShouldPersistTaps="handled"
           ListFooterComponent={sendMutation.isPending ? <TypingIndicator /> : null}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         />
       )}
 
-      <ChatComposer value={inputText} onChangeText={setInputText} onSend={handleSend} disabled={sendMutation.isPending} />
+      <ChatComposer
+        value={inputText}
+        onChangeText={setInputText}
+        onSend={handleSend}
+        disabled={sendMutation.isPending || isThreadSyncing}
+      />
 
       <ChatHistorySheet
         visible={historyVisible}
@@ -260,7 +364,7 @@ export default function AiChatScreen() {
           // Picking a thread cancels any pending "new chat" state, otherwise
           // the auto-load effect would fight the explicit choice.
           setSkipAutoLoad(false);
-          setPendingText(null);
+          setOptimistic(null);
           setSelectedConversationId(id);
         }}
       />
@@ -269,21 +373,9 @@ export default function AiChatScreen() {
 }
 
 const s = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-  },
-  headerText: { flex: 1, gap: 3 },
-  headerActions: { flexDirection: 'row', gap: Spacing.xs, marginLeft: Spacing.sm },
   headerBtn: { padding: 4 },
-  title: { fontSize: Typography.size.h2, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, letterSpacing: -0.4 },
-  subtitle: { fontSize: Typography.size.small, fontFamily: Typography.fontFamily, color: Colors.textSecondary },
   list: { flex: 1 },
   listContent: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
-  emptyWrap: { flex: 1, justifyContent: 'center' },
-  upsellContent: { flex: 1, justifyContent: 'center' },
+  emptyContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: Spacing.lg },
+  upsellContent: { flex: 1, justifyContent: 'center', paddingHorizontal: Spacing.lg },
 });

@@ -3,8 +3,9 @@ import { View, RefreshControl, StyleSheet, Text } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { getProducts } from '@/services/products';
 import { InventoryHeader } from '@/components/inventory/InventoryHeader';
 import { ProductCard } from '@/components/inventory/ProductCard';
@@ -14,8 +15,13 @@ import { Spacing } from '@/constants/Spacing';
 import { usePermission } from '@/utils/permissions';
 
 export default function StaffInventory() {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const canViewProducts = usePermission('view_products');
+  // The product editor is shared with the owner's tree; these two permissions
+  // are what decide whether it's offered here. The screens behind them check
+  // again, and the server enforces both independently.
+  const canCreateProducts = usePermission('create_product');
+  const canEditProducts = usePermission('edit_product');
 
   const {
     value: searchValue,
@@ -59,7 +65,7 @@ export default function StaffInventory() {
   return (
     <View style={styles.container}>
       <InventoryHeader
-        onAddPress={() => {}}
+        onAddPress={() => router.push('/(staff)/inventory/new')}
         searchValue={searchValue}
         onSearchChange={onSearchChange}
         onSearchSubmit={onSearchSubmit}
@@ -67,7 +73,7 @@ export default function StaffInventory() {
         onSelectRecent={selectRecent}
         onClearRecent={clearRecent}
         title="Products"
-        showAddButton={false}
+        showAddButton={canCreateProducts}
         productCount={allProducts.length}
       />
       <FlashList
@@ -75,7 +81,15 @@ export default function StaffInventory() {
         data={products}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <ProductCard product={item} showCostPrice={false} showActions={false} />
+          <ProductCard
+            product={item}
+            showCostPrice={false}
+            // Only Edit is offered — no delete or stock adjustment handler is
+            // passed, so those actions don't render. Cost price stays hidden
+            // either way; the server never sends it to a staff role.
+            showActions={canEditProducts}
+            onEdit={canEditProducts ? () => router.push(`/(staff)/inventory/${item._id}/edit`) : undefined}
+          />
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}

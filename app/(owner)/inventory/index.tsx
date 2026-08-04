@@ -12,7 +12,7 @@ import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -67,7 +67,7 @@ const FILTER_OPTIONS: FilterOption[] = [
 ];
 
 export default function OwnerInventory() {
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const {
     value: searchValue,
     query: searchQuery,

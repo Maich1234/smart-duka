@@ -92,6 +92,15 @@ export default function RegisterScreen() {
         acceptedTerms: data.acceptedTerms,
       });
       if (res.success) {
+        // The account exists either way, so we always continue to the verify
+        // screen — but if the mail never left, say so here rather than letting
+        // them watch an empty inbox and conclude the signup silently failed.
+        if (res.emailSent === false) {
+          toast({
+            type: 'error',
+            message: res.message || 'Account created, but the email did not send. Tap resend on the next screen.',
+          });
+        }
         router.replace({ pathname: '/(auth)/verify-email', params: { email: data.email } });
       } else {
         toast({ type: 'error', message: res.message || 'Registration failed. Please try again.' });

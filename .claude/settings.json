@@ -99,7 +99,18 @@
       "Bash(grep -n -iB2 -A2 \"discount\\\\|promo\" /home/maich/Documents/smart-duka/constants/helpTopics.ts)",
       "Bash(cat src/models/Product.js)",
       "Bash(cat src/models/Sale.js)",
-      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\('expo:', pkg.dependencies.expo\\)\")"
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\('expo:', pkg.dependencies.expo\\)\")",
+      "Bash(grep -iE \"verify|/r$|receipt\")",
+      "Bash(curl -s -o /dev/null -w \"live /public/books/verify/x -> %{http_code}\\\\n\" \"https://smart-duka-backend-iota.vercel.app/api/v1/public/books/verify/abc\")",
+      "Bash(curl -s -o /dev/null -w \"live /public/receipt/x   -> %{http_code}\\\\n\" \"https://smart-duka-backend-iota.vercel.app/api/v1/public/receipt/abc\")",
+      "Bash(mkdir -p \"app/\\(staff\\)/inventory/[id]\" && git mv \"app/\\(staff\\)/inventory.tsx\" \"app/\\(staff\\)/inventory/index.tsx\" && find \"app/\\(staff\\)/inventory\" -type f | sort)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{time_total}s\\\\n\" -X POST https://smart-duka-backend-iota.vercel.app/api/v1/ai/chat -H \"Content-Type: application/json\" -d '{\"message\":\"hi\"}' --max-time 40)",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\\)\")",
+      "Bash(node --check src/controllers/productController.js)",
+      "Bash(echo \"TSC EXIT: $?\")",
+      "Bash(echo \"LINT EXIT: $?\")",
+      "Bash(echo \"TSC: $?\")",
+      "Bash(echo \"LINT: $?\")"
     ],
     "additionalDirectories": [
       "/tmp",
@@ -108,7 +119,8 @@
       "/home/maich/Documents/smart-duka-backend/src/validations",
       "/home/maich/Documents/smart-duka-backend/src/controllers",
       "/home/maich/Documents/smart-duka-backend/src/routes/v1",
-      "/home/maich/Documents/smart-duka-backend/src/services"
+      "/home/maich/Documents/smart-duka-backend/src/services",
+      "/home/maich/Documents/smart-duka/app/(staff)/inventory"
     ]
   },
   "enabledPlugins": {

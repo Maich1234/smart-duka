@@ -1,5 +1,6 @@
 import React from 'react';
 import { Stack } from 'expo-router';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useTheme } from '@/hooks/useTheme';
 
 export default function StaffStackLayout() {
@@ -8,10 +9,9 @@ export default function StaffStackLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: '600' },
-        headerShadowVisible: false,
+        header: ({ route, options }) => (
+          <ScreenHeader title={options.title ?? route.name} fallbackHref="/(owner)/staff" />
+        ),
         contentStyle: { backgroundColor: colors.background },
       }}
     >

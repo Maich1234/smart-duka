@@ -1,6 +1,6 @@
-# Smart Duka 👋
+# Dukana 👋
 
-Smart Duka is a mobile app for managing a shop's inventory, sales, and staff. It's built with [Expo](https://expo.dev) and [Expo Router](https://docs.expo.dev/router/introduction), and supports separate experiences for shop owners and staff.
+Dukana is a mobile app for managing a shop's inventory, sales, and staff. It's built with [Expo](https://expo.dev) and [Expo Router](https://docs.expo.dev/router/introduction), and supports separate experiences for shop owners and staff.
 
 ## Features
 

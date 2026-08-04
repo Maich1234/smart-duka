@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useFocusEffect, useNavigation } from "expo-router/react-navigation";
+import { router } from 'expo-router';
 import { useAlert } from '@/context/AlertContext';
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -23,9 +24,10 @@ import { SaleDetailsModal } from '@/components/sales/SaleDetailsModal';
 import { ReceiptModal } from '@/components/sales/ReceiptModal';
 import { MpesaPaymentModal } from '@/components/payments/MpesaPaymentModal';
 import { ShiftGate, ActiveShiftBar } from '@/components/shifts/ShiftGate';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { applyBestPromotion } from '@/utils/promotions';
 import { formatCurrency } from '@/utils/formatters';
-import { isOfflineQueued } from '@/utils/errors';
+import { isOfflineQueued, isOfflineUnavailable, mutationErrorMessage } from '@/utils/errors';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -38,7 +40,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCartStore, cartKey } from '@/store/staffCartStore';
 import { isOfflineDbAvailable } from '@/utils/offlineDb';
-import { syncProductCache, searchCachedProducts, PRODUCT_CACHE_STALE_MS } from '@/utils/productCache';
+import { syncProductCache, searchCachedProducts, applyOfflineStockDelta, PRODUCT_CACHE_STALE_MS } from '@/utils/productCache';
 
 /**
  * The till. Product search, cart, payment (cash / M-Pesa), receipt, and the
@@ -51,9 +53,18 @@ import { syncProductCache, searchCachedProducts, PRODUCT_CACHE_STALE_MS } from '
  * implicitly hold every permission, so the same component serves both
  * /(staff)/sales and /(owner)/pos without branching on role.
  */
-export function PosScreen() {
+interface PosScreenProps {
+  /**
+   * True where the till is pushed on top of something (the owner's /pos),
+   * false where it *is* the tab (a cashier's Sales tab, which has nothing
+   * behind it to go back to).
+   */
+  showBack?: boolean;
+}
+
+export function PosScreen({ showBack = false }: PosScreenProps) {
   const user = useAuthStore((s: AuthState) => s.user);
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useTabBarHeight();
   const canRecordSale = usePermission('record_sale');
   const canViewSales = usePermission('view_sales');
   const canVoidSale = usePermission('void_sale');
@@ -131,34 +142,48 @@ export function PosScreen() {
     return unsubscribe;
   }, [navigation, cart.length, alert, clearCart]);
 
+  // Leaving mid-sale silently loses the cart, so the hardware back gesture and
+  // the header's back button both run this. Confirming now also *leaves* —
+  // it used to only empty the cart, so "Discard" left the cashier standing on
+  // the same screen wondering whether anything had happened.
+  const confirmLeave = React.useCallback(() => {
+    // Nothing to lose — leave straight away, if there is anywhere to go.
+    if (cart.length === 0) {
+      if (router.canGoBack()) router.back();
+      return;
+    }
+    alert({
+      type: 'confirm',
+      title: 'Discard Sale?',
+      message: 'You have items in your cart. Going back will clear your current sale.',
+      buttons: [
+        { label: 'Stay', variant: 'ghost' },
+        {
+          label: 'Discard',
+          variant: 'danger',
+          onPress: () => {
+            clearCart();
+            setCustomerPhone('');
+            setMpesaMode('stk');
+            setManualReceiptCode('');
+            if (router.canGoBack()) router.back();
+          },
+        },
+      ],
+    });
+  }, [alert, cart.length, clearCart]);
+
   // Intercept Android back button when mid-sale to prevent silent cart loss.
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
         if (cart.length === 0) return false;
-        alert({
-          type: 'confirm',
-          title: 'Discard Sale?',
-          message: 'You have items in your cart. Going back will clear your current sale.',
-          buttons: [
-            { label: 'Stay', variant: 'ghost' },
-            {
-              label: 'Discard',
-              variant: 'danger',
-              onPress: () => {
-                clearCart();
-                setCustomerPhone('');
-                setMpesaMode('stk');
-                setManualReceiptCode('');
-              },
-            },
-          ],
-        });
+        confirmLeave();
         return true;
       };
       const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => sub.remove();
-    }, [cart.length, alert, clearCart])
+    }, [cart.length, confirmLeave])
   );
 
   // ── Product lookup: local first ─────────────────────────────────────────
@@ -276,15 +301,34 @@ export function PosScreen() {
       setCompletedSale(data.data);
       setReceiptVisible(true);
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
       if (isOfflineQueued(error)) {
+        // Take the stock down locally too. The server hasn't seen this sale
+        // yet, so without this the mirror keeps offering units that are
+        // already in a customer's bag — and every oversold line comes back
+        // as a permanent "Insufficient stock" rejection when the queue drains.
+        // Read from the mutation's own variables rather than the cart, which
+        // is cleared on the next line.
+        applyOfflineStockDelta(shopId, variables.items.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })));
+        queryClient.invalidateQueries({ queryKey: ['productCache', shopId] });
+
         clearCart();
         setManualReceiptCode('');
         setMpesaMode('stk');
         toast({ type: 'info', message: 'Sale saved offline — will sync when connected.' });
         return;
       }
-      toast({ type: 'error', message: error.response?.data?.message || 'Sale failed' });
+      if (isOfflineUnavailable(error)) {
+        // Nothing was saved anywhere — say so plainly instead of the
+        // reassuring offline message, and keep the cart so it isn't retyped.
+        toast({ type: 'error', message: error.message });
+        return;
+      }
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Sale failed') });
     },
   });
 
@@ -303,7 +347,7 @@ export function PosScreen() {
         toast({ type: 'info', message: 'Void saved offline — will sync when connected.' });
         return;
       }
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not void this sale.' });
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Could not void this sale.') });
     },
   });
 
@@ -397,7 +441,22 @@ export function PosScreen() {
         cartUnitPrice: unitPrice ?? existing.cartUnitPrice,
       });
     } else {
-      addItem({ ...selectedProduct, cartQuantity: quantity, cartUnitPrice: unitPrice });
+      addItem({
+        ...selectedProduct,
+        cartQuantity: quantity,
+        cartUnitPrice: unitPrice,
+        // Product-level preview, for every type that isn't variant-picked.
+        //
+        // Withheld when the cashier set their own price: the preview is
+        // computed server-side at list price, and the floor it is derived from
+        // is deliberately never sent to staff, so it cannot be recomputed here.
+        // The sale still pays the correct amount on the negotiated price — a
+        // quiet omission beats quoting a figure that won't match the payout.
+        cartVariantCommission:
+          unitPrice != null && unitPrice !== selectedProduct.sellingPrice
+            ? undefined
+            : selectedProduct.commissionPreview,
+      });
     }
     setQuantityModalVisible(false);
     setSelectedProduct(null);
@@ -496,9 +555,17 @@ export function PosScreen() {
 
   if (!canRecordSale && !canViewSales) {
     return (
-      <View style={styles.center}>
-        <Ionicons name="lock-closed-outline" size={48} color={Colors.textTertiary} />
-        <Text style={styles.restrictedText}>You do not have permission to access Sales.</Text>
+      <View style={styles.container}>
+        <ScreenHeader
+          title="Sales"
+          showBack={showBack}
+          bordered={false}
+          backgroundColor={Colors.background}
+        />
+        <View style={styles.center}>
+          <Ionicons name="lock-closed-outline" size={48} color={Colors.textTertiary} />
+          <Text style={styles.restrictedText}>You do not have permission to access Sales.</Text>
+        </View>
       </View>
     );
   }
@@ -506,7 +573,13 @@ export function PosScreen() {
   if (!canRecordSale) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>My Sales History</Text>
+        <ScreenHeader
+          title="My Sales History"
+          showBack={showBack}
+          onBack={confirmLeave}
+          bordered={false}
+          backgroundColor={Colors.background}
+        />
         <FlatList
           showsVerticalScrollIndicator={false}
           data={mySales}
@@ -538,7 +611,7 @@ export function PosScreen() {
           visible={detailsModalVisible}
           onClose={() => setDetailsModalVisible(false)}
           sale={selectedSale}
-          shopName={user?.shop?.name || 'Smart Duka'}
+          shopName={user?.shop?.name || 'Dukana'}
           shopPhone={user?.shop?.phone}
           currency={user?.shop?.currency}
           thankYouNote={thankYouNote}
@@ -558,7 +631,13 @@ export function PosScreen() {
   return (
     <ShiftGate>
     <View style={styles.container}>
-      <Text style={styles.title}>Record Sale</Text>
+      <ScreenHeader
+        title="Record Sale"
+        showBack={showBack}
+        onBack={confirmLeave}
+        bordered={false}
+        backgroundColor={Colors.background}
+      />
       <ActiveShiftBar />
       <ContextualSearchBar
         value={search}
@@ -755,7 +834,7 @@ export function PosScreen() {
         visible={detailsModalVisible}
         onClose={() => setDetailsModalVisible(false)}
         sale={selectedSale}
-        shopName={user?.shop?.name || 'Smart Duka'}
+        shopName={user?.shop?.name || 'Dukana'}
         shopPhone={user?.shop?.phone}
         currency={user?.shop?.currency}
         thankYouNote={thankYouNote}
@@ -773,7 +852,7 @@ export function PosScreen() {
         visible={receiptVisible}
         onClose={() => setReceiptVisible(false)}
         sale={completedSale}
-        shopName={user?.shop?.name || 'Smart Duka'}
+        shopName={user?.shop?.name || 'Dukana'}
         shopPhone={user?.shop?.phone}
         currency={user?.shop?.currency}
         servedByName={user?.name}
@@ -802,14 +881,6 @@ const styles = StyleSheet.create({
   searchBar: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
   restrictedText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: Typography.size.body, textAlign: 'center' },
-  title: {
-    fontSize: Typography.size.h2,
-    fontFamily: Typography.fontFamilyBold,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    marginBottom: Spacing.sm,
-    color: Colors.textPrimary,
-  },
   cartSection: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,

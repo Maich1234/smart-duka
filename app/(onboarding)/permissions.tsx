@@ -36,7 +36,7 @@ const STEPS: PermissionStep[] = [
     iconBg: Colors.warningSubtle,
     iconColor: '#B45309',
     title: 'Stay ahead of your shop',
-    body: 'Smart Duka watches your business so you don’t have to.',
+    body: 'Dukana watches your business so you don’t have to.',
     bullets: [
       { icon: 'cube-outline', text: 'Know the moment stock runs low' },
       { icon: 'phone-portrait-outline', text: 'See M-PESA payments as they arrive' },

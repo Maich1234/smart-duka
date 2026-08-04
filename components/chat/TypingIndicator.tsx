@@ -14,7 +14,7 @@ import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 
 // Same pulsing-dot technique as components/ui/LoadingState.tsx, restyled as
-// an inline "Smart Duka AI is thinking..." bubble instead of a full-page loader.
+// an inline "Dukana AI is thinking..." bubble instead of a full-page loader.
 const PULSE_MS = 233;
 const HOLD_MS = 867;
 const STAGGER_MS = 200;

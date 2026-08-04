@@ -65,16 +65,28 @@ const checkOffline = async (): Promise<boolean> => {
 };
 
 // Enqueue helper — shared between request pre-flight and response error path.
+//
+// Only claims "saved offline" when the write actually reached SQLite. When
+// offline storage is unavailable (web without COOP/COEP, a browser with no
+// OPFS, a corrupt database file) the operation is genuinely lost, and telling
+// the cashier it was saved is worse than telling them it failed — they walk
+// away from a sale that will never exist.
 const queueAndReject = (
   method: string,
   url: string,
   body: any,
   idempotencyKey: string,
 ) => {
-  enqueueOperation(
+  const queued = enqueueOperation(
     { method, url, body: body ?? null },
     idempotencyKey,
   );
+  if (!queued) {
+    return Promise.reject({
+      offlineUnavailable: true,
+      message: 'No connection, and this device can\'t save changes offline. Please reconnect and try again.',
+    });
+  }
   return Promise.reject({
     offlineQueued: true,
     message: 'Saved offline — will sync when connected.',

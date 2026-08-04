@@ -5,6 +5,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Button } from '@/components/ui/Button';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useAlert } from '@/context/AlertContext';
 import { getShopConfig } from '@/services/shop';
 import { usePrinterStore } from '@/store/printerStore';
@@ -38,6 +39,7 @@ const PAPER_WIDTHS: { value: PaperWidth; label: string; hint: string }[] = [
  * receipt then prints in one tap with no system dialog at all.
  */
 export const PrinterSetupScreen: React.FC = () => {
+  const tabBarHeight = useTabBarHeight();
   const { toast, alert } = useAlert();
   const { printer, savePrinter, setPaperWidth, forgetPrinter } = usePrinterStore();
 
@@ -52,7 +54,7 @@ export const PrinterSetupScreen: React.FC = () => {
   const supported = transports.length > 0;
 
   const { data: shopConfig } = useQuery({ queryKey: ['shopConfig'], queryFn: getShopConfig });
-  const shopName = shopConfig?.data.name ?? 'Smart Duka';
+  const shopName = shopConfig?.data.name ?? 'Dukana';
 
   /**
    * Reads the adapter state and the already-bonded devices. Kept off the render
@@ -103,7 +105,7 @@ export const PrinterSetupScreen: React.FC = () => {
       alert({
         type: 'warning',
         title: 'Bluetooth permission needed',
-        message: 'Smart Duka needs Bluetooth access to find your printer. Allow it in Settings, then try again.',
+        message: 'Dukana needs Bluetooth access to find your printer. Allow it in Settings, then try again.',
         buttons: [
           { label: 'Not now', variant: 'ghost' },
           { label: 'Open Settings', onPress: () => Linking.openSettings() },
@@ -186,7 +188,7 @@ export const PrinterSetupScreen: React.FC = () => {
   );
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]} showsVerticalScrollIndicator={false}>
       <Text style={styles.intro}>
         Connect the thermal printer on your counter and receipts print straight to it — no system print dialog.
         Without one, printing keeps using your phone&apos;s built-in print sheet.
@@ -322,7 +324,7 @@ export const PrinterSetupScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+  content: { padding: Spacing.md },
   intro: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,

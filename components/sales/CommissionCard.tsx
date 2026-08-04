@@ -41,6 +41,8 @@ interface CommissionCardProps {
   isLoading: boolean;
   /** Set when the shop owner hasn't enabled commission visibility for staff. */
   forbidden?: boolean;
+  /** Whose earnings these are — changes the wording from "you" to a name. */
+  subject?: 'self' | 'staff';
   period: CommissionPeriod;
   onPeriodChange: (period: CommissionPeriod) => void;
   currency?: string;
@@ -50,10 +52,12 @@ export const CommissionCard: React.FC<CommissionCardProps> = ({
   data,
   isLoading,
   forbidden = false,
+  subject = 'self',
   period,
   onPeriodChange,
   currency = 'KES',
 }) => {
+  const isSelf = subject === 'self';
   if (forbidden) {
     return (
       <EmptyState
@@ -106,7 +110,12 @@ export const CommissionCard: React.FC<CommissionCardProps> = ({
               />
             ))
           ) : (
-            <EmptyState title="No commission yet" subtitle="Sell a commission-enabled variant to start earning." />
+            <EmptyState
+              title="No commission yet"
+              subtitle={isSelf
+                ? 'Sell a product that pays commission to start earning.'
+                : 'No commission earned in this period.'}
+            />
           )}
         </>
       )}

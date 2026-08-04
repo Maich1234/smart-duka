@@ -27,7 +27,7 @@ import { PurchaseSummaryBar } from '@/components/purchases/PurchaseSummaryBar';
 import { SupplierPickerSheet } from '@/components/purchases/SupplierPickerSheet';
 import { PurchaseConfirmationSheet } from '@/components/purchases/PurchaseConfirmationSheet';
 import { PaymentMethodSelector } from '@/components/ui/PaymentMethodSelector';
-import { isOfflineQueued } from '@/utils/errors';
+import { isOfflineQueued, mutationErrorMessage } from '@/utils/errors';
 import { randomUUID } from '@/utils/uuid';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -137,7 +137,7 @@ export function NewPurchaseScreen() {
         router.replace(base as never);
         return;
       }
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not save this purchase.' });
+      toast({ type: 'error', message: mutationErrorMessage(error, 'Could not save this purchase.') });
     },
   });
 

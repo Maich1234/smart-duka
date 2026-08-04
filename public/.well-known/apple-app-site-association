@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["REPLACE_WITH_TEAM_ID.com.wabunifu.smartduka"],
+        "appIDs": ["REPLACE_WITH_TEAM_ID.com.nifulabs.dukana"],
         "components": [
           { "/": "/*" }
         ]
