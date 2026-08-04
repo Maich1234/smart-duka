@@ -21,11 +21,23 @@ export interface RatingsResponse {
   };
 }
 
+export interface RatingWindow {
+  avgStars: number;
+  totalRatings: number;
+}
+
 export interface RatingsSummary {
   avgStars: number;
   totalRatings: number;
   distribution: { stars: number; count: number }[];
   byStaff: { staffId: string; staffName: string; avgStars: number; totalRatings: number }[];
+  /** Added after launch — optional so an older backend still renders. */
+  withComments?: number;
+  positiveCount?: number;
+  negativeCount?: number;
+  lastRatedAt?: string | null;
+  last30Days?: RatingWindow;
+  previous30Days?: RatingWindow;
 }
 
 export interface RatingsSummaryResponse {
@@ -56,6 +68,8 @@ export interface PublicReceiptResponse {
 export const getRatings = async (params?: {
   staffId?: string;
   stars?: number;
+  /** Only ratings the customer actually wrote something on. */
+  hasComment?: boolean;
   page?: number;
   limit?: number;
 }): Promise<RatingsResponse> => {
