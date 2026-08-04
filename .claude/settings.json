@@ -110,7 +110,21 @@
       "Bash(echo \"TSC EXIT: $?\")",
       "Bash(echo \"LINT EXIT: $?\")",
       "Bash(echo \"TSC: $?\")",
-      "Bash(echo \"LINT: $?\")"
+      "Bash(echo \"LINT: $?\")",
+      "Bash(convert -list format)",
+      "Bash(fc-list : family)",
+      "WebFetch(domain:expo.fyi)",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(p.dependencies['react-native-reanimated'], p.dependencies['react-native'], p.dependencies['expo']\\)\")",
+      "Bash(node --check src/controllers/ratingController.js)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(p.scripts, Object.keys\\(p.devDependencies||{}\\)\\)\")",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(node /tmp/claude-1000/-home-maich-Documents-smart-duka/3e7fd72c-d887-495c-8120-7b77aad56cb9/scratchpad/scan.mjs)",
+      "Bash(node /tmp/claude-1000/-home-maich-Documents-smart-duka/3e7fd72c-d887-495c-8120-7b77aad56cb9/scratchpad/scan2.mjs)",
+      "Bash(node /tmp/claude-1000/-home-maich-Documents-smart-duka/3e7fd72c-d887-495c-8120-7b77aad56cb9/scratchpad/scan3.mjs)",
+      "Bash(node --test tests/)",
+      "Bash(git -C /home/maich/Documents/smart-duka-web branch --show-current)",
+      "Bash(git -C /home/maich/Documents/smart-duka-web diff src/lib/site.ts src/app/layout.tsx src/utils/staffEmailSlug.ts src/components/ui/Toggle.tsx)",
+      "Bash(git -C /home/maich/Documents/smart-duka-web diff -U0)"
     ],
     "additionalDirectories": [
       "/tmp",
