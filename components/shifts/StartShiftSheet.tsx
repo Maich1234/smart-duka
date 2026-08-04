@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/Button';
 import { startShift } from '@/services/shifts';
 import { useInvalidateShift } from '@/hooks/useShift';
 import { useAlert } from '@/context/AlertContext';
+import { useAuthStore } from '@/store/authStore';
+import { usePendingShiftStore } from '@/store/pendingShiftStore';
+import { isOfflineQueued, isOfflineUnavailable, mutationErrorMessage } from '@/utils/errors';
 import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -30,8 +33,15 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
   const [loading, setLoading] = useState(false);
   const { toast } = useAlert();
   const invalidateShift = useInvalidateShift();
+  const userId = useAuthStore((s) => s.user?._id);
+  const openPendingShift = usePendingShiftStore((s) => s.open);
 
   const parsedFloat = Number(openingFloat.replace(/[^0-9.]/g, '')) || 0;
+
+  const reset = () => {
+    setOpeningFloat('');
+    setNote('');
+  };
 
   const handleStart = async () => {
     setLoading(true);
@@ -40,11 +50,34 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
       haptics.success();
       invalidateShift();
       toast({ type: 'success', message: 'Shift started — the till is yours!' });
-      setOpeningFloat('');
-      setNote('');
+      reset();
       onClose();
       onStarted?.();
     } catch (error: any) {
+      // Offline: the start is in the outbox and the till opens now. Waiting
+      // for the server would be pointless theatre — the opening float is cash
+      // the cashier counted themselves, and nothing about it needs
+      // confirming. This used to fall through to the error toast below, which
+      // left the gate locked and the shop unable to sell for the length of
+      // the outage.
+      if (isOfflineQueued(error) && userId) {
+        openPendingShift({
+          openingFloat: parsedFloat,
+          openingNote: note.trim() || undefined,
+          userId,
+        });
+        haptics.success();
+        invalidateShift();
+        toast({
+          type: 'success',
+          message: 'Shift started offline — it will sync when you\'re back online.',
+        });
+        reset();
+        onClose();
+        onStarted?.();
+        return;
+      }
+
       // 409 = a shift is already open (e.g. started on another device) — the
       // gate clears once the refreshed state lands.
       if (error.response?.status === 409) {
@@ -55,7 +88,9 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
       haptics.error();
       toast({
         type: 'error',
-        message: error.response?.data?.message || 'Could not start the shift. Try again.',
+        message: isOfflineUnavailable(error)
+          ? error.message
+          : mutationErrorMessage(error, 'Could not start the shift. Try again.'),
       });
     } finally {
       setLoading(false);

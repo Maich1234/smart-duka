@@ -18,10 +18,8 @@ import {
   onSyncStateChange,
   getPendingCount,
   getFailedCount,
-  retryAllFailed,
-  discardAllFailed,
 } from '@/utils/offlineQueue';
-import { useAlert } from '@/context/AlertContext';
+import { FailedSyncSheet } from '@/components/sync/FailedSyncSheet';
 import { Typography } from '@/constants/Typography';
 
 // ─── Colour tokens ─────────────────────────────────────────────────────────────
@@ -78,9 +76,9 @@ export const OfflineIndicator: React.FC = () => {
   const [failedCount, setFailedCount]   = useState(() => getFailedCount());
   const [syncing, setSyncing]         = useState(false);
   const [phase, setPhase]             = useState<ToastPhase>('hidden');
+  const [sheetOpen, setSheetOpen]     = useState(false);
 
   const insets = useSafeAreaInsets();
-  const { alert, toast } = useAlert();
 
   // Refs used to drive auto-dismiss timers without stale closures
   const dismissTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,53 +162,7 @@ export const OfflineIndicator: React.FC = () => {
   // Cleanup on unmount
   useEffect(() => () => { clearDismiss(); clearDone(); }, []);
 
-  // Offers the only two honest options for a rejected write: try it again
-  // (the cause may have been fixed since — restocked, permission granted), or
-  // acknowledge it is gone. Discarding is destructive and irreversible, so it
-  // is the danger action behind a confirmation, never the default.
-  const openFailedActions = () => {
-    const noun = `${failedCount} change${failedCount > 1 ? 's' : ''}`;
-    alert({
-      type: 'warning',
-      title: 'Some changes could not sync',
-      message: `${failedCount > 1 ? `${noun} were` : `${noun} was`} rejected by the server — often because stock ran out or the item changed while you were offline. Retry to send ${failedCount > 1 ? 'them' : 'it'} again, or discard to remove ${failedCount > 1 ? 'them' : 'it'} for good.`,
-      buttons: [
-        {
-          label: 'Retry',
-          variant: 'primary',
-          onPress: () => {
-            const n = retryAllFailed();
-            toast({ type: 'info', message: `Retrying ${n} change${n === 1 ? '' : 's'}…` });
-          },
-        },
-        {
-          label: 'Discard',
-          variant: 'danger',
-          onPress: () => {
-            alert({
-              type: 'confirm',
-              title: 'Discard failed changes?',
-              message: 'They will be permanently removed from this device and will never reach the server. This cannot be undone.',
-              buttons: [
-                { label: 'Cancel', variant: 'ghost' },
-                {
-                  label: 'Discard',
-                  variant: 'danger',
-                  onPress: () => {
-                    const n = discardAllFailed();
-                    toast({ type: 'warning', message: `Discarded ${n} change${n === 1 ? '' : 's'}.` });
-                  },
-                },
-              ],
-            });
-          },
-        },
-        { label: 'Not now', variant: 'ghost' },
-      ],
-    });
-  };
-
-  if (phase === 'hidden') return null;
+  const pillVisible = phase !== 'hidden';
 
   const bg =
     phase === 'failed' ? FAILED_BG
@@ -218,9 +170,13 @@ export const OfflineIndicator: React.FC = () => {
         : phase === 'done' ? DONE_BG
           : SYNCING_BG;
 
+  // "Needs review", not "failed": the pill is persistent and unmissable, and
+  // the wording is what a cashier reads mid-transaction. Nothing is lost at
+  // this point — the writes are still on the device and still recoverable —
+  // so the label should prompt a look, not announce a disaster.
   const label =
     phase === 'failed'
-      ? `${failedCount} change${failedCount > 1 ? 's' : ''} failed to sync · Tap to fix`
+      ? `${failedCount} change${failedCount > 1 ? 's' : ''} need${failedCount > 1 ? '' : 's'} review · Tap`
       : phase === 'offline'
         ? `No internet${pendingCount > 0 ? ` · ${pendingCount} pending` : ''}`
         : phase === 'done'
@@ -234,6 +190,12 @@ export const OfflineIndicator: React.FC = () => {
           : 'sync-outline';
 
   return (
+    <>
+    {/* The pill hides on its own schedule; the sheet must not. Discarding the
+        last failed row flips the phase to 'hidden' in the same tick, and an
+        early return up here would rip the sheet off the screen mid-read —
+        including out from under the confirmation the user is answering. */}
+    {pillVisible ? (
     <Animated.View
       entering={SlideInUp.springify().damping(18).stiffness(200)}
       exiting={SlideOutUp.duration(220)}
@@ -243,7 +205,7 @@ export const OfflineIndicator: React.FC = () => {
       <AnimatedPressable
         style={[styles.pill, { backgroundColor: bg }]}
         // Only the failed pill is interactive — the others are pure status.
-        onPress={phase === 'failed' ? openFailedActions : undefined}
+        onPress={phase === 'failed' ? () => setSheetOpen(true) : undefined}
         disabled={phase !== 'failed'}
         accessibilityRole={phase === 'failed' ? 'button' : 'text'}
         accessibilityLabel={label}
@@ -272,6 +234,10 @@ export const OfflineIndicator: React.FC = () => {
         )}
       </AnimatedPressable>
     </Animated.View>
+    ) : null}
+
+    <FailedSyncSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
+    </>
   );
 };
 

@@ -49,7 +49,7 @@ const useShiftClock = (startedAt?: string) => {
 
 /** Slim status strip shown above the till while a shift is running. */
 export const ActiveShiftBar: React.FC = () => {
-  const { enabled, shift } = useShift();
+  const { enabled, shift, isPendingSync } = useShift();
   const elapsed = useShiftClock(shift?.startedAt);
   const endCtx = useContext(ShiftEndContext);
 
@@ -70,9 +70,13 @@ export const ActiveShiftBar: React.FC = () => {
 
   return (
     <Animated.View entering={FadeInDown.duration(300)} style={styles.bar}>
-      <Animated.View style={[styles.dot, dotStyle]} />
+      <Animated.View style={[styles.dot, isPendingSync && styles.dotPending, dotStyle]} />
       <Text style={styles.barText}>
-        On shift{elapsed ? ` · ${elapsed}` : ''} · float {formatCurrency(shift.openingFloat)}
+        {/* Says so plainly while the shift is device-only: the cashier is on
+            shift and selling, but nobody else can see it yet, and the owner's
+            dashboard will not show them until this syncs. */}
+        On shift{isPendingSync ? ' (offline)' : ''}
+        {elapsed ? ` · ${elapsed}` : ''} · float {formatCurrency(shift.openingFloat)}
       </Text>
       <AnimatedPressable
         onPress={() => {
@@ -168,6 +172,8 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#34D399' },
+  // Amber, not red: an unsynced shift is in-flight, not broken.
+  dotPending: { backgroundColor: '#FBBF24' },
   barText: {
     flex: 1,
     color: 'rgba(248,250,252,0.85)',

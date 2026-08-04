@@ -148,6 +148,46 @@ export type FailedOperation = {
   url: string;
   attempts: number;
   createdAt: number;
+  /** HTTP status the server rejected it with, when there was a response. */
+  status: number | null;
+  /** The server's own wording for the rejection, when it sent one. */
+  error: string | null;
+  /** Plain-language name for the thing that failed, e.g. "Sale". */
+  label: string;
+};
+
+/**
+ * Human name for a queued operation, derived from its method and path.
+ *
+ * The failure sheet shows this instead of the raw `POST /sales` a cashier has
+ * no way to interpret. Ordered most-specific-first because several patterns
+ * share a prefix (`/sales/:id/void` must not read as "Sale").
+ */
+const describeOperation = (method: string, url: string): string => {
+  const path = url.split('?')[0];
+  const rules: [RegExp, string][] = [
+    [/^\/sales\/[^/]+\/void$/, 'Voided sale'],
+    [/^\/sales\/[^/]+\/refund$/, 'Refund'],
+    [/^\/sales$/, 'Sale'],
+    [/^\/shifts\/start$/, 'Shift start'],
+    [/^\/shifts\/[^/]+\/end$/, 'Shift close'],
+    [/^\/expenses/, 'Expense'],
+    [/^\/products\/[^/]+\/stock$/, 'Stock update'],
+    [/^\/products/, method === 'POST' ? 'New product' : 'Product update'],
+    [/^\/purchases\/[^/]+\/approve$/, 'Purchase approval'],
+    [/^\/purchases/, method === 'POST' ? 'Purchase order' : 'Purchase update'],
+    [/^\/suppliers/, method === 'POST' ? 'New supplier' : 'Supplier update'],
+    [/^\/staff/, 'Staff change'],
+  ];
+  for (const [pattern, label] of rules) {
+    if (pattern.test(path)) return label;
+  }
+  return 'Change';
+};
+
+type FailedRow = {
+  id: string; method: string; url: string; attempts: number;
+  created_at: number; last_status: number | null; last_error: string | null;
 };
 
 /** Lists permanently-failed operations so the UI can describe what was lost. */
@@ -155,10 +195,9 @@ export const listFailedOperations = (): FailedOperation[] => {
   if (!isOfflineDbAvailable()) return [];
   try {
     const userId = currentUserId();
-    return getDb().getAllSync<{
-      id: string; method: string; url: string; attempts: number; created_at: number;
-    }>(
-      `SELECT id, method, url, attempts, created_at FROM offline_queue
+    return getDb().getAllSync<FailedRow>(
+      `SELECT id, method, url, attempts, created_at, last_status, last_error
+       FROM offline_queue
        WHERE status = 'failed' AND (user_id = ? OR user_id IS NULL)
        ORDER BY created_at DESC`,
       [userId],
@@ -168,9 +207,34 @@ export const listFailedOperations = (): FailedOperation[] => {
       url: r.url,
       attempts: r.attempts,
       createdAt: r.created_at,
+      status: r.last_status,
+      error: r.last_error,
+      label: describeOperation(r.method, r.url),
     }));
   } catch {
     return [];
+  }
+};
+
+/**
+ * True when a mutation matching `urlFragment` is still waiting to sync.
+ *
+ * Lets a screen tell "the server hasn't been told yet" apart from "the server
+ * was told and said no" — the difference between an offline shift that is
+ * still on its way up and one whose start was rejected and must be cleared.
+ */
+export const hasQueuedOperation = (urlFragment: string): boolean => {
+  if (!isOfflineDbAvailable()) return false;
+  try {
+    const row = getDb().getFirstSync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM offline_queue
+       WHERE status = 'pending' AND (user_id = ? OR user_id IS NULL)
+         AND url LIKE ?`,
+      [currentUserId(), `%${urlFragment}%`],
+    );
+    return (row?.count ?? 0) > 0;
+  } catch {
+    return false;
   }
 };
 
@@ -216,38 +280,87 @@ export const enqueueOperation = (
 };
 
 /**
- * Moves every failed row back into the pending queue for another attempt.
+ * Moves failed rows back into the pending queue for another attempt — all of
+ * them, or just the ids given.
+ *
+ * Each row gets a BRAND NEW idempotency key, and that is the whole point.
+ * A row only reaches 'failed' after the server answered with a definitive
+ * 4xx, and the server stores that outcome against the key for 72 h
+ * (middlewares/idempotency.js) so any later request carrying it replays the
+ * same rejection verbatim. Re-sending the original key therefore could not
+ * succeed under any circumstances: the request never reached the handler, it
+ * was answered from the idempotency record. Users pressed Retry, watched it
+ * fail instantly, and pressed it again forever.
+ *
+ * Minting a new key is safe precisely because the failure was a 4xx: the
+ * server rejected the payload, so nothing was committed and there is no
+ * duplicate to guard against. Transient failures never land here — they stay
+ * 'pending' on the slow cadence, still holding their original key, which is
+ * where dedupe actually matters.
+ *
  * Attempt counters reset so the retry gets a full backoff budget rather than
  * immediately falling back to the slow cadence.
  */
-export const retryAllFailed = (): number => {
+export const retryAllFailed = (ids?: string[]): number => {
   if (!isOfflineDbAvailable()) return 0;
   try {
+    const db = getDb();
     const userId = currentUserId();
-    const result = getDb().runSync(
-      `UPDATE offline_queue
-         SET status = 'pending', attempts = 0, next_attempt_at = ?
-       WHERE status = 'failed' AND (user_id = ? OR user_id IS NULL)`,
-      [Date.now(), userId],
+    const scope = ids?.length
+      ? { clause: ` AND id IN (${ids.map(() => '?').join(',')})`, params: ids }
+      : { clause: '', params: [] as string[] };
+
+    const rows = db.getAllSync<{ id: string }>(
+      `SELECT id FROM offline_queue
+       WHERE status = 'failed' AND (user_id = ? OR user_id IS NULL)${scope.clause}`,
+      [userId, ...scope.params],
     );
+
+    let changed = 0;
+    for (const row of rows) {
+      db.runSync(
+        `UPDATE offline_queue
+           SET status = 'pending', attempts = 0, next_attempt_at = ?,
+               idempotency_key = ?, last_status = NULL, last_error = NULL
+         WHERE id = ?`,
+        [Date.now(), randomUUID(), row.id],
+      );
+      changed += 1;
+    }
+
     notifyCount();
     void processQueue();
-    return result.changes;
+    return changed;
   } catch {
     return 0;
   }
 };
 
-/** Permanently discards failed rows. Only ever called from an explicit action. */
-export const discardAllFailed = (): number => {
+/**
+ * Permanently discards failed rows — all of them, or just the ids given.
+ * Only ever called from an explicit action.
+ *
+ * Deletes by id rather than by status when ids are supplied: a row the user
+ * just asked to retry is 'pending' again, and a status-only delete would
+ * silently skip it, report "discarded 0", and let the row fail its way back
+ * onto the screen. The user reads that as the app ignoring them.
+ */
+export const discardAllFailed = (ids?: string[]): number => {
   if (!isOfflineDbAvailable()) return 0;
   try {
     const userId = currentUserId();
-    const result = getDb().runSync(
-      `DELETE FROM offline_queue
-       WHERE status = 'failed' AND (user_id = ? OR user_id IS NULL)`,
-      [userId],
-    );
+    const result = ids?.length
+      ? getDb().runSync(
+        `DELETE FROM offline_queue
+         WHERE (user_id = ? OR user_id IS NULL)
+           AND id IN (${ids.map(() => '?').join(',')})`,
+        [userId, ...ids],
+      )
+      : getDb().runSync(
+        `DELETE FROM offline_queue
+         WHERE status = 'failed' AND (user_id = ? OR user_id IS NULL)`,
+        [userId],
+      );
     notifyCount();
     return result.changes;
   } catch {
@@ -284,6 +397,38 @@ const sendRow = (row: QueueRow, token: string) => {
   });
 };
 
+/**
+ * True when a rejection means the work is already done rather than refused.
+ *
+ * Replaying an outbox is not the same as making a request: the desired end
+ * state can already hold by the time the row is sent, and the server has no
+ * way to distinguish that from a genuine conflict. Starting a shift that is
+ * already open, or closing one that is already closed, is exactly the
+ * situation the queue exists to produce — surfacing it as a red "rejected by
+ * the server" badge tells the user something is broken when the outcome they
+ * asked for is precisely what they got.
+ *
+ * Kept deliberately narrow: only cases where the *client's intent* is
+ * satisfied by the current server state. A sold-out product or a rejected
+ * payload is a real failure and must still be shown.
+ */
+const isAlreadySatisfied = (row: QueueRow, err: any): boolean => {
+  const status: number | undefined = err?.response?.status;
+  const code: string | undefined = err?.response?.data?.code;
+  const path = row.url.split('?')[0];
+
+  // Duplicate shift start — the shift the user opened offline is open.
+  if (status === 409 && code === 'SHIFT_ALREADY_ACTIVE' && /^\/shifts\/start$/.test(path)) {
+    return true;
+  }
+  // Closing a shift that is no longer open: already closed by an earlier
+  // replay of this same intent, or force-closed by the owner meanwhile.
+  if (status === 404 && code === 'NO_ACTIVE_SHIFT' && /^\/shifts\/[^/]+\/end$/.test(path)) {
+    return true;
+  }
+  return false;
+};
+
 /** Applies backoff / permanent-failure bookkeeping for a failed attempt. */
 const recordFailure = (row: QueueRow, err: any) => {
   const db = getDb();
@@ -297,11 +442,15 @@ const recordFailure = (row: QueueRow, err: any) => {
     httpStatus < 500 &&
     !TRANSIENT_STATUSES.has(httpStatus);
   const newAttempts = row.attempts + 1;
+  const serverMessage: string | null =
+    typeof err?.response?.data?.message === 'string' ? err.response.data.message : null;
 
   if (isPermanent) {
     db.runSync(
-      `UPDATE offline_queue SET status = 'failed', attempts = ? WHERE id = ?`,
-      [newAttempts, row.id]
+      `UPDATE offline_queue
+         SET status = 'failed', attempts = ?, last_status = ?, last_error = ?
+       WHERE id = ?`,
+      [newAttempts, httpStatus ?? null, serverMessage, row.id]
     );
   } else if (newAttempts >= row.max_attempts) {
     // Exhausted fast-backoff budget but not a permanent error.
@@ -400,7 +549,11 @@ export const processQueue = async (): Promise<void> => {
         db.runSync(`DELETE FROM offline_queue WHERE id = ?`, [row.id]);
       } catch (err: any) {
         if (err?.response?.status !== 401) {
-          recordFailure(row, err);
+          if (isAlreadySatisfied(row, err)) {
+            db.runSync(`DELETE FROM offline_queue WHERE id = ?`, [row.id]);
+          } else {
+            recordFailure(row, err);
+          }
           continue;
         }
 
@@ -424,7 +577,11 @@ export const processQueue = async (): Promise<void> => {
           db.runSync(`DELETE FROM offline_queue WHERE id = ?`, [row.id]);
         } catch (retryErr: any) {
           if (retryErr?.response?.status === 401) break; // still unauthorized — pause
-          recordFailure(row, retryErr);
+          if (isAlreadySatisfied(row, retryErr)) {
+            db.runSync(`DELETE FROM offline_queue WHERE id = ?`, [row.id]);
+          } else {
+            recordFailure(row, retryErr);
+          }
         }
       }
     }

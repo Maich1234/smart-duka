@@ -40,6 +40,17 @@ const migrate = (db: SQLiteDatabase): void => {
   if (!hasColumn('offline_queue', 'user_id')) {
     db.execSync(`ALTER TABLE offline_queue ADD COLUMN user_id TEXT`);
   }
+
+  // The server's own rejection reason, kept so a failed row can explain
+  // itself. Without these the failure surface could only say "N changes
+  // failed" — the cashier had no way to tell a sold-out product from a
+  // duplicate shift, and no basis for choosing retry over discard.
+  if (!hasColumn('offline_queue', 'last_status')) {
+    db.execSync(`ALTER TABLE offline_queue ADD COLUMN last_status INTEGER`);
+  }
+  if (!hasColumn('offline_queue', 'last_error')) {
+    db.execSync(`ALTER TABLE offline_queue ADD COLUMN last_error TEXT`);
+  }
 };
 
 export const initOfflineDb = (): void => {
@@ -70,7 +81,9 @@ export const initOfflineDb = (): void => {
         max_attempts INTEGER NOT NULL DEFAULT 5,
         next_attempt_at INTEGER NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        last_status INTEGER,
+        last_error TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_queue_ready
         ON offline_queue(status, user_id, next_attempt_at);

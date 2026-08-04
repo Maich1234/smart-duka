@@ -88,7 +88,15 @@ export const startShift = async (payload: {
   openingFloat: number;
   openingNote?: string;
 }): Promise<{ success: boolean; data: Shift; message?: string }> => {
-  const res = await api.post('/shifts/start', { ...payload, device: deviceInfo() });
+  // startedAt is stamped here, not on the server: offline this request sits in
+  // the outbox until the network returns, and a shift dated by its own sync
+  // would report the wrong duration and reconciliation window. The server
+  // clamps the value it accepts.
+  const res = await api.post('/shifts/start', {
+    ...payload,
+    startedAt: new Date().toISOString(),
+    device: deviceInfo(),
+  });
   return res.data;
 };
 

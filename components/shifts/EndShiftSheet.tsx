@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/Button';
 import { endShift, getShiftById, type Shift, type ShiftSummary } from '@/services/shifts';
 import { useInvalidateShift } from '@/hooks/useShift';
 import { useAlert } from '@/context/AlertContext';
+import { useAuthStore } from '@/store/authStore';
+import { usePendingShiftStore, PENDING_SHIFT_ID } from '@/store/pendingShiftStore';
+import { isOfflineQueued, isOfflineUnavailable, mutationErrorMessage } from '@/utils/errors';
 import { formatCurrency } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
@@ -51,16 +54,29 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
   const [countedText, setCountedText] = useState('');
   const [closing, setClosing] = useState(false);
   const [closedShift, setClosedShift] = useState<Shift | null>(null);
+  /** Set when the close went to the outbox — there is no report to show yet. */
+  const [closedOffline, setClosedOffline] = useState(false);
   const { toast } = useAlert();
   const invalidateShift = useInvalidateShift();
+  const userId = useAuthStore((s) => s.user?._id);
+  const markClosePending = usePendingShiftStore((s) => s.markClosePending);
+
+  // A shift opened offline has no server record to reconcile against, so
+  // there is nothing to fetch — asking would 404 on a sentinel id.
+  const isLocalShift = shift?._id === PENDING_SHIFT_ID;
 
   // Live preview of what the drawer *should* hold, before committing.
   const { data: detail, isLoading: loadingPreview } = useQuery({
     queryKey: ['shiftPreview', shift?._id],
     queryFn: () => getShiftById(shift!._id),
-    enabled: visible && !!shift && !closedShift,
+    enabled: visible && !!shift && !isLocalShift && !closedShift && !closedOffline,
     refetchOnMount: 'always',
   });
+  // Null offline, or for a shift opened offline: the reconciliation figures
+  // live on the server and cannot be computed here. The sheet used to render
+  // its loading box on `!live`, so an unreachable server spun the spinner
+  // forever under a "Reconciling your shift…" label that was never going to
+  // finish — see the `!live` branch below for what shows instead.
   const live: ShiftSummary | null = detail?.liveSummary ?? null;
 
   const counted = useMemo(() => {
@@ -84,10 +100,23 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
       invalidateShift();
       onEnded?.();
     } catch (error: any) {
+      // Offline: the close is queued and the cashier is off shift as far as
+      // this device is concerned. Refusing to clock them out would strand
+      // them on a till they have already counted and handed over.
+      if (isOfflineQueued(error) && userId) {
+        markClosePending(userId);
+        haptics.success();
+        setClosedOffline(true);
+        invalidateShift();
+        onEnded?.();
+        return;
+      }
       haptics.error();
       toast({
         type: 'error',
-        message: error.response?.data?.message || 'Could not close the shift. Try again.',
+        message: isOfflineUnavailable(error)
+          ? error.message
+          : mutationErrorMessage(error, 'Could not close the shift. Try again.'),
       });
     } finally {
       setClosing(false);
@@ -98,6 +127,7 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
     if (closing) return;
     setCountedText('');
     setClosedShift(null);
+    setClosedOffline(false);
     onClose();
   };
 
@@ -120,17 +150,40 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {!closedShift ? (
+        {closedOffline ? (
+          <View style={styles.doneWrap}>
+            <Animated.View
+              entering={ZoomIn.springify().damping(11)}
+              style={[styles.verdictIcon, { backgroundColor: `${Colors.info}1A` }]}
+            >
+              <Ionicons name="cloud-offline-outline" size={40} color={Colors.info} />
+            </Animated.View>
+            <Text style={styles.doneTitle}>Shift closed</Text>
+            <Text style={styles.doneSub}>
+              You&apos;re clocked out. Your drawer count is saved on this device and the full
+              reconciliation report will reach your owner as soon as you&apos;re back online.
+            </Text>
+            <Button title="Done" onPress={handleClose} size="lg" style={styles.endBtn} />
+          </View>
+        ) : !closedShift ? (
           <>
             <Text style={styles.title}>End your shift</Text>
             <Text style={styles.subtitle}>
               Here&apos;s everything from this session. Count the drawer to reconcile.
             </Text>
 
-            {loadingPreview || !live ? (
+            {loadingPreview ? (
               <View style={styles.loadingBox}>
                 <ActivityIndicator color={Colors.primary} />
                 <Text style={styles.loadingText}>Reconciling your shift…</Text>
+              </View>
+            ) : !live ? (
+              <View style={styles.offlineBox}>
+                <Ionicons name="cloud-offline-outline" size={18} color={Colors.textSecondary} />
+                <Text style={styles.offlineText}>
+                  Your sales totals are on the server and can&apos;t be shown right now. Count the
+                  drawer anyway — the figures are reconciled the moment this syncs.
+                </Text>
               </View>
             ) : (
               <View style={styles.card}>
@@ -252,6 +305,24 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
+  },
+  offlineBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  offlineText: {
+    flex: 1,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+    lineHeight: 19,
   },
   card: {
     backgroundColor: Colors.background,
