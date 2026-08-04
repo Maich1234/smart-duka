@@ -808,8 +808,8 @@ export default function OwnerProfile() {
           </View>
         </Animated.View>
 
-        {/* ── SMART DUKA AI ─────────────────────────────────────────────── */}
-        <SectionLabel label="SMART DUKA AI" />
+        {/* ── DUKANA AI ─────────────────────────────────────────────────── */}
+        <SectionLabel label="DUKANA AI" />
         <Animated.View entering={FadeInUp.duration(360).delay(130)} style={styles.sectionWrap}>
           <DukanaAiSection
             state={aiAccessState}
