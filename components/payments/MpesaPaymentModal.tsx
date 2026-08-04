@@ -305,11 +305,16 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
   const isTerminal = status === 'failed' || status === 'cancelled' || status === 'timeout';
 
   return (
-    <Animated.View entering={FadeIn.duration(200)} style={StyleSheet.absoluteFill}>
-      <Pressable
-        style={styles.backdrop}
-        onPress={status === 'pending' || status === 'initiating' ? undefined : onCancel}
-      />
+    // The backdrop fades and the sheet springs as siblings, not one inside the
+    // other: an `entering` nested under another `entering` can be left stranded
+    // at its start values, and here that would strand the sheet's contents.
+    <View style={StyleSheet.absoluteFill}>
+      <Animated.View entering={FadeIn.duration(200)} style={StyleSheet.absoluteFill}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={status === 'pending' || status === 'initiating' ? undefined : onCancel}
+        />
+      </Animated.View>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.sheetWrap}
@@ -503,7 +508,7 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
           )}
         </Animated.View>
       </KeyboardAvoidingView>
-    </Animated.View>
+    </View>
   );
 };
 

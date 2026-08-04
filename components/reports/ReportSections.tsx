@@ -25,31 +25,45 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { Shadows } from '@/constants/Shadows';
+import { haptics } from '@/utils/haptics';
 import { formatCurrency } from '@/utils/formatters';
 
 // ─── shared primitives ────────────────────────────────────────────────────────
 
+/**
+ * Horizontal rails run edge to edge: they cancel the screen's gutter and
+ * re-apply it as content padding, so a card that scrolls off is cut by the
+ * screen rather than sliced in mid-air 24px short of it. SCREEN_GUTTER must
+ * stay in step with the reports screen's `paddingHorizontal`.
+ */
+const SCREEN_GUTTER = Spacing.lg;
+const CAROUSEL_BLEED = { marginHorizontal: -SCREEN_GUTTER } as const;
+
+/**
+ * Deliberately *not* animated. Every section already enters as one block, and
+ * a nested `entering` inside an entering parent leaves the child stranded at
+ * its initial translateY under Reanimated 4 — which is what used to drop these
+ * headers behind the card underneath them.
+ */
 function SectionHeader({
   icon,
   title,
   subtitle,
-  delay = 0,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle?: string;
-  delay?: number;
 }) {
   return (
-    <Animated.View entering={FadeInDown.duration(320).delay(delay)} style={sh.container}>
+    <View style={sh.container}>
       <View style={sh.iconWrap}>
         <Ionicons name={icon} size={15} color={Colors.primary} />
       </View>
-      <View>
+      <View style={sh.text}>
         <Text style={sh.title}>{title}</Text>
-        {subtitle && <Text style={sh.subtitle}>{subtitle}</Text>}
+        {subtitle && <Text style={sh.subtitle} numberOfLines={2}>{subtitle}</Text>}
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -68,6 +82,7 @@ const sh = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  text: { flex: 1 },
   title: {
     fontSize: 15,
     fontFamily: Typography.fontFamilySemiBold,
@@ -247,10 +262,11 @@ export function InsightCards({ summary, series, currency, period }: InsightCards
 
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(200)}>
-      <SectionHeader icon="bulb-outline" title="Quick Insights" delay={180} />
+      <SectionHeader icon="bulb-outline" title="Quick Insights" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={CAROUSEL_BLEED}
         contentContainerStyle={ins.scroll}
       >
         {items.map((item, i) => (
@@ -273,8 +289,8 @@ export function InsightCards({ summary, series, currency, period }: InsightCards
 const ins = StyleSheet.create({
   scroll: {
     gap: Spacing.sm,
-    paddingRight: Spacing.xs,
-    paddingBottom: 2,
+    paddingHorizontal: SCREEN_GUTTER,
+    paddingBottom: Spacing.xs,
   },
   card: {
     width: 150,
@@ -388,10 +404,11 @@ export function QuickShortcuts({ showPurchases = false }: QuickShortcutsProps) {
 
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(260)}>
-      <SectionHeader icon="grid-outline" title="Quick Access" delay={240} />
+      <SectionHeader icon="grid-outline" title="Quick Access" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={CAROUSEL_BLEED}
         contentContainerStyle={qs.scroll}
       >
         {shortcuts.map((s) => (
@@ -421,8 +438,8 @@ export function QuickShortcuts({ showPurchases = false }: QuickShortcutsProps) {
 const qs = StyleSheet.create({
   scroll: {
     gap: Spacing.sm,
-    paddingRight: Spacing.xs,
-    paddingBottom: 2,
+    paddingHorizontal: SCREEN_GUTTER,
+    paddingBottom: Spacing.xs,
   },
   card: {
     width: 128,
@@ -474,7 +491,6 @@ export function TopProductsLeaderboard({ products, currency }: TopProductsProps)
         icon="trophy-outline"
         title="Top Products"
         subtitle="Ranked by revenue generated"
-        delay={300}
       />
       {products.length === 0 ? (
         <EmptyCard
@@ -638,7 +654,6 @@ export function StaffPerformanceSection({ staff, currency }: StaffSectionProps) 
         icon="people-outline"
         title="Staff Performance"
         subtitle="Sales contribution by team member"
-        delay={360}
       />
       {staff.length === 0 ? (
         <EmptyCard
@@ -778,6 +793,7 @@ interface RatingsProps {
 
 export function RatingsModule({ ratings }: RatingsProps) {
   const hasData = ratings && ratings.totalRatings > 0;
+  const commentCount = ratings?.withComments ?? 0;
 
   const sentiment =
     !ratings ? '' :
@@ -792,7 +808,6 @@ export function RatingsModule({ ratings }: RatingsProps) {
         icon="star-outline"
         title="Customer Ratings"
         subtitle="How customers rate their experience"
-        delay={420}
       />
       {!hasData ? (
         <EmptyCard
@@ -862,6 +877,24 @@ export function RatingsModule({ ratings }: RatingsProps) {
               })}
             </>
           )}
+
+          {/* The comments themselves live on their own screen — a review is
+              something you read, not a number you glance at. */}
+          <View style={rm.divider} />
+          <AnimatedPressable
+            onPress={() => { haptics.light(); router.push('/(owner)/ratings' as never); }}
+            style={rm.readAll}
+            accessibilityRole="button"
+            accessibilityLabel="Read customer reviews"
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={15} color={Colors.primary} />
+            <Text style={rm.readAllText}>
+              {commentCount > 0
+                ? `Read ${commentCount} written review${commentCount === 1 ? '' : 's'}`
+                : 'Browse all reviews'}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+          </AnimatedPressable>
         </View>
       )}
     </Animated.View>
@@ -1007,6 +1040,19 @@ const rm = StyleSheet.create({
     fontFamily: Typography.fontFamilyBold,
     color: Colors.textPrimary,
   },
+  readAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+  },
+  readAllText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
+  },
 });
 
 // ─── StockIntelligence ────────────────────────────────────────────────────────
@@ -1026,7 +1072,6 @@ export function StockIntelligence({ depletion }: StockIntelligenceProps) {
         icon="speedometer-outline"
         title="Stock Intelligence"
         subtitle="Inventory velocity and stockout risk"
-        delay={480}
       />
       {!hasData ? (
         <EmptyCard
@@ -1362,10 +1407,20 @@ const rb = StyleSheet.create({
 
 // ─── PeakActivitySection ──────────────────────────────────────────────────────
 
-const BAR_COL = 40;
 const BAR_W = 28;
 const BAR_CHART_H = 110;
 const BAR_TOP_PAD = 18;
+
+/**
+ * Column width follows the labels, not the bars: hourly buckets read "11 AM"
+ * but daily ones read "Wed, Jul 29", and a fixed 40px column ran those into
+ * each other. The bar stays BAR_W wide and centred either way.
+ */
+function barColumnWidth(series: ReportBucket[]): number {
+  const longest = series.reduce((n, b) => Math.max(n, b.label.length), 0);
+  // ~5.2px per glyph at fontSize 10, plus a 6px breathing gap between labels.
+  return Math.max(BAR_W + 12, Math.ceil(longest * 5.2) + 8);
+}
 
 interface PeakActivityProps {
   series: ReportBucket[];
@@ -1385,7 +1440,8 @@ export function PeakActivitySection({ series, currency, period }: PeakActivityPr
   const totalTxns = series.reduce((s, b) => s + b.transactionCount, 0);
   const peakBucket = series[peakIndex];
   const periodUnit = period === 'daily' ? 'hour' : 'day';
-  const chartWidth = series.length * BAR_COL;
+  const barCol = barColumnWidth(series);
+  const chartWidth = series.length * barCol;
 
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(230)}>
@@ -1393,7 +1449,6 @@ export function PeakActivitySection({ series, currency, period }: PeakActivityPr
         icon="bar-chart-outline"
         title="Activity Breakdown"
         subtitle={`Sales by ${periodUnit} · ${totalTxns} transactions total`}
-        delay={210}
       />
       <View style={[pa.card, Shadows.sm]}>
         {/* peak callout strip */}
@@ -1441,7 +1496,7 @@ export function PeakActivitySection({ series, currency, period }: PeakActivityPr
                   bucket.total > 0 ? (bucket.total / maxTotal) * BAR_CHART_H : 0,
                   bucket.total > 0 ? 4 : 0,
                 );
-                const x = i * BAR_COL + (BAR_COL - BAR_W) / 2;
+                const x = i * barCol + (barCol - BAR_W) / 2;
                 const y = BAR_TOP_PAD + BAR_CHART_H - barH;
                 const isPeak = i === peakIndex;
                 const intensity = 0.35 + (bucket.total / maxTotal) * 0.65;
@@ -1478,7 +1533,7 @@ export function PeakActivitySection({ series, currency, period }: PeakActivityPr
             {/* labels row */}
             <View style={pa.labelRow}>
               {series.map((bucket, i) => (
-                <View key={bucket.date + i} style={{ width: BAR_COL, alignItems: 'center' }}>
+                <View key={bucket.date + i} style={[pa.labelCell, { width: barCol }]}>
                   <Text
                     style={[pa.label, i === peakIndex && pa.labelPeak]}
                     numberOfLines={1}
@@ -1555,11 +1610,15 @@ const pa = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: Spacing.sm,
     paddingTop: Spacing.sm,
-    paddingBottom: 2,
+    paddingBottom: Spacing.sm,
   },
   labelRow: {
     flexDirection: 'row',
-    marginTop: 4,
+    marginTop: 6,
+  },
+  labelCell: {
+    alignItems: 'center',
+    paddingHorizontal: 3,
   },
   label: {
     fontSize: 10,

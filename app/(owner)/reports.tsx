@@ -4,8 +4,9 @@ import {
   Text,
   StyleSheet,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { StatusBar } from 'expo-status-bar';
@@ -37,7 +38,6 @@ import { BorderRadius } from '@/constants/BorderRadius';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { Motion } from '@/constants/Motion';
 
 // ─── screen ───────────────────────────────────────────────────────────────────
 
@@ -97,25 +97,27 @@ export default function OwnerReports() {
         backgroundColor={Colors.background}
         fallbackHref="/(owner)/dashboard"
       />
-      <Animated.ScrollView
-        entering={FadeIn.duration(Motion.duration.slow)}
+      {/* Plain ScrollView on purpose: each section below runs its own entering
+          animation, and nesting those inside another one leaves the children
+          stranded at their start transform. */}
+      <ScrollView
         style={s.root}
-      contentContainerStyle={[
-        s.content,
-        {
-          paddingTop: Spacing.md,
-          paddingBottom: tabBarHeight + Spacing.xl,
-        },
-      ]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          tintColor={Colors.primary}
-        />
-      }
-    >
+        contentContainerStyle={[
+          s.content,
+          {
+            paddingTop: Spacing.lg,
+            paddingBottom: tabBarHeight + Spacing.xl,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={Colors.primary}
+          />
+        }
+      >
       {/* ── period selector ────────────────────────────────────────── */}
       <Animated.View entering={FadeInDown.duration(340).delay(40)}>
         <PeriodSegmentControl value={period} onChange={setPeriod} />
@@ -211,7 +213,7 @@ export default function OwnerReports() {
         </View>
         <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
       </AnimatedPressable>
-      </Animated.ScrollView>
+      </ScrollView>
     </>
   );
 }
@@ -226,7 +228,6 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Spacing.md,
-    marginHorizontal: Spacing.lg,
     minHeight: 64,
   },
   booksIcon: {
@@ -257,11 +258,14 @@ const s = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.lg,
   },
+  // One rhythm for the whole page: cards that belong to the same idea sit a
+  // `gap` apart, separate sections a `sectionGap`. Anything tighter and the
+  // section headers read as part of the card above them.
   gap: {
-    height: Spacing.md,
+    height: Spacing.lg,
   },
   sectionGap: {
-    height: Spacing.lg,
+    height: Spacing.xl,
   },
   dividerRow: {
     flexDirection: 'row',

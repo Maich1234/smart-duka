@@ -57,13 +57,13 @@ export function ReportsSkeleton() {
       <Shimmer height={13} borderRadius={5} style={{ width: '68%', marginBottom: Spacing.lg }} />
 
       {/* period control */}
-      <Shimmer height={46} borderRadius={BorderRadius.xl} style={{ marginBottom: Spacing.md }} />
+      <Shimmer height={46} borderRadius={BorderRadius.xl} style={{ marginBottom: Spacing.lg }} />
 
       {/* hero card */}
-      <Shimmer height={228} borderRadius={BorderRadius.xl} style={{ marginBottom: Spacing.md }} />
+      <Shimmer height={228} borderRadius={BorderRadius.xl} style={{ marginBottom: Spacing.lg }} />
 
       {/* breakdown card */}
-      <Shimmer height={108} borderRadius={BorderRadius.lg} style={{ marginBottom: Spacing.md }} />
+      <Shimmer height={108} borderRadius={BorderRadius.lg} style={{ marginBottom: Spacing.lg }} />
 
       {/* insight cards */}
       <SkeletonSectionHeader />
@@ -82,10 +82,10 @@ export function ReportsSkeleton() {
 
       {/* peak activity */}
       <SkeletonSectionHeader />
-      <Shimmer height={160} borderRadius={BorderRadius.lg} style={{ marginBottom: Spacing.lg }} />
+      <Shimmer height={160} borderRadius={BorderRadius.lg} style={{ marginBottom: Spacing.xl }} />
 
       {/* divider label */}
-      <Shimmer height={10} borderRadius={4} style={{ width: '45%', alignSelf: 'center', marginBottom: Spacing.lg }} />
+      <Shimmer height={10} borderRadius={4} style={{ width: '45%', alignSelf: 'center', marginBottom: Spacing.xl }} />
 
       {/* top products */}
       <SkeletonSectionHeader />
@@ -115,15 +115,14 @@ const sk = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
-  insightRow: { gap: Spacing.sm, paddingRight: Spacing.xs, marginBottom: Spacing.sm },
-  gap: { height: Spacing.lg },
+  insightRow: { gap: Spacing.sm, paddingRight: Spacing.xs },
+  gap: { height: Spacing.xl },
   listCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: 'hidden',
-    marginBottom: Spacing.sm,
   },
   listRow: {
     flexDirection: 'row',

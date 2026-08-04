@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useAlert } from '@/context/AlertContext';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -352,7 +352,10 @@ export default function OwnerInventory() {
           ) : null
         }
         ListHeaderComponent={
-          <Animated.View entering={FadeInDown.duration(400).delay(100)}>
+          // Plain wrapper: the stat cards inside stagger themselves in, and an
+          // `entering` here would be a second animation on the same path —
+          // which can leave those cards stuck at their start offset.
+          <View>
             <InventoryStatsRow stats={stats} />
             {/* Intelligence banner — shows when depletion data is ready */}
             {depletion &&
@@ -379,7 +382,7 @@ export default function OwnerInventory() {
               </Text>
               <Text style={styles.sectionLabelCount}>{filteredProducts.length}</Text>
             </View>
-          </Animated.View>
+          </View>
         }
         ListEmptyComponent={
           <EmptyInventoryState

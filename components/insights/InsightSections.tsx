@@ -19,22 +19,25 @@ import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { Shadows } from '@/constants/Shadows';
 
+/**
+ * Not animated, deliberately — see the same note in reports/ReportSections:
+ * an `entering` nested inside an entering parent strands the child at its
+ * start transform, sliding the header under the card below it.
+ */
 function SectionHeader({
   icon,
   title,
-  delay = 0,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
-  delay?: number;
 }) {
   return (
-    <Animated.View entering={FadeInDown.duration(320).delay(delay)} style={sh.container}>
+    <View style={sh.container}>
       <View style={sh.iconWrap}>
         <Ionicons name={icon} size={15} color={Colors.primary} />
       </View>
       <Text style={sh.title}>{title}</Text>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -198,7 +201,7 @@ export function AiNarrativeCard({
   const tone = PRIORITY_STYLE[insight.priority];
   return (
     <Animated.View entering={FadeInDown.duration(340).delay(100)}>
-      <SectionHeader icon="sparkles" title="Dukana Says" delay={80} />
+      <SectionHeader icon="sparkles" title="Dukana Says" />
       <View style={[nc.card, Shadows.sm]}>
         <View style={[nc.priorityChip, { backgroundColor: tone.bg }]}>
           <Text style={[nc.priorityText, { color: tone.fg }]}>{tone.label}</Text>
@@ -263,7 +266,7 @@ export function AlertsList({ alerts }: { alerts: BusinessSnapshot['alerts'] }) {
   if (alerts.length === 0) return null;
   return (
     <Animated.View entering={FadeInDown.duration(340).delay(160)}>
-      <SectionHeader icon="notifications-outline" title="Alerts" delay={140} />
+      <SectionHeader icon="notifications-outline" title="Alerts" />
       <View style={[al.card, Shadows.sm]}>
         {alerts.map((alert, i) => {
           const tone = ALERT_STYLE[alert.severity];
@@ -294,7 +297,7 @@ const al = StyleSheet.create({
 export function TrendSummary({ trend, currency }: { trend: BusinessSnapshot['trend']; currency?: string }) {
   return (
     <Animated.View entering={FadeInDown.duration(340).delay(220)}>
-      <SectionHeader icon="trending-up-outline" title="Trend" delay={200} />
+      <SectionHeader icon="trending-up-outline" title="Trend" />
       <View style={[ts.card, Shadows.sm]}>
         {(['week', 'month'] as const).map((range, i) => (
           <View key={range} style={[ts.row, i === 0 && ts.rowBorder]}>

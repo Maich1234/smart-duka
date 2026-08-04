@@ -211,20 +211,20 @@ export const PaymentsSection: React.FC = () => {
 
   if (view === 'form') {
     return (
-      <Animated.View entering={FadeInDown.duration(260)}>
-        <MpesaConfigForm
-          onSave={handleSaveConfig}
-          loading={saving}
-          onCancel={() => setView(config?.consumerKeySet ? 'configured' : 'no_config')}
-          initialValues={config ? {
-            environment: config.environment,
-            businessName: config.businessName,
-            shortcode: config.shortcode,
-            initiatorName: config.initiatorName,
-          } : undefined}
-          isEditing={!!config?.consumerKeySet}
-        />
-      </Animated.View>
+      // No wrapper animation: MpesaConfigForm animates its own root, and
+      // stacking a second `entering` on the same path can strand it.
+      <MpesaConfigForm
+        onSave={handleSaveConfig}
+        loading={saving}
+        onCancel={() => setView(config?.consumerKeySet ? 'configured' : 'no_config')}
+        initialValues={config ? {
+          environment: config.environment,
+          businessName: config.businessName,
+          shortcode: config.shortcode,
+          initiatorName: config.initiatorName,
+        } : undefined}
+        isEditing={!!config?.consumerKeySet}
+      />
     );
   }
 

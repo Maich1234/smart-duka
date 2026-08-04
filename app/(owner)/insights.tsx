@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { View, Text, StyleSheet, RefreshControl, ActivityIndicator, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { StatusBar } from 'expo-status-bar';
@@ -24,7 +23,6 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { Motion } from '@/constants/Motion';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -68,10 +66,12 @@ export default function OwnerInsights() {
         backgroundColor={Colors.background}
         fallbackHref="/(owner)/dashboard"
       />
-      <Animated.ScrollView
-        entering={FadeIn.duration(Motion.duration.slow)}
+      {/* Plain ScrollView on purpose: each card below runs its own entering
+          animation, and nesting those inside another one leaves the children
+          stranded at their start transform. */}
+      <ScrollView
         style={s.root}
-        contentContainerStyle={[s.content, { paddingTop: Spacing.md, paddingBottom: tabBarHeight + Spacing.xl }]}
+        contentContainerStyle={[s.content, { paddingTop: Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           hasAiInsights ? (
@@ -115,7 +115,7 @@ export default function OwnerInsights() {
             <Text style={s.errorText}>Couldn&apos;t load insights. Pull down to try again.</Text>
           </View>
         )}
-      </Animated.ScrollView>
+      </ScrollView>
     </>
   );
 }
@@ -123,8 +123,10 @@ export default function OwnerInsights() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: Spacing.lg },
-  gap: { height: Spacing.md },
-  sectionGap: { height: Spacing.lg },
+  // Same rhythm as the reports screen: related cards a `gap` apart, separate
+  // sections a `sectionGap`, so a section header never crowds the card above.
+  gap: { height: Spacing.lg },
+  sectionGap: { height: Spacing.xl },
   loading: { paddingVertical: Spacing.xxl, alignItems: 'center' },
   errorText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamily, color: Colors.textSecondary },
 });
