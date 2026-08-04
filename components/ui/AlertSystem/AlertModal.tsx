@@ -225,6 +225,17 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
   // render. Removing the buffer would mean lifting config ownership into
   // AlertProvider — a rewrite of the app's global alert primitive for one
   // render, which isn't a trade worth making here.
+  //
+  // Keyed on `config` as well as `visible`, which is what makes a *nested*
+  // alert work: a button handler that calls alert() again runs before the
+  // dialog's own dismiss, so `visible` never leaves true and an effect keyed
+  // on it alone would ignore the new config entirely — then the dismiss timer
+  // already scheduled by animateOut would tear the dialog down. The second
+  // alert simply never appeared. That silently broke every confirm-inside-a-
+  // choice flow in the app, including "Discard failed changes?", which was
+  // unreachable: the only way to clear a failed sync was a dialog that could
+  // not render. The cleanup below cancels that pending dismiss before the
+  // swap, so the new content animates in over the old.
   useEffect(() => {
     if (visible && config) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -263,14 +274,20 @@ export function AlertModal({ config, visible, onDismiss }: AlertModalProps) {
     }
 
     return () => {
-      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
     };
-    // Deliberately keyed on the open/close transition only. The animation
-    // helpers are recreated every render and `modalMounted` is written inside,
-    // so declaring them would replay the entrance animation (or loop on the
-    // exit) on every re-render of an open alert.
+    // Keyed on the open/close transition and the config identity. The
+    // animation helpers are recreated every render and `modalMounted` is
+    // written inside, so declaring those would replay the entrance animation
+    // (or loop on the exit) on every re-render of an open alert. `config` is
+    // provider state — it only changes when alert() is called, never per
+    // render — so it is safe to depend on and is what lets a nested alert
+    // replace the one that opened it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [visible, config]);
 
   const overlayAnim = useAnimatedStyle(() => ({
     opacity: opacity.value,
