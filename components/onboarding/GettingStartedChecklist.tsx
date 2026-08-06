@@ -212,6 +212,18 @@ export const GettingStartedChecklist: React.FC = () => {
           </AnimatedPressable>
         ))}
       </View>
+
+      <AnimatedPressable
+        onPress={() => {
+          haptics.light();
+          router.push('/(owner)/setup-guide' as Parameters<typeof router.push>[0]);
+        }}
+        style={styles.guideLink}
+        accessibilityRole="button"
+      >
+        <Text style={styles.guideLinkText}>View full guide</Text>
+        <Ionicons name="chevron-forward" size={13} color={Colors.primary} />
+      </AnimatedPressable>
     </Animated.View>
   );
 };
@@ -278,6 +290,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
+  },
+  guideLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    marginTop: Spacing.xs,
+    paddingVertical: 6,
+  },
+  guideLinkText: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
   },
   doneWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   doneCheck: {

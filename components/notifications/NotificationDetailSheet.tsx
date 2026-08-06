@@ -6,6 +6,7 @@ import { BottomSheet } from '../ui/BottomSheet';
 import { iconForType, labelForType } from './notificationMeta';
 import type { AppNotification } from '@/services/notificationInbox';
 import { formatDateTime } from '@/utils/formatters';
+import { openWebPage } from '@/utils/openWebPage';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -47,6 +48,13 @@ export const NotificationDetailSheet: React.FC<NotificationDetailSheetProps> = (
         <Text style={styles.title} selectable>{notification.title}</Text>
         <Text style={styles.body} selectable>{notification.body}</Text>
 
+        {notification.data?.actionUrl ? (
+          <Button
+            title={notification.type === 'subscription_reminder' ? 'Pay now' : 'Open'}
+            onPress={() => openWebPage(notification.data!.actionUrl!)}
+            style={styles.actionBtn}
+          />
+        ) : null}
         <Button title="Close" variant="outline" onPress={onClose} style={styles.closeBtn} />
       </ScrollView>
     </BottomSheet>
@@ -93,5 +101,6 @@ const styles = StyleSheet.create({
     lineHeight: Typography.lineHeight.body,
     fontFamily: Typography.fontFamily,
   },
-  closeBtn: { marginTop: Spacing.lg },
+  actionBtn: { marginTop: Spacing.lg },
+  closeBtn: { marginTop: Spacing.sm },
 });

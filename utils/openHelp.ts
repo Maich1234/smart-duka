@@ -1,8 +1,8 @@
-import { Linking } from 'react-native';
 import { HELP_CENTER_URL } from '@/constants/config';
+import { openWebPage } from '@/utils/openWebPage';
 
 /**
- * Opens a Help & Learning Center article in the browser.
+ * Opens a Help & Learning Center article in an in-app browser tab.
  *
  * The Help Center lives entirely on the marketing site now — no help content
  * ships in this bundle on any platform. It used to exist twice: the written
@@ -11,9 +11,10 @@ import { HELP_CENTER_URL } from '@/constants/config';
  * bundle, and made every article server-rendered and indexable.
  *
  * Native already behaved this way (the in-app /help routes were just browser
- * redirects), so this is not a change in what users experience.
+ * redirects), so this is not a change in what users experience beyond staying
+ * inside the app rather than switching to an external browser.
  */
 export function openHelp(slug?: string) {
   const path = slug ? `/help/${slug}` : '/help';
-  Linking.openURL(`${HELP_CENTER_URL}${path}`);
+  openWebPage(`${HELP_CENTER_URL}${path}`);
 }

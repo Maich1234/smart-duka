@@ -42,6 +42,9 @@ import { describeSubscription, type SubscriptionTone } from '@/utils/subscriptio
 import { usePrinterStore } from '@/store/printerStore';
 import { resolveSaleMethods } from '@/constants/paymentMethods';
 import { openHelp } from '@/utils/openHelp';
+import { openWebPage } from '@/utils/openWebPage';
+import { useWarmUpBrowser } from '@/hooks/useWarmUpBrowser';
+import { WEB_URL } from '@/constants/config';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -187,13 +190,17 @@ interface HelpItem {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   sub: string;
+  // Help Center article — opens `${HELP_CENTER_URL}/help/:slug`.
   slug?: string;
+  // Any other web-app page (e.g. Contact) — opens `${WEB_URL}${path}` directly,
+  // bypassing the /help/:slug convention for destinations that aren't articles.
+  path?: string;
 }
 
 const HELP_ITEMS: HelpItem[] = [
   { icon: 'book-outline', label: 'Tutorials', sub: 'Learn features', slug: 'getting-started' },
   { icon: 'help-circle-outline', label: 'FAQ', sub: 'Common questions', slug: 'faq' },
-  { icon: 'chatbubble-ellipses-outline', label: 'Support', sub: 'Contact us', slug: 'support' },
+  { icon: 'chatbubble-ellipses-outline', label: 'Support', sub: 'Contact us', path: '/contact' },
 ];
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -203,6 +210,7 @@ export default function OwnerProfile() {
   const tabBarHeight = useTabBarHeight();
   const { toast, alert } = useAlert();
   const queryClient = useQueryClient();
+  useWarmUpBrowser();
 
   const handleLogout = () => {
     alert({
@@ -831,12 +839,29 @@ export default function OwnerProfile() {
 
         {/* ── HELP & LEARNING ───────────────────────────────────────────── */}
         <SectionLabel label="HELP & LEARNING" />
+        <Animated.View entering={FadeInUp.duration(360).delay(150)} style={styles.setupGuideRow}>
+          <AnimatedPressable
+            style={styles.setupGuideCard}
+            onPress={() => router.push('/(owner)/setup-guide' as Parameters<typeof router.push>[0])}
+            accessibilityRole="button"
+            accessibilityLabel="Open Setup Guide"
+          >
+            <View style={styles.helpIconWrap}>
+              <Ionicons name="rocket-outline" size={20} color={Colors.primary} />
+            </View>
+            <View style={styles.setupGuideText}>
+              <Text style={styles.setupGuideLabel}>Setup Guide</Text>
+              <Text style={styles.setupGuideSub}>Get your shop running, step by step</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+          </AnimatedPressable>
+        </Animated.View>
         <Animated.View entering={FadeInUp.duration(360).delay(160)} style={styles.helpRow}>
           {HELP_ITEMS.map((item) => (
             <AnimatedPressable
               key={item.label}
               style={styles.helpCard}
-              onPress={() => openHelp(item.slug)}
+              onPress={() => (item.path ? openWebPage(`${WEB_URL}${item.path}`) : openHelp(item.slug))}
             >
               <View style={styles.helpIconWrap}>
                 <Ionicons name={item.icon} size={20} color={Colors.primary} />
@@ -1079,6 +1104,32 @@ const styles = StyleSheet.create({
   },
 
   // Help
+  setupGuideRow: {
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  setupGuideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  setupGuideText: { flex: 1 },
+  setupGuideLabel: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  setupGuideSub: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
   helpRow: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.lg,

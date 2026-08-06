@@ -31,6 +31,7 @@ import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Motion } from '@/constants/Motion';
+import { openWebPage } from '@/utils/openWebPage';
 
 // Initialise SQLite queue DB synchronously before any React render
 initOfflineDb();
@@ -301,7 +302,10 @@ function NotificationListener() {
           {
             label: 'View',
             variant: 'primary',
-            onPress: () => router.push(routeForNotification(data) as never),
+            onPress: () => {
+              if (data?.actionUrl) openWebPage(data.actionUrl);
+              else router.push(routeForNotification(data) as never);
+            },
           },
         ],
       });
@@ -313,7 +317,8 @@ function NotificationListener() {
   // straight to the report the push was about.
   useEffect(() => {
     const unsubscribe = onNotificationOpened((data) => {
-      router.push(routeForNotification(data) as never);
+      if (data?.actionUrl) openWebPage(data.actionUrl);
+      else router.push(routeForNotification(data) as never);
     });
     return unsubscribe;
   }, []);

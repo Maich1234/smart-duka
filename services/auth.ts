@@ -244,3 +244,13 @@ export const cancelAccountDeletion = async (): Promise<{ success: boolean; messa
   const response = await api.post('/auth/me/restore');
   return response.data;
 };
+
+/**
+ * Mints a short-lived token for the embedded Setup Guide WebView — see
+ * app/(owner)/setup-guide.tsx. Not a general session token: the backend only
+ * accepts it at GET /setup/status.
+ */
+export const getWebviewToken = async (): Promise<{ token: string; expiresIn: number }> => {
+  const response = await api.post('/auth/webview-token');
+  return response.data.data;
+};

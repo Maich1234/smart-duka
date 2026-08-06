@@ -14,6 +14,8 @@ const TOOL_LABELS: Record<string, string> = {
   detect_sales_anomaly: 'anomaly check',
   get_staff_performance: 'staff performance',
   get_expense_summary: 'expenses',
+  search_help_topics: 'Help Center',
+  get_setup_status: 'setup status',
 };
 
 export function ToolsUsedFootnote({ toolsUsed }: { toolsUsed: string[] }) {

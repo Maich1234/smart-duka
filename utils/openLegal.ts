@@ -1,10 +1,10 @@
-import { Linking } from 'react-native';
 import { WEB_URL } from '@/constants/config';
+import { openWebPage } from '@/utils/openWebPage';
 
 export type LegalDocument = 'terms' | 'privacy' | 'delete-account';
 
 /**
- * Opens a legal document in the browser.
+ * Opens a legal document in an in-app browser tab.
  *
  * The documents live on the web front end rather than being duplicated in the
  * app, for the same reason the Help Center does: one copy to keep current. It
@@ -17,5 +17,5 @@ export type LegalDocument = 'terms' | 'privacy' | 'delete-account';
  * app/(owner)/subscription.tsx).
  */
 export function openLegal(document: LegalDocument) {
-  Linking.openURL(`${WEB_URL}/${document}`);
+  openWebPage(`${WEB_URL}/${document}`);
 }

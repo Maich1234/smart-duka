@@ -12,6 +12,7 @@ import { LegalSection } from '@/components/profile/LegalSection';
 import { PrinterSection } from '@/components/profile/PrinterSection';
 import { Button } from '@/components/ui/Button';
 import { openHelp } from '@/utils/openHelp';
+import { useWarmUpBrowser } from '@/hooks/useWarmUpBrowser';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 
@@ -20,6 +21,7 @@ export default function StaffProfile() {
   const tabBarHeight = useTabBarHeight();
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const { toast, alert } = useAlert();
+  useWarmUpBrowser();
 
   // Signing out mid-shift loses an in-progress sale and, with one-device
   // sessions, means asking the owner for help if the password isn't to hand —
