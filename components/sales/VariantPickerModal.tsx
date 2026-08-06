@@ -18,6 +18,12 @@ interface VariantPickerModalProps {
   onConfirm: (variant: ProductVariant, quantity: number) => void;
   productName: string;
   variants: ProductVariant[];
+  /**
+   * Units of each variant already in the cart, keyed by variant id. Stock is
+   * checked against what's left after them, so two trips through this sheet
+   * can't build a cart the server has to reject at checkout.
+   */
+  inCartByVariant?: Record<string, number>;
   loading?: boolean;
 }
 
@@ -37,25 +43,48 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
   onConfirm,
   productName,
   variants,
+  inCartByVariant,
   loading = false,
 }) => {
-  // First variant with stock, else the first one at all.
+  const remaining = (v: ProductVariant) =>
+    Math.max(0, v.quantity - (inCartByVariant?.[v._id] ?? 0));
+
+  // First variant with stock left, else the first one at all.
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => variants.find((v) => v.quantity > 0)?._id ?? variants[0]?._id ?? null,
+    () => variants.find((v) => remaining(v) > 0)?._id ?? variants[0]?._id ?? null,
   );
   const [quantity, setQuantity] = useState('1');
   const { toast } = useAlert();
 
   const selected = variants.find((v) => v._id === selectedId);
+  const available = selected ? remaining(selected) : 0;
+  const inCart = selected ? inCartByVariant?.[selected._id] ?? 0 : 0;
+  const qty = parseInt(quantity, 10);
+
+  // Shown under the field as it's typed, not as a toast after tapping Add.
+  const quantityError = (() => {
+    if (!quantity.trim()) return undefined;
+    if (/[.,]/.test(quantity)) return 'Sold in whole units — enter a whole number.';
+    if (isNaN(qty)) return 'Enter a number.';
+    if (qty <= 0) return 'Quantity must be more than 0.';
+    if (qty > available) {
+      return inCart > 0
+        ? `Only ${available} left — ${inCart} already in this sale.`
+        : `Only ${available} in stock.`;
+    }
+    return undefined;
+  })();
+
+  const canAdd = !!selected && !quantityError && !isNaN(qty) && qty > 0;
 
   const handleConfirm = () => {
     if (!selected) {
       toast({ type: 'warning', message: 'Please choose a variant before adding to cart' });
       return;
     }
-    const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty <= 0 || qty > selected.quantity) {
-      toast({ type: 'error', message: `Quantity must be between 1 and ${selected.quantity}` });
+    // The button is disabled while invalid; this stays as the backstop.
+    if (!canAdd) {
+      toast({ type: 'error', message: quantityError ?? 'Enter a quantity first' });
       return;
     }
     onConfirm(selected, qty);
@@ -69,7 +98,7 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
       <View style={styles.chipRow}>
         {variants.map((v) => {
           const active = v._id === selectedId;
-          const outOfStock = v.quantity === 0;
+          const outOfStock = remaining(v) === 0;
           return (
             <AnimatedPressable
               key={v._id}
@@ -93,14 +122,29 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
 
       {selected && (
         <>
-          <Text style={styles.maxStock}>Available: {selected.quantity}</Text>
-          <Input label="Quantity" value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
+          <Text style={styles.maxStock}>
+            Available: {available}
+            {inCart > 0 ? ` · ${inCart} already in this sale` : ''}
+          </Text>
+          <Input
+            label="Quantity"
+            value={quantity}
+            onChangeText={setQuantity}
+            keyboardType="numeric"
+            error={quantityError}
+          />
         </>
       )}
 
       <View style={styles.buttonRow}>
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button title="Add" onPress={handleConfirm} loading={loading} style={styles.flexBtn} />
+        <Button
+          title="Add"
+          onPress={handleConfirm}
+          loading={loading}
+          disabled={!canAdd}
+          style={styles.flexBtn}
+        />
       </View>
     </>
   );

@@ -424,9 +424,20 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     // Bundles carry no stock of their own (their components do) — let the
     // server be authoritative on whether there's enough component stock.
     const tracksOwnStock = product.trackInventory && product.productType !== 'bundle';
-    if (tracksOwnStock && product.quantity <= 0) {
-      toast({ type: 'warning', message: `${product.name} is out of stock` });
-      return;
+    if (tracksOwnStock) {
+      const inCart = cart.find((i) => i._id === product._id && !i.cartVariantId)?.cartQuantity ?? 0;
+      // Opening the sheet with nothing left to add would just show a disabled
+      // Add button, so say why here instead.
+      if (product.quantity - inCart <= 0) {
+        toast({
+          type: 'warning',
+          message:
+            inCart > 0
+              ? `All ${product.quantity} of ${product.name} are already in this sale`
+              : `${product.name} is out of stock`,
+        });
+        return;
+      }
     }
     setSelectedProduct(product);
     setQuantityModalVisible(true);
@@ -486,6 +497,21 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const removeFromCart = (key: string) => {
     removeItem(key);
   };
+
+  // What the cart already holds of the product being picked, per variant, so the
+  // picker warns against the stock that's actually left rather than the shelf count.
+  const variantsInCart = useMemo(
+    () =>
+      selectedProduct
+        ? cart.reduce<Record<string, number>>((acc, item) => {
+            if (item._id === selectedProduct._id && item.cartVariantId) {
+              acc[item.cartVariantId] = (acc[item.cartVariantId] ?? 0) + item.cartQuantity;
+            }
+            return acc;
+          }, {})
+        : {},
+    [cart, selectedProduct]
+  );
 
   const cartPromoResults = cart.map((item) =>
     applyBestPromotion(item.promotions, item.cartQuantity, item.cartUnitPrice ?? item.sellingPrice)
@@ -808,6 +834,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             ? selectedProduct.quantity
             : Infinity
         }
+        inCart={
+          selectedProduct
+            ? cart.find((i) => i._id === selectedProduct._id && !i.cartVariantId)?.cartQuantity ?? 0
+            : 0
+        }
         unitOfMeasure={
           selectedProduct?.productType === 'weighted' || selectedProduct?.productType === 'refillable'
             ? selectedProduct.unitOfMeasure
@@ -828,6 +859,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         onConfirm={confirmVariantAdd}
         productName={selectedProduct?.name || ''}
         variants={selectedProduct?.variants || []}
+        inCartByVariant={variantsInCart}
       />
 
       <SaleDetailsModal

@@ -10,6 +10,13 @@ export const formatCurrency = (amount: number, currency: string = 'KES'): string
 };
 
 /**
+ * Format a stock quantity for display: whole units stay whole ("4", not "4.000"),
+ * weighed goods keep up to three decimals with the trailing zeros dropped.
+ */
+export const formatQuantity = (quantity: number): string =>
+  `${Number(quantity.toFixed(3))}`;
+
+/**
  * Format date to local string (e.g., "15 Jan 2025")
  */
 export const formatDate = (dateString: string | Date): string => {
