@@ -5,6 +5,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { ToolsUsedFootnote } from './ToolsUsedFootnote';
+import formatChatText from './formatChatText';
 
 interface MessageBubbleProps {
   role: 'user' | 'model';
@@ -17,7 +18,7 @@ export function MessageBubble({ role, text, toolsUsed }: MessageBubbleProps) {
   return (
     <View style={[s.row, isUser ? s.rowUser : s.rowModel]}>
       <View style={[s.bubble, isUser ? s.bubbleUser : s.bubbleModel]}>
-        <Text style={[s.text, isUser ? s.textUser : s.textModel]}>{text}</Text>
+        {isUser ? <Text style={[s.text, s.textUser]}>{text}</Text> : formatChatText(text)}
       </View>
       {!isUser && toolsUsed && toolsUsed.length > 0 ? <ToolsUsedFootnote toolsUsed={toolsUsed} /> : null}
     </View>
@@ -33,5 +34,4 @@ const s = StyleSheet.create({
   bubbleModel: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 4 },
   text: { fontSize: Typography.size.small, lineHeight: 20, fontFamily: Typography.fontFamily },
   textUser: { color: Colors.white },
-  textModel: { color: Colors.textPrimary },
 });
