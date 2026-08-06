@@ -124,7 +124,14 @@
       "Bash(node --test tests/)",
       "Bash(git -C /home/maich/Documents/smart-duka-web branch --show-current)",
       "Bash(git -C /home/maich/Documents/smart-duka-web diff src/lib/site.ts src/app/layout.tsx src/utils/staffEmailSlug.ts src/components/ui/Toggle.tsx)",
-      "Bash(git -C /home/maich/Documents/smart-duka-web diff -U0)"
+      "Bash(git -C /home/maich/Documents/smart-duka-web diff -U0)",
+      "Bash(curl -s -o /tmp/claude-1000/-home-maich-Documents-smart-duka/45edce9a-876d-48b9-a20e-69900e62bd98/scratchpad/shift.txt -w \"%{http_code}\\\\n\" -X POST https://smart-duka-backend-iota.vercel.app/api/v1/shifts/start -H 'Content-Type: application/json' -H 'Authorization: Bearer invalid' -d '{\"openingFloat\":0,\"startedAt\":\"2026-08-04T10:00:00.000Z\",\"device\":{\"platform\":\"android\"}}')",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts\\)\\)\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(awk '/^commit /{c=$2} /RESUME_SPLASH_AFTER_MS = 5/{print c}')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
+      "Bash(echo \"server up, exit:$?\")"
     ],
     "additionalDirectories": [
       "/tmp",
