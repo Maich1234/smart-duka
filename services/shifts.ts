@@ -84,6 +84,24 @@ export const getActiveShift = async (): Promise<{
   return res.data;
 };
 
+/**
+ * True when the server rejected the request purely because it doesn't know a
+ * field this build sends. Joi's `stripUnknown` does not override an explicit
+ * `.unknown(false)`, so a backend older than the app answers 400 "Validation
+ * error" for the whole request instead of ignoring the field.
+ */
+const rejectsUnknownField = (error: any, field: string): boolean => {
+  if (error?.response?.status !== 400) return false;
+  const details = error.response.data?.errors;
+  return (
+    Array.isArray(details) &&
+    details.length === 1 &&
+    typeof details[0] === 'string' &&
+    details[0].includes(field) &&
+    details[0].includes('not allowed')
+  );
+};
+
 export const startShift = async (payload: {
   openingFloat: number;
   openingNote?: string;
@@ -92,12 +110,29 @@ export const startShift = async (payload: {
   // the outbox until the network returns, and a shift dated by its own sync
   // would report the wrong duration and reconciliation window. The server
   // clamps the value it accepts.
-  const res = await api.post('/shifts/start', {
+  const body = {
     ...payload,
     startedAt: new Date().toISOString(),
     device: deviceInfo(),
-  });
-  return res.data;
+  };
+
+  try {
+    const res = await api.post('/shifts/start', body);
+    return res.data;
+  } catch (error: any) {
+    // A backend that predates startedAt fails the whole request rather than
+    // ignoring the field, which locks the till and stops the shop selling until
+    // a deploy lands. The timestamp only earns its keep for a shift replayed
+    // from the outbox — sent live it is already ~now — so give up the field
+    // rather than the shift. Each api.post carries its own idempotency key, so
+    // this retry is not replayed as the stored 400.
+    if (rejectsUnknownField(error, 'startedAt')) {
+      const { startedAt: _startedAt, ...legacyBody } = body;
+      const res = await api.post('/shifts/start', legacyBody);
+      return res.data;
+    }
+    throw error;
+  }
 };
 
 /** Pass 'current' to close the caller's own active shift. */
