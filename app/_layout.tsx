@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useRef } from 'react';
-import { Stack, router, usePathname } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PressablesConfig } from 'pressto';
@@ -199,25 +199,23 @@ function SessionExpiredHandler() {
   return null;
 }
 
-// Re-shows the splash animation when the app returns from a long stay in the
-// background. Two guards keep it from destroying in-progress state:
-//  - Signed-out users are never redirected — on Android, the Google Password
-//    Manager sheet and system permission dialogs briefly background the app,
-//    and replaying the splash from there wiped the login/onboarding forms and
-//    bounced people back to the start of the welcome journey.
-//  - Short background stints (quick app switches, those same system dialogs
-//    for signed-in users) don't count; only a genuinely stale session replays
-//    the splash and re-routes to the dashboard.
-const RESUME_SPLASH_AFTER_MS = 5 * 60 * 1000;
+// Refreshes potentially-stale data when the app returns from a long stay in
+// the background. Deliberately does NOT touch navigation — wherever the user
+// was (mid-sale in the POS, a drilled-down report, an open form) they must
+// land back exactly there; only the underlying data gets a refetch.
+//  - Signed-out users are skipped — there's no session data to go stale.
+//  - Short background stints (quick app switches, Android's Google Password
+//    Manager sheet and system permission dialogs briefly backgrounding the
+//    app) don't count; only a genuinely long absence invalidates the cache.
+// An actually-invalid session is still caught the normal way: the refetches
+// below hit the API, a 401 flows through the axios interceptor, and
+// SessionExpiredHandler takes it from there — this file never has to
+// second-guess session validity itself.
+const RESUME_REFRESH_AFTER_MS = 5 * 60 * 1000;
 
 function AppResumeHandler() {
   const backgroundedAtRef = useRef<number | null>(null);
-  const pathnameRef = useRef('');
-  const pathname = usePathname();
-
-  useEffect(() => {
-    pathnameRef.current = pathname;
-  }, [pathname]);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
@@ -230,14 +228,15 @@ function AppResumeHandler() {
       if (nextState !== 'active') return;
       const backgroundedAt = backgroundedAtRef.current;
       backgroundedAtRef.current = null;
-      if (backgroundedAt === null || Date.now() - backgroundedAt < RESUME_SPLASH_AFTER_MS) return;
+      if (backgroundedAt === null || Date.now() - backgroundedAt < RESUME_REFRESH_AFTER_MS) return;
       if (!useAuthStore.getState().user) return;
-      if (pathnameRef.current !== '/splash') {
-        router.replace('/splash');
-      }
+      // Default refetchType 'active' only refetches currently-mounted
+      // queries — screens not on-screen just get marked stale, refetching
+      // lazily next time they mount, rather than firing needless requests.
+      queryClient.invalidateQueries();
     });
     return () => sub.remove();
-  }, []);
+  }, [queryClient]);
 
   return null;
 }
