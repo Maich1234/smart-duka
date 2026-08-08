@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
@@ -55,12 +55,15 @@ export default function ShiftsList() {
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ['shifts', page],
     queryFn: () => getShifts({ page, limit: 10 }),
+    // Keep the current page's shifts mounted while the next page loads,
+    // instead of the whole list dropping to a skeleton on every page tap.
+    placeholderData: keepPreviousData,
   });
 
   const shifts = data?.data ?? [];
   const totalPages = data?.pagination?.pages ?? 1;
 
-  if (isLoading) return <ListSkeleton />;
+  if (isLoading && shifts.length === 0) return <ListSkeleton />;
 
   return (
     <FlashList

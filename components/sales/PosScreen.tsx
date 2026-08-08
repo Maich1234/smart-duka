@@ -12,6 +12,7 @@ import { getProducts, type Product, type ProductVariant } from '@/services/produ
 import { createSale, getMySales, voidSale, refundSale, type Sale } from '@/services/sales';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
+import { getTransactionStatus } from '@/services/mpesa';
 import { ProductCard } from '@/components/inventory/ProductCard';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useSearch } from '@/hooks/useSearch';
@@ -40,9 +41,19 @@ import {
 } from '@/constants/paymentMethods';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCartStore, cartKey } from '@/store/staffCartStore';
+import { usePendingMpesaStore, type PendingMpesaPayment } from '@/store/pendingMpesaStore';
 import { isOfflineDbAvailable } from '@/utils/offlineDb';
 import { syncProductCache, searchCachedProducts, applyOfflineStockDelta, PRODUCT_CACHE_STALE_MS } from '@/utils/productCache';
 import { addOrIncrementCartItem } from '@/utils/cartOperations';
+
+// How long the background watcher (below) keeps quietly re-checking a
+// payment the cashier cancelled out of while it was still pending, and how
+// often. Capped rather than indefinite — a payment the customer genuinely
+// never completes shouldn't be polled for the rest of an open-ended shift;
+// past this window it falls back to the banner's manual "Check" and to the
+// next app-restart recovery pass.
+const BACKGROUND_WATCH_INTERVAL_MS = 10000;
+const MAX_BACKGROUND_WATCH_MS = 5 * 60 * 1000;
 
 /**
  * The till. Product search, cart, payment (cash / M-Pesa), receipt, and the
@@ -100,6 +111,15 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const [mpesaModalVisible, setMpesaModalVisible] = useState(false);
   const [mpesaMode, setMpesaMode] = useState<'stk' | 'manual'>('stk');
   const [manualReceiptCode, setManualReceiptCode] = useState('');
+  // Set when reopening the M-Pesa modal against a payment recovered from a
+  // previous app session (see the recovery effect below) — carries its own
+  // frozen phone/amount/saleItems rather than reading the live cart, since
+  // the cart may have moved on by the time the cashier checks.
+  const [resumePayment, setResumePayment] = useState<PendingMpesaPayment | null>(null);
+  // A recovered payment still `pending` server-side (or whose outcome
+  // couldn't be checked — no network on this launch). Surfaced as a banner
+  // rather than an interruption, since there's nothing urgent to decide yet.
+  const [pendingBanner, setPendingBanner] = useState<PendingMpesaPayment | null>(null);
 
   const queryClient = useQueryClient();
   const navigation = useNavigation();
@@ -555,8 +575,14 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   const handleMpesaSuccess = (transactionId: string | null, receiptNumber: string | null) => {
     setMpesaModalVisible(false);
+    // A resumed modal carries its own frozen snapshot of what was being sold
+    // when the STK push went out — more trustworthy than the live cart, which
+    // this same transaction's recovery may be running well after the fact.
+    const items = resumePayment?.saleItems ?? buildSaleItems();
+    setResumePayment(null);
+    usePendingMpesaStore.getState().clear();
     createSaleMutation.mutate({
-      items: buildSaleItems(),
+      items,
       paymentMethod: 'mpesa',
       // Normal flow: link confirmed STK push transaction
       // Offline flow: no transactionId — pass receipt number for the backend to record
@@ -565,6 +591,97 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         : { mpesaReceiptNumber: receiptNumber ?? undefined }),
     });
   };
+
+  // Resolves a persisted pending payment against the server — shared by the
+  // mount-time recovery effect (a previous app session ended mid-payment)
+  // and the background watcher effect (the cashier cancelled the modal
+  // *this* session while the payment was still genuinely open, which stops
+  // the modal's own polling the instant it unmounts). Either source lands on
+  // the same three outcomes, so there's one place that decides what they mean.
+  const checkPendingPayment = React.useCallback((payment: PendingMpesaPayment) => {
+    return getTransactionStatus(payment.transactionId)
+      .then((res) => {
+        const s = res.data.status;
+        if (s === 'success') {
+          setPendingBanner(null);
+          alert({
+            type: 'confirm',
+            title: 'M-Pesa Payment Confirmed',
+            message: `A payment of ${formatCurrency(payment.amount, user?.shop?.currency)} from ${payment.phoneNumber} has gone through. Record this sale now?`,
+            buttons: [
+              { label: 'Already recorded', variant: 'ghost', onPress: () => usePendingMpesaStore.getState().clear() },
+              {
+                label: 'Record Sale',
+                onPress: () => {
+                  usePendingMpesaStore.getState().clear();
+                  createSaleMutation.mutate({
+                    items: payment.saleItems,
+                    paymentMethod: MPESA_METHOD_KEY,
+                    mpesaTransactionId: payment.transactionId,
+                  });
+                },
+              },
+            ],
+          });
+        } else if (s === 'pending') {
+          setPendingBanner(payment);
+        } else {
+          // failed / cancelled / timeout — nothing was charged, safe to drop.
+          usePendingMpesaStore.getState().clear();
+          setPendingBanner(null);
+          toast({
+            type: 'info',
+            message: `A pending M-Pesa payment of ${formatCurrency(payment.amount, user?.shop?.currency)} to ${payment.phoneNumber} did not complete.`,
+          });
+        }
+      })
+      .catch(() => {
+        // Outcome unknown (no connection right now) — keep watching/showing
+        // the banner rather than guessing either way.
+        setPendingBanner(payment);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.shop?.currency]);
+
+  // Recover an M-Pesa payment left mid-flight by a previous app session (the
+  // app was backgrounded and the process was later killed before the STK
+  // push resolved — see MpesaPaymentModal's own AppState handling for the
+  // ordinary backgrounding case, which this doesn't overlap with). Runs once
+  // per shop session.
+  useEffect(() => {
+    if (!shopId) return;
+    const payment = usePendingMpesaStore.getState().payment;
+    if (!payment) return;
+    if (payment.shopId !== shopId) {
+      // Stale record from a different shop/login — never ask about money
+      // that isn't this shop's to begin with.
+      usePendingMpesaStore.getState().clear();
+      return;
+    }
+    checkPendingPayment(payment);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId]);
+
+  // A payment the cashier cancelled out of (or that mount-time recovery
+  // found) while it was still genuinely pending. Re-checks quietly in the
+  // background so a payment the customer completes moments later is caught
+  // without the cashier needing to notice the banner and tap it — capped so
+  // an indefinitely-open till doesn't poll forever for a payment that's
+  // simply never coming. Pauses while the modal itself is open (resumed via
+  // the banner's "Check" button) so the two don't poll the same transaction
+  // at once.
+  useEffect(() => {
+    if (!pendingBanner || mpesaModalVisible) return;
+    const remaining = MAX_BACKGROUND_WATCH_MS - (Date.now() - new Date(pendingBanner.createdAt).getTime());
+    if (remaining <= 0) return;
+
+    const intervalId = setInterval(() => checkPendingPayment(pendingBanner), BACKGROUND_WATCH_INTERVAL_MS);
+    const timeoutId = setTimeout(() => clearInterval(intervalId), remaining);
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
+  }, [pendingBanner, mpesaModalVisible, checkPendingPayment]);
 
   if (!canRecordSale && !canViewSales) {
     return (
@@ -652,6 +769,35 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         backgroundColor={Colors.background}
       />
       <ActiveShiftBar />
+      {pendingBanner && (
+        <View style={styles.recoveryBanner}>
+          <Ionicons name="time-outline" size={16} color={Colors.warning} />
+          <Text style={styles.recoveryBannerText}>
+            M-Pesa payment of {formatCurrency(pendingBanner.amount, user?.shop?.currency)} to{' '}
+            {pendingBanner.phoneNumber} is still awaiting confirmation.
+          </Text>
+          <AnimatedPressable
+            onPress={() => {
+              setResumePayment(pendingBanner);
+              setPendingBanner(null);
+              setMpesaModalVisible(true);
+            }}
+            style={styles.recoveryBannerBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Check M-Pesa payment status"
+          >
+            <Text style={styles.recoveryBannerBtnText}>Check</Text>
+          </AnimatedPressable>
+          <AnimatedPressable
+            onPress={() => setPendingBanner(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          >
+            <Ionicons name="close" size={16} color={Colors.textTertiary} />
+          </AnimatedPressable>
+        </View>
+      )}
       <View style={styles.searchRow}>
         <ContextualSearchBar
           value={search}
@@ -914,12 +1060,43 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
       <MpesaPaymentModal
         visible={mpesaModalVisible}
-        phoneNumber={customerPhone}
-        amount={totalAmount}
+        phoneNumber={resumePayment?.phoneNumber ?? customerPhone}
+        amount={resumePayment?.amount ?? totalAmount}
         accountReference={undefined}
         currency={user?.shop?.currency}
         onSuccess={handleMpesaSuccess}
-        onCancel={() => setMpesaModalVisible(false)}
+        onCancel={() => {
+          setMpesaModalVisible(false);
+          // Closing the modal stops its polling outright (it unmounts). If
+          // the transaction never got a chance to resolve on its own, don't
+          // just drop it — surface the banner immediately and let the
+          // background watcher keep checking, instead of waiting for the
+          // cashier to reopen this screen.
+          const stillOpen = usePendingMpesaStore.getState().payment;
+          if (stillOpen) setPendingBanner(stillOpen);
+          setResumePayment(null);
+        }}
+        onResolved={() => {
+          // Polling itself determined this is dead — nothing left to watch.
+          usePendingMpesaStore.getState().clear();
+          setPendingBanner(null);
+        }}
+        resumeTransactionId={resumePayment?.transactionId}
+        onInitiated={
+          resumePayment
+            ? undefined
+            : (transactionId) => {
+                if (!shopId) return;
+                usePendingMpesaStore.getState().set({
+                  transactionId,
+                  shopId,
+                  phoneNumber: customerPhone,
+                  amount: totalAmount,
+                  saleItems: buildSaleItems(),
+                  createdAt: new Date().toISOString(),
+                });
+              }
+        }
       />
     </View>
     </ShiftGate>
@@ -929,6 +1106,35 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  recoveryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.warningSubtle,
+    borderWidth: 1,
+    borderColor: `${Colors.warning}30`,
+  },
+  recoveryBannerText: {
+    flex: 1,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textPrimary,
+  },
+  recoveryBannerBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.warning,
+  },
+  recoveryBannerBtnText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.white,
+  },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -969,7 +1175,13 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: Spacing.xs,
   },
-  historySection: { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg, marginBottom: Spacing.xl },
+  // marginBottom deliberately omitted — this is the last thing in the
+  // FlatList's footer, so the space above the tab bar is already the
+  // FlatList's own contentContainerStyle.paddingBottom. A marginBottom here
+  // used to stack on top of that unconditionally (unlike the pagination
+  // footer above, which is conditional), inflating the gap under the last
+  // sale card well past what the till's list screens use everywhere else.
+  historySection: { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg },
   paginationRow: {
     flexDirection: 'row',
     alignItems: 'center',

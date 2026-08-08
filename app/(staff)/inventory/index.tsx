@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { getProducts } from '@/services/products';
 import { InventoryHeader } from '@/components/inventory/InventoryHeader';
@@ -37,6 +37,10 @@ export default function StaffInventory() {
     queryKey: ['products', searchQuery],
     queryFn: () => getProducts({ search: searchQuery }),
     enabled: canViewProducts,
+    // Keep the current results (and the search bar/header) mounted while a
+    // new search term loads, instead of the whole screen — including the
+    // input the cashier is typing into — dropping to a skeleton.
+    placeholderData: keepPreviousData,
   });
 
   const allProducts = useMemo(() => data?.data || [], [data]);

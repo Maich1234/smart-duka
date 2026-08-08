@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Screen } from '@/components/ui/Screen';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { QueryError } from '@/components/ui/QueryError';
@@ -107,6 +107,11 @@ export default function BooksScreen() {
     // predates this morning's sales is worse than a spinner.
     staleTime: 0,
     retry: false,
+    // Keep the previous book/period on screen while the next one is built,
+    // instead of the document dropping to a skeleton on every tab/period
+    // tap — isPlaceholderData below marks it as stale so it's never mistaken
+    // for the freshly-built figure the staleTime:0 above is protecting.
+    placeholderData: keepPreviousData,
   });
 
   const doc = bookQuery.data;
@@ -195,7 +200,7 @@ export default function BooksScreen() {
         })}
       </View>
 
-      {bookQuery.isLoading ? (
+      {bookQuery.isLoading && !doc ? (
         <ListSkeleton rows={5} />
       ) : bookQuery.isError || !doc ? (
         <QueryError
@@ -207,6 +212,13 @@ export default function BooksScreen() {
           <View style={s.card}>
             <Text style={s.bookTitle}>{doc.title}</Text>
             <Text style={s.bookPeriod}>{doc.period.label} · in {currency}</Text>
+
+            {bookQuery.isPlaceholderData && (
+              <View style={s.updatingRow}>
+                <ActivityIndicator size="small" color={Colors.textTertiary} />
+                <Text style={s.updatingText}>Updating figures for this selection…</Text>
+              </View>
+            )}
 
             {doc.meta.estimated && (
               <View style={s.warning}>
@@ -401,6 +413,17 @@ const s = StyleSheet.create({
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  updatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  updatingText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textTertiary,
   },
   warning: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   ScrollView,
@@ -7,8 +7,10 @@ import {
   StyleSheet,
   Switch,
   TextInput,
+  BackHandler,
   type LayoutChangeEvent,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router/react-navigation';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Input } from '../ui/Input';
@@ -17,6 +19,7 @@ import { SelectPicker, type PickerOption } from '../ui/SelectPicker';
 import { HelpLink } from '../help/HelpLink';
 import { ScreenHeader } from '../ui/ScreenHeader';
 import { CommissionModal, type CommissionValue } from './CommissionModal';
+import { useAlert } from '@/context/AlertContext';
 import { formatCurrency } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
@@ -90,6 +93,8 @@ interface ProductFormProps {
   isEditing: boolean;
   loading?: boolean;
   availableProducts?: Product[];
+  /** Categories this shop has already used, for the category picker. */
+  categories?: string[];
   currency?: string;
   /**
    * Whether the viewer may set commission, and the cost of a *saved* variant.
@@ -134,12 +139,69 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   isEditing,
   loading = false,
   availableProducts = [],
+  categories = [],
   currency = 'KES',
   canManageMargins = true,
   canSetCostPrice = true,
   barcodePrefilled = false,
 }) => {
+  const { alert } = useAlert();
   const update = (patch: Partial<ProductFormData>) => setForm({ ...form, ...patch });
+
+  // Snapshot of the form as this screen was entered — an edit compares
+  // against the real saved values, a create against the (possibly
+  // barcode-prefilled) empty form. Only read inside handleCancel, so it's
+  // fine that JSON.stringify isn't cheap; it never runs on a keystroke.
+  const initialFormRef = useRef(form);
+  const isDirty = useCallback(
+    () => JSON.stringify(form) !== JSON.stringify(initialFormRef.current),
+    [form]
+  );
+
+  // Leaving mid-edit silently loses changes, so the header back button, the
+  // Cancel button, and the hardware back gesture all run this — same shape
+  // as PosScreen's confirmLeave for an in-progress sale.
+  const handleCancel = useCallback(() => {
+    if (!isDirty()) {
+      onCancel();
+      return;
+    }
+    alert({
+      type: 'confirm',
+      title: 'Discard Changes?',
+      message: isEditing
+        ? 'You have unsaved changes to this product. Leaving now will discard them.'
+        : 'You have unsaved changes. Leaving now will discard this product.',
+      buttons: [
+        { label: 'Keep Editing', variant: 'ghost' },
+        { label: 'Discard', variant: 'danger', onPress: onCancel },
+      ],
+    });
+  }, [isDirty, alert, isEditing, onCancel]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (!isDirty()) return false;
+        handleCancel();
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
+    }, [isDirty, handleCancel])
+  );
+
+  // Categories are stored lowercase; the picker shows them capitalized for
+  // readability but always writes back the same lowercase value that's
+  // already sent on save (see buildProductPayload), so display casing here
+  // never affects what's actually stored or matched against.
+  // Memoized: `form` (and so this component) re-renders on every keystroke
+  // anywhere in this fairly large form, and `categories` only changes when
+  // the underlying query result does.
+  const categoryOptions: PickerOption[] = useMemo(
+    () => categories.map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) })),
+    [categories],
+  );
 
   // Both screens that host this form live inside the owner tab group, whose
   // tab bar is absolutely positioned over the content — a fixed bottom pad
@@ -289,7 +351,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       <ScreenHeader
         title={isEditing ? 'Edit Product' : 'Add Product'}
         subtitle={isEditing ? 'Update product details' : 'Create a new product for your inventory'}
-        onBack={onCancel}
+        onBack={handleCancel}
         insetTop={false}
         right={<HelpLink slug="product-types" label="Help" />}
       />
@@ -343,12 +405,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           />
           <View style={styles.row}>
             <View style={styles.flexInput} onLayout={registerFieldY('category')}>
-              <Input
+              <SelectPicker
                 label="Category"
                 placeholder="Select category"
                 value={form.category}
-                onChangeText={(t) => { update({ category: t }); if (errors.category) setErrors((e) => ({ ...e, category: '' })); }}
-                rightIcon="chevron-down"
+                options={categoryOptions}
+                onChange={(v) => { update({ category: v }); if (errors.category) setErrors((e) => ({ ...e, category: '' })); }}
+                searchable={categoryOptions.length > 5}
+                allowCustom
+                customLabel="Other"
+                customPlaceholder="Type a new category"
                 error={errors.category}
               />
             </View>
@@ -920,7 +986,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
         {/* ── Actions ── */}
         <View style={styles.buttonRow}>
-          <Button title="Cancel" variant="outline" onPress={onCancel} style={styles.flexBtn} />
+          <Button title="Cancel" variant="outline" onPress={handleCancel} style={styles.flexBtn} />
           <Button
             title={isEditing ? 'Save Changes' : 'Add Product'}
             leftIcon={isEditing ? undefined : 'add-circle-outline'}

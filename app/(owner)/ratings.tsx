@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, RefreshControl, ScrollView } from 'react-native
 import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
@@ -208,6 +208,9 @@ export default function CustomerReviews() {
     getNextPageParam: (last) =>
       last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
     initialPageParam: 1,
+    // Keep showing the previous filter's reviews while the new one loads,
+    // instead of the whole screen dropping to a skeleton on every chip tap.
+    placeholderData: keepPreviousData,
   });
 
   const reviews = data?.pages.flatMap((p) => p.data) ?? [];
@@ -220,7 +223,7 @@ export default function CustomerReviews() {
     setFilter(next);
   };
 
-  if (isLoading) return <ListSkeleton rows={5} heroHeight={190} />;
+  if (isLoading && reviews.length === 0) return <ListSkeleton rows={5} heroHeight={190} />;
 
   return (
     <FlashList

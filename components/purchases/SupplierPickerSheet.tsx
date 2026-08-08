@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -41,6 +41,9 @@ export const SupplierPickerSheet: React.FC<SupplierPickerSheetProps> = ({ visibl
     queryKey: ['suppliers', searchQuery],
     queryFn: () => getSuppliers({ search: searchQuery, limit: 20 }),
     enabled: visible,
+    // Keep the current matches on screen while a new search term loads,
+    // instead of swapping the list for a spinner on every keystroke.
+    placeholderData: keepPreviousData,
   });
   const suppliers = data?.data ?? [];
 

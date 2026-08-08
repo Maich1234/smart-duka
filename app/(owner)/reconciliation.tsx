@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { PeriodSegmentControl } from '@/components/reports/PeriodSegmentControl';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -98,6 +98,9 @@ function CashiersSection() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['reconciliation-cashiers', period],
     queryFn: () => getCashierReconciliation({ period: toReconciliationPeriod(period) }),
+    // Keep the current period's cashiers on screen while the next period
+    // loads, instead of the list dropping to a skeleton on every tab tap.
+    placeholderData: keepPreviousData,
   });
 
   const enabled = data?.enabled ?? true;
@@ -109,7 +112,7 @@ function CashiersSection() {
         <PeriodSegmentControl value={period} onChange={setPeriod} />
       </View>
 
-      {isLoading ? (
+      {isLoading && !data ? (
         <ListSkeleton rows={4} />
       ) : isError ? (
         <QueryError onRetry={refetch} />
@@ -141,6 +144,9 @@ function MonthlySection() {
     // Rwanda...) that shifts the 1st back a day, so "August" would silently
     // fetch July's numbers.
     queryFn: () => getMonthlyReconciliation({ date: `${monthKey(monthDate)}-01` }),
+    // Keep the current month's figures on screen while the next month loads,
+    // instead of the whole card dropping to a skeleton on every month tap.
+    placeholderData: keepPreviousData,
   });
 
   const changeMonth = (delta: number) => {
@@ -180,7 +186,7 @@ function MonthlySection() {
         </AnimatedPressable>
       </View>
 
-      {isLoading ? (
+      {isLoading && !data ? (
         <ListSkeleton rows={3} />
       ) : isError ? (
         <QueryError onRetry={refetch} />

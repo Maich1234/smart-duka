@@ -11,7 +11,7 @@ import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -72,6 +72,9 @@ export default function PaymentsScreen() {
     getNextPageParam: (last) =>
       last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
     initialPageParam: 1,
+    // Keep showing the current transactions while a new search/status filter
+    // loads, instead of the list dropping to blank/empty mid-fetch.
+    placeholderData: keepPreviousData,
   });
 
   const allTransactions = data?.pages.flatMap((p) => p.data) ?? [];

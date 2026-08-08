@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { useAlert } from '@/context/AlertContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { getProducts, createProduct } from '@/services/products';
+import { getProducts, getProductCategories, createProduct } from '@/services/products';
 import { getShopConfig } from '@/services/shop';
 import { Screen } from '@/components/ui/Screen';
 import { ProductForm, type ProductFormData } from '@/components/inventory/ProductForm';
 import { buildProductPayload, EMPTY_PRODUCT_FORM } from './productPayload';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { isOfflineQueued, mutationErrorMessage } from '@/utils/errors';
+
+// Stable reference so ProductForm's categoryOptions memo isn't invalidated by
+// a fresh `[]` on every render while the categories query is still loading.
+const EMPTY_CATEGORIES: string[] = [];
 
 /**
  * Create a product. Mounted under both role trees — owners always, and staff
@@ -37,11 +41,17 @@ export function NewProductScreen() {
   const availableProducts = (data?.data || []).filter((p) =>
     ['standard', 'variable', 'weighted', 'refillable'].includes(p.productType)
   );
+  const { data: categoriesData } = useQuery({ queryKey: ['productCategories'], queryFn: getProductCategories });
+  const categories = categoriesData?.data ?? EMPTY_CATEGORIES;
 
   const createMutation = useMutation({
     mutationFn: createProduct,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      // A brand-new category typed on this product should be selectable the
+      // next time someone opens this picker, not just after a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ['productCategories'] });
+      toast({ type: 'success', message: `${data.data.name} added to your inventory` });
       router.back();
     },
     onError: (error: any) => {
@@ -70,6 +80,7 @@ export function NewProductScreen() {
         isEditing={false}
         loading={createMutation.isPending}
         availableProducts={availableProducts}
+        categories={categories}
         currency={currency}
         canManageMargins={marginAccess.canManageMargins}
         canSetCostPrice={marginAccess.canSetCostPrice}

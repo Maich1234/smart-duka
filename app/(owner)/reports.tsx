@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -60,6 +60,9 @@ export default function OwnerReports() {
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['salesReport', period],
     queryFn: () => getSalesReport(period),
+    // Keep showing the current period's report while the next one loads,
+    // instead of the whole screen dropping to a skeleton on every tab tap.
+    placeholderData: keepPreviousData,
   });
 
   const { data: ratingsData } = useQuery({

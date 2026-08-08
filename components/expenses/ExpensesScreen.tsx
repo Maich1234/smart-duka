@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   getExpenses,
@@ -75,6 +75,9 @@ export const ExpensesScreen: React.FC = () => {
     queryKey: ['expenses', page],
     queryFn: () => getExpenses({ page, limit: 10 }),
     enabled: canManageExpenses,
+    // Keep the current page's expenses mounted while the next page loads,
+    // instead of the whole screen dropping to a full-screen loading state.
+    placeholderData: keepPreviousData,
   });
 
   const { data: summaryData } = useQuery({

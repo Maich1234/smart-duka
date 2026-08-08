@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getStaff } from '@/services/staff';
@@ -52,6 +52,9 @@ export default function OwnerStaffList() {
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['staff', searchQuery, page],
     queryFn: () => getStaff({ search: searchQuery, page, limit: 10 }),
+    // Keep the current team list mounted while a new search/page loads,
+    // instead of the whole screen dropping to a skeleton.
+    placeholderData: keepPreviousData,
   });
 
   // Independent of the paginated/searched list: a request must not disappear

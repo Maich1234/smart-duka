@@ -137,7 +137,10 @@
       "Bash(node --test tests/reconciliation.test.js)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('expo',{}\\).get\\('plugins',[]\\), indent=2\\)\\)\")",
       "Bash(node --check src/models/Product.js)",
-      "Bash(node --check src/validations/productValidation.js)"
+      "Bash(node --check src/validations/productValidation.js)",
+      "Bash(echo \"MOBILE_EXIT:$?\")",
+      "Bash(git status *)",
+      "Bash(grep -iE \"\\(api[_-]?key|secret|password|token|private[_-]?key\\)\\\\s*[:=]\\\\s*['\\\\\"][a-zA-Z0-9]{10,}\")"
     ],
     "additionalDirectories": [
       "/tmp",

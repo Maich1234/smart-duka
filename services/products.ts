@@ -172,6 +172,15 @@ export const getProducts = async (params?: {
 };
 
 /**
+ * Distinct categories this shop has already used, for the category picker on
+ * the product form — sorted, lowercase (categories are stored lowercase).
+ */
+export const getProductCategories = async (): Promise<{ success: boolean; data: string[] }> => {
+  const response = await api.get('/products/categories');
+  return response.data;
+};
+
+/**
  * Get single product by ID
  */
 export const getProductById = async (id: string): Promise<ProductResponse> => {

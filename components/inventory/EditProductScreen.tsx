@@ -3,12 +3,16 @@ import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { getProductById, getProducts, updateProduct, type Product, type UpdateProductData } from '@/services/products';
+import { getProductById, getProducts, getProductCategories, updateProduct, type Product, type UpdateProductData } from '@/services/products';
 import { getShopConfig } from '@/services/shop';
 import { Screen } from '@/components/ui/Screen';
 import { ProductForm, type ProductFormData } from '@/components/inventory/ProductForm';
 import { buildProductPayload } from './productPayload';
 import { useAuthStore, type AuthState } from '@/store/authStore';
+
+// Stable reference so ProductForm's categoryOptions memo isn't invalidated by
+// a fresh `[]` on every render while the categories query is still loading.
+const EMPTY_CATEGORIES: string[] = [];
 
 /** The saved product rendered into the shape ProductForm edits. */
 const toFormData = (product: Product): ProductFormData => ({
@@ -97,12 +101,18 @@ function EditProductForm({ id, product }: { id: string; product: Product }) {
   const availableProducts = (productsData?.data || []).filter(
     (p) => p._id !== id && ['standard', 'variable', 'weighted', 'refillable'].includes(p.productType)
   );
+  const { data: categoriesData } = useQuery({ queryKey: ['productCategories'], queryFn: getProductCategories });
+  const categories = categoriesData?.data ?? EMPTY_CATEGORIES;
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateProductData) => updateProduct(id, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product', id] });
+      // A category renamed to something new here should show up next time
+      // this picker opens, not just after a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ['productCategories'] });
+      toast({ type: 'success', message: `${data.data.name} updated` });
       router.back();
     },
     onError: (error: any) =>
@@ -124,6 +134,7 @@ function EditProductForm({ id, product }: { id: string; product: Product }) {
         isEditing
         loading={updateMutation.isPending}
         availableProducts={availableProducts}
+        categories={categories}
         currency={currency}
         canManageMargins={marginAccess.canManageMargins}
         canSetCostPrice={marginAccess.canSetCostPrice}

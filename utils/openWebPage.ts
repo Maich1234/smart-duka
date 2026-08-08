@@ -8,7 +8,10 @@ import * as WebBrowser from 'expo-web-browser';
  * `Linking.openURL`.
  */
 export function openWebPage(url: string) {
-  WebBrowser.openBrowserAsync(url);
+  // createTask: false keeps Custom Tabs in the app's own task on Android —
+  // without it, the browser opens as a separate entry in the recents/app
+  // switcher, breaking the in-app feel.
+  WebBrowser.openBrowserAsync(url, { createTask: false });
 }
 
 /**

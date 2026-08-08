@@ -4,7 +4,7 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { QueryError } from '@/components/ui/QueryError';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
@@ -68,6 +68,10 @@ export default function DailySummaryScreen() {
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['dailySummary', date],
     queryFn: () => getDailySummary(date),
+    // Keep showing the current day's summary while the next day loads,
+    // instead of the whole body dropping to a skeleton on every tap of the
+    // day switcher.
+    placeholderData: keepPreviousData,
   });
 
   const summary = data?.data;

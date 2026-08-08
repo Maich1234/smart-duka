@@ -7,6 +7,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  AppState,
 } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -41,6 +42,31 @@ interface Props {
   onSuccess: (transactionId: string | null, mpesaReceiptNumber: string | null) => void;
   onCancel: () => void;
   currency?: string;
+  /**
+   * Fires once the STK push has been accepted and is awaiting the customer —
+   * the caller's cue to persist enough to recover this transaction if the app
+   * is backgrounded and killed before it resolves. Not called in resume mode
+   * (the caller already has a record; this would just overwrite its
+   * `saleItems` snapshot with whatever's in the cart *now*).
+   */
+  onInitiated?: (transactionId: string) => void;
+  /**
+   * Skips sending a new STK push and polls this existing transaction instead
+   * — for reopening the modal against a payment recovered from a previous
+   * app session. Never fire a second STK push for the same sale.
+   */
+  resumeTransactionId?: string;
+  /**
+   * Fires once, the moment polling independently determines the transaction
+   * is dead (`failed`/`cancelled`/`timeout`) — not just when the cashier
+   * dismisses that screen. Closing this modal (onCancel) unmounts it, which
+   * stops polling entirely; without this, a payment the cashier cancelled on
+   * while it was still genuinely pending would leave the caller's persisted
+   * record dangling with nothing to distinguish "still open" from "already
+   * resolved." Never fires for `success` — that has its own explicit
+   * `onSuccess`, tied to the cashier confirming the sale.
+   */
+  onResolved?: (status: 'failed' | 'cancelled' | 'timeout') => void;
 }
 
 type ModalStatus = 'initiating' | 'pending' | 'success' | 'failed' | 'cancelled' | 'timeout';
@@ -65,10 +91,13 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
   onSuccess,
   onCancel,
   currency = 'KES',
+  onInitiated,
+  resumeTransactionId,
+  onResolved,
 }) => {
   const { toast } = useAlert();
-  const [status, setStatus] = useState<ModalStatus>('initiating');
-  const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [status, setStatus] = useState<ModalStatus>(resumeTransactionId ? 'pending' : 'initiating');
+  const [transactionId, setTransactionId] = useState<string | null>(resumeTransactionId ?? null);
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isOfflineEntry, setIsOfflineEntry] = useState(false);
@@ -122,6 +151,23 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
     else if (status === 'cancelled' || status === 'timeout') haptics.warning();
   }, [status]);
 
+  // Tell the caller the instant polling itself determines this transaction
+  // is dead — not only when the cashier acknowledges the screen. The cashier
+  // cancelling *before* this fires (while still `pending`) is a distinct,
+  // still-open case the caller handles via onCancel instead.
+  useEffect(() => {
+    if (status === 'failed' || status === 'cancelled' || status === 'timeout') {
+      onResolved?.(status);
+    }
+    // onResolved is a caller-supplied callback, not reactive state this
+    // effect should re-run for — only the status transition matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  // Currently-polled transaction, so an app-resume check (below) can poll the
+  // right id without waiting for the next interval tick.
+  const activeTxIdRef = useRef<string | null>(null);
+
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
@@ -131,11 +177,59 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
       clearInterval(countdownRef.current);
       countdownRef.current = null;
     }
+    activeTxIdRef.current = null;
   }, []);
+
+  // One status check. Shared by the interval tick and the app-resume handler
+  // so backgrounding the app doesn't leave the cashier stuck until the next
+  // scheduled tick — iOS/Android both throttle or fully suspend JS timers
+  // while backgrounded, so the interval alone can go silent for minutes.
+  const checkStatusOnce = useCallback(async (txId: string) => {
+    const elapsed = Date.now() - startTimeRef.current;
+    if (elapsed > MAX_POLL_DURATION_MS) {
+      stopPolling();
+      setStatus('timeout');
+      return;
+    }
+    try {
+      const res = await getTransactionStatus(txId);
+      consecutiveErrorsRef.current = 0;
+      const s = res.data.status as MpesaTransactionStatus;
+      if (s !== 'pending') {
+        stopPolling();
+        if (s === 'success') {
+          setReceiptNumber(res.data.mpesaReceiptNumber);
+          setStatus('success');
+        } else if (s === 'cancelled') {
+          setStatus('cancelled');
+        } else if (s === 'timeout') {
+          setStatus('timeout');
+        } else {
+          setErrorMessage(res.data.errorMessage ?? 'Payment was not completed.');
+          setStatus('failed');
+        }
+      }
+    } catch (err: any) {
+      // Distinguish transient network jitter from persistent server errors.
+      // After MAX_CONSECUTIVE_ERRORS back-to-back failures we surface an error
+      // rather than leaving staff waiting for the full 120s countdown.
+      const isNetworkError = !err?.response;
+      if (!isNetworkError) {
+        consecutiveErrorsRef.current += 1;
+        if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+          stopPolling();
+          setErrorMessage(err.response?.data?.message ?? 'Unable to reach payment server. Check your connection.');
+          setStatus('failed');
+        }
+      }
+      // Pure network jitter — keep polling silently.
+    }
+  }, [stopPolling]);
 
   const beginPolling = useCallback((txId: string) => {
     stopPolling();
     consecutiveErrorsRef.current = 0;
+    activeTxIdRef.current = txId;
 
     // Live countdown so staff know how long is left.
     const totalSeconds = Math.round(MAX_POLL_DURATION_MS / 1000);
@@ -150,48 +244,29 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
       });
     }, 1000);
 
-    pollRef.current = setInterval(async () => {
-      const elapsed = Date.now() - startTimeRef.current;
-      if (elapsed > MAX_POLL_DURATION_MS) {
-        stopPolling();
-        setStatus('timeout');
-        return;
+    pollRef.current = setInterval(() => { checkStatusOnce(txId); }, POLL_INTERVAL_MS);
+  }, [stopPolling, checkStatusOnce]);
+
+  // Backgrounding suspends/throttles the interval above; resuming should
+  // re-sync immediately rather than leaving a stale "waiting" screen up for
+  // however long is left on the throttled tick. The transaction itself lives
+  // on the server (keyed by activeTxIdRef, not component state), so this is
+  // a plain re-check, never a new STK push.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active' && activeTxIdRef.current && pollRef.current) {
+        checkStatusOnce(activeTxIdRef.current);
+        // Also re-sync the visible countdown against wall-clock time so it
+        // doesn't sit frozen at the value it had when the app backgrounded.
+        const remaining = Math.max(
+          0,
+          Math.round((MAX_POLL_DURATION_MS - (Date.now() - startTimeRef.current)) / 1000)
+        );
+        setCountdown(remaining);
       }
-      try {
-        const res = await getTransactionStatus(txId);
-        consecutiveErrorsRef.current = 0;
-        const s = res.data.status as MpesaTransactionStatus;
-        if (s !== 'pending') {
-          stopPolling();
-          if (s === 'success') {
-            setReceiptNumber(res.data.mpesaReceiptNumber);
-            setStatus('success');
-          } else if (s === 'cancelled') {
-            setStatus('cancelled');
-          } else if (s === 'timeout') {
-            setStatus('timeout');
-          } else {
-            setErrorMessage(res.data.errorMessage ?? 'Payment was not completed.');
-            setStatus('failed');
-          }
-        }
-      } catch (err: any) {
-        // Distinguish transient network jitter from persistent server errors.
-        // After MAX_CONSECUTIVE_ERRORS back-to-back failures we surface an error
-        // rather than leaving staff waiting for the full 120s countdown.
-        const isNetworkError = !err?.response;
-        if (!isNetworkError) {
-          consecutiveErrorsRef.current += 1;
-          if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
-            stopPolling();
-            setErrorMessage(err.response?.data?.message ?? 'Unable to reach payment server. Check your connection.');
-            setStatus('failed');
-          }
-        }
-        // Pure network jitter — keep polling silently.
-      }
-    }, POLL_INTERVAL_MS);
-  }, [stopPolling]);
+    });
+    return () => sub.remove();
+  }, [checkStatusOnce]);
 
   const sendSTKPush = useCallback(async (key: string) => {
     setStatus('initiating');
@@ -227,19 +302,37 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
 
       setStatus('pending');
       startTimeRef.current = Date.now();
+      onInitiated?.(res.data.transactionId);
       beginPolling(res.data.transactionId);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || err.message || 'Failed to send payment request');
       setStatus('failed');
     }
-  }, [phoneNumber, amount, accountReference, beginPolling]);
+  }, [phoneNumber, amount, accountReference, beginPolling, onInitiated]);
 
-  // Start the STK Push on mount. Mounting *is* the open, and every field above
-  // is already at its initial value, so there is nothing to reset first.
+  // Start the STK Push on mount, unless reopening against an already-sent
+  // one — mounting *is* the open, and every field above is already at its
+  // initial value, so there is nothing to reset first.
   useEffect(() => {
-    // New payment intent → new idempotency key
-    idempotencyKeyRef.current = randomUUID();
-    sendSTKPush(idempotencyKeyRef.current);
+    if (resumeTransactionId) {
+      // Re-check immediately rather than waiting out the first poll interval
+      // — this mount likely *is* the cashier asking "did it go through?"
+      // after a recovered payment banner. `transactionId` and `status` are
+      // already initialised above for this case. Both calls below set state
+      // synchronously (checkStatusOnce on its stale-timeout path, beginPolling
+      // via its countdown seed), so both are deferred a macrotask — same
+      // pattern as useShiftClock's kickoff in ShiftGate.tsx — to keep them
+      // out of the effect's own synchronous pass.
+      startTimeRef.current = Date.now();
+      setTimeout(() => {
+        checkStatusOnce(resumeTransactionId);
+        beginPolling(resumeTransactionId);
+      }, 0);
+    } else {
+      // New payment intent → new idempotency key
+      idempotencyKeyRef.current = randomUUID();
+      sendSTKPush(idempotencyKeyRef.current);
+    }
 
     return () => {
       stopPolling();
@@ -249,9 +342,12 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
 
   /**
    * Retry: reuses the SAME idempotency key so the server knows this is a retry
-   * of the same payment intent — not a new one.
+   * of the same payment intent — not a new one. A resumed modal never sent
+   * its own STK push, so it has no key yet; a retry from there is genuinely
+   * a fresh attempt and needs one minted now.
    */
   const handleRetry = () => {
+    if (!idempotencyKeyRef.current) idempotencyKeyRef.current = randomUUID();
     sendSTKPush(idempotencyKeyRef.current);
   };
 

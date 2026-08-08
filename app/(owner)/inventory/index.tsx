@@ -13,7 +13,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getProducts, deleteProduct, updateStock, type Product } from '@/services/products';
@@ -102,6 +102,10 @@ export default function OwnerInventory() {
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['products', searchQuery, page],
     queryFn: () => getProducts({ search: searchQuery, page, limit: 10 }),
+    // Keep showing the current page/search results while the next one loads,
+    // instead of the whole screen (search bar included) dropping to a
+    // skeleton on every keystroke or page change.
+    placeholderData: keepPreviousData,
   });
 
   const deleteMutation = useMutation({

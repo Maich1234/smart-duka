@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PeriodSegmentControl } from '@/components/reports/PeriodSegmentControl';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
@@ -34,6 +34,9 @@ export default function MyReconciliationScreen() {
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['my-reconciliation', period],
     queryFn: () => getCashierReconciliation({ period: toReconciliationPeriod(period) }),
+    // Keep the current period's figures on screen while the next period
+    // loads, instead of the card dropping to a skeleton on every tab tap.
+    placeholderData: keepPreviousData,
   });
 
   const enabled = data?.enabled ?? true;
@@ -54,7 +57,7 @@ export default function MyReconciliationScreen() {
         <PeriodSegmentControl value={period} onChange={setPeriod} />
       </View>
 
-      {isLoading ? (
+      {isLoading && !data ? (
         <ListSkeleton rows={3} />
       ) : isError ? (
         <QueryError onRetry={refetch} />

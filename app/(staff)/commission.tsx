@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Screen } from '@/components/ui/Screen';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getMyCommission } from '@/services/sales';
@@ -24,6 +24,9 @@ export default function StaffCommission() {
     queryKey: ['myCommission', period],
     queryFn: () => getMyCommission({ startDate, endDate }),
     enabled: eligible,
+    // Keep showing the current period's figures while the next one loads,
+    // instead of the card dropping to a skeleton on every period tap.
+    placeholderData: keepPreviousData,
   });
 
   const forbidden = (error as any)?.response?.status === 403;

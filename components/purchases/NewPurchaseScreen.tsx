@@ -5,7 +5,7 @@ import { useNavigation } from 'expo-router/react-navigation';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAlert } from '@/context/AlertContext';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { purchasingBasePath } from '@/utils/purchasingRoutes';
@@ -75,6 +75,9 @@ export function NewPurchaseScreen() {
     queryKey: ['products', searchQuery, productsPage, EXCLUDE_TYPES],
     queryFn: () => getProducts({ search: searchQuery, page: productsPage, limit: 10, excludeTypes: EXCLUDE_TYPES }),
     enabled: canCreate,
+    // Keep the current matches mounted while a new search/page loads,
+    // instead of the list flashing empty on every keystroke.
+    placeholderData: keepPreviousData,
   });
   // Server already hides bundle/service; this only catches the rarer
   // untracked-inventory case, which isn't a distinct productType to filter on.

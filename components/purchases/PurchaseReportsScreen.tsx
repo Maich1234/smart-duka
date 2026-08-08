@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -89,6 +89,9 @@ export function PurchaseReportsScreen() {
     queryKey: ['purchaseAnalytics', period],
     queryFn: () => getPurchaseAnalytics({ period }),
     enabled: canView && canViewPrices,
+    // Keep showing the current period's analytics while the next one loads,
+    // instead of the whole screen dropping to a skeleton on every tab tap.
+    placeholderData: keepPreviousData,
   });
 
   if (!canView || !canViewPrices) {
@@ -105,11 +108,12 @@ export function PurchaseReportsScreen() {
     );
   }
 
-  if (isLoading) {
+  const analytics = data?.data;
+
+  if (isLoading && !analytics) {
     return <ListSkeleton rows={4} heroHeight={180} />;
   }
 
-  const analytics = data?.data;
   if (isError || !analytics) {
     return <QueryError onRetry={refetch} />;
   }
