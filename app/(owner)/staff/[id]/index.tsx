@@ -13,7 +13,11 @@ import { getShopConfig } from '@/services/shop';
 import { ResetPasswordModal } from '@/components/staff/ResetPasswordModal';
 import { StaffDeletionRequestCard } from '@/components/staff/StaffDeletionRequestCard';
 import { CommissionCard, getCommissionPeriodRange, type CommissionPeriod } from '@/components/sales/CommissionCard';
+import { SaleCard } from '@/components/sales/SaleCard';
+import { getSales } from '@/services/sales';
+import { getShifts } from '@/services/shifts';
 import { haptics } from '@/utils/haptics';
+import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -77,6 +81,17 @@ export default function StaffDetailsScreen() {
 
   const { data: shopData } = useQuery({ queryKey: ['shop'], queryFn: getShopConfig });
   const currency = shopData?.data?.currency ?? 'KES';
+
+  // Recent sales (incl. voided) and shift history — a lightweight "what has
+  // this person actually done" view, mirroring the web staff detail page.
+  const { data: recentSalesData, isLoading: isSalesLoading } = useQuery({
+    queryKey: ['staff-sales', id],
+    queryFn: () => getSales({ staffId: id, limit: 5 }),
+  });
+  const { data: recentShiftsData, isLoading: isShiftsLoading } = useQuery({
+    queryKey: ['staff-shifts', id],
+    queryFn: () => getShifts({ staffId: id, limit: 5 }),
+  });
 
   const isOnCommission = data?.data?.commissionEligible === true;
   const { startDate, endDate } = getCommissionPeriodRange(commissionPeriod);
@@ -221,6 +236,61 @@ export default function StaffDetailsScreen() {
           <Ionicons name="trash-outline" size={16} color={Colors.danger} />
           <Text style={[styles.actionBtnText, { color: Colors.danger }]}>Delete</Text>
         </AnimatedPressable>
+      </View>
+
+      {/* Sales & Shifts */}
+      <View style={styles.permissionsSection}>
+        <Text style={styles.sectionTitle}>Sales & Shifts</Text>
+        <Text style={styles.sectionSubtitle}>Recent activity for this staff member.</Text>
+        <View style={styles.permissionsCard}>
+          <View style={styles.categoryBlock}>
+            <Text style={styles.categoryTitle}>Recent sales</Text>
+            {isSalesLoading ? (
+              <Text style={styles.footerText}>Loading…</Text>
+            ) : (recentSalesData?.data.length ?? 0) === 0 ? (
+              <Text style={styles.footerText}>No sales recorded yet.</Text>
+            ) : (
+              recentSalesData!.data.map((sale) => (
+                <SaleCard key={sale._id} sale={sale} currency={currency} />
+              ))
+            )}
+          </View>
+          <View style={[styles.categoryBlock, styles.categoryBlockBorder]}>
+            <Text style={styles.categoryTitle}>Recent shifts</Text>
+            {isShiftsLoading ? (
+              <Text style={styles.footerText}>Loading…</Text>
+            ) : (recentShiftsData?.data.length ?? 0) === 0 ? (
+              <Text style={styles.footerText}>No shifts recorded yet.</Text>
+            ) : (
+              recentShiftsData!.data.map((shift) => {
+                const discrepancy = shift.summary?.cashDiscrepancy;
+                const badge = shift.status === 'active'
+                  ? { label: 'OPEN', color: Colors.primary, bg: Colors.primarySubtle }
+                  : discrepancy == null
+                  ? { label: 'NOT COUNTED', color: Colors.textTertiary, bg: Colors.divider }
+                  : discrepancy === 0
+                  ? { label: 'BALANCED', color: Colors.success, bg: Colors.successSubtle }
+                  : {
+                      label: discrepancy > 0 ? `OVER ${formatCurrency(discrepancy, currency)}` : `SHORT ${formatCurrency(Math.abs(discrepancy), currency)}`,
+                      color: Colors.danger,
+                      bg: Colors.dangerSubtle,
+                    };
+                return (
+                  <AnimatedPressable
+                    key={shift._id}
+                    style={styles.shiftRow}
+                    onPress={() => router.push(`/(owner)/shifts/${shift._id}`)}
+                  >
+                    <Text style={styles.permissionLabel}>{formatDateTime(shift.startedAt)}</Text>
+                    <View style={[styles.shiftBadge, { backgroundColor: badge.bg }]}>
+                      <Text style={[styles.shiftBadgeText, { color: badge.color }]}>{badge.label}</Text>
+                    </View>
+                  </AnimatedPressable>
+                );
+              })
+            )}
+          </View>
+        </View>
       </View>
 
       {/* Sales & Commission */}
@@ -460,6 +530,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     paddingVertical: 7,
+  },
+  shiftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    paddingVertical: 8,
+  },
+  shiftBadge: {
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  shiftBadgeText: {
+    fontSize: 10,
+    fontFamily: Typography.fontFamilySemiBold,
+    letterSpacing: 0.3,
   },
   permissionLabel: {
     fontSize: Typography.size.body,

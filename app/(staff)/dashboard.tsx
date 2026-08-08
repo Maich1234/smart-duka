@@ -52,6 +52,7 @@ export default function StaffDashboard() {
   const insets = useSafeAreaInsets();
   const canManageExpenses = usePermission('manage_expenses');
   const canViewPurchases = usePermission('view_purchases');
+  const canViewReconciliation = usePermission('view_reconciliation');
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['staffDashboard'],
     queryFn: getStaffDashboard,
@@ -66,6 +67,8 @@ export default function StaffDashboard() {
   // earning any. A tile leading to a permanent zero reads as a broken feature.
   const showCommissionTile =
     (shopConfigData?.data?.showStaffCommission ?? false) && user?.commissionEligible === true;
+  const showReconciliationTile =
+    canViewReconciliation && (shopConfigData?.data?.shiftManagementEnabled ?? false);
 
   const [timeContext, setTimeContext] = useState({
     greeting: getGreeting(),
@@ -97,8 +100,11 @@ export default function StaffDashboard() {
     if (showCommissionTile) {
       list.push({ id: 'commission', title: 'My Commission', icon: 'cash-outline', tint: Colors.success, tintBg: Colors.primarySubtle, route: '/(staff)/commission' });
     }
+    if (showReconciliationTile) {
+      list.push({ id: 'reconciliation', title: 'My Reconciliation', icon: 'swap-horizontal-outline', tint: Colors.info, tintBg: Colors.primarySubtle, route: '/(staff)/reconciliation' });
+    }
     return list;
-  }, [canManageExpenses, showPurchasesTile, showCommissionTile]);
+  }, [canManageExpenses, showPurchasesTile, showCommissionTile, showReconciliationTile]);
 
   const unreadCount = useUnreadNotificationsCount();
 

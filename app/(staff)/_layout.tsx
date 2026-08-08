@@ -238,6 +238,7 @@ export default function StaffLayout() {
       <Tabs.Screen name="purchases" options={{ title: 'Purchases', href: null, headerShown: false }} />
       <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
       <Tabs.Screen name="commission" options={{ title: 'My Commission', href: null }} />
+      <Tabs.Screen name="reconciliation" options={{ title: 'My Reconciliation', href: null }} />
       <Tabs.Screen name="printer" options={{ title: 'Receipt Printer', href: null }} />
     </Tabs>
   );

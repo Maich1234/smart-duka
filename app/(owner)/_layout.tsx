@@ -337,6 +337,13 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="reconciliation"
+        options={{
+          title: 'Reconciliation',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="ratings"
         options={{
           title: 'Customer Reviews',

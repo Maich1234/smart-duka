@@ -349,6 +349,14 @@ const SHORTCUTS = [
     route: '/(owner)/shifts',
   },
   {
+    id: 'reconciliation',
+    label: 'Reconciliation',
+    sub: 'Cashiers & cash',
+    icon: 'swap-horizontal-outline' as const,
+    colors: ['#334155', '#64748B'] as [string, string],
+    route: '/(owner)/reconciliation',
+  },
+  {
     id: 'expenses',
     label: 'Expenses',
     sub: 'Track costs',

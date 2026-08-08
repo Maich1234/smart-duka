@@ -147,12 +147,13 @@ export const createSale = async (data: CreateSaleData): Promise<SaleResponse> =>
 /**
  * Get all sales with filters
  * Owner sees all; staff sees only their own unless granted 'view_all_sales' permission
- * @param params - startDate, endDate, staffId, paymentMethod, page, limit
+ * @param params - startDate, endDate, staffId, status, paymentMethod, page, limit
  */
 export const getSales = async (params?: {
   startDate?: string;
   endDate?: string;
   staffId?: string;
+  status?: 'completed' | 'voided' | 'refund_pending' | 'refunded';
   paymentMethod?: string;
   /** Server-side search across invoice number and cashier name */
   search?: string;
