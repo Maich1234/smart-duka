@@ -233,6 +233,9 @@ export default function StaffLayout() {
       <Tabs.Screen name="inventory" options={{ title: 'Stock', headerShown: false }} />
       <Tabs.Screen name="sales"     options={{ title: 'Sales',  headerShown: false }} />
       <Tabs.Screen name="profile"   options={{ title: 'Profile' }} />
+      {/* The till's barcode scanner. Pushed from PosScreen's search bar,
+          never reachable from the tab bar. */}
+      <Tabs.Screen name="scan" options={{ title: 'Scan Barcode', href: null, headerShown: false }} />
       {/* Draws its own ScreenHeader — it carries the Add Expense action. */}
       <Tabs.Screen name="expenses"  options={{ title: 'Expenses', href: null, headerShown: false }} />
       <Tabs.Screen name="purchases" options={{ title: 'Purchases', href: null, headerShown: false }} />

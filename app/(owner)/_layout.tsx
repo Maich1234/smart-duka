@@ -266,6 +266,16 @@ export default function OwnerLayout() {
           headerShown: false,
         }}
       />
+      {/* The till's barcode scanner. Pushed from PosScreen's search bar,
+          never reachable from the tab bar — see pos.tsx above. */}
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: 'Scan Barcode',
+          href: null,
+          headerShown: false,
+        }}
+      />
       <Tabs.Screen
         name="staff"
         options={{

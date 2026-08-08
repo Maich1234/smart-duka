@@ -14,6 +14,8 @@ import { useAuthStore, type AuthState } from '@/store/authStore';
 const toFormData = (product: Product): ProductFormData => ({
   name: product.name,
   category: product.category,
+  sku: product.sku ?? '',
+  barcode: product.barcode ?? '',
   sellingPrice: String(product.sellingPrice),
   costPrice: String(product.costPrice ?? ''),
   quantity: String(product.quantity),

@@ -37,6 +37,10 @@ export const buildProductPayload = (
   const payload: CreateProductData = {
     name: form.name,
     category: form.category.toLowerCase(),
+    // Sent even when blank, like promotions below, so clearing the field
+    // actually clears a previously saved SKU instead of leaving it stuck.
+    sku: form.sku?.trim() ?? '',
+    barcode: form.barcode?.trim() ?? '',
     productType: form.productType,
     sellingPrice: parseFloat(form.sellingPrice),
     quantity: parseInt(form.quantity) || 0,
@@ -124,7 +128,7 @@ export const buildProductPayload = (
 };
 
 export const EMPTY_PRODUCT_FORM: ProductFormData = {
-  name: '', category: '', sellingPrice: '', costPrice: '', quantity: '', lowStockAlert: '5',
+  name: '', category: '', barcode: '', sellingPrice: '', costPrice: '', quantity: '', lowStockAlert: '5',
   productType: 'standard', unitOfMeasure: 'unit', trackInventory: true,
   minPrice: '', maxPrice: '', allowPriceOverride: false, bundleItems: [], variants: [],
   commissionEnabled: false, commissionBasePrice: '', commissionEmployeeSharePercent: '100',

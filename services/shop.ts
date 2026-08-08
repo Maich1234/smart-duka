@@ -29,6 +29,9 @@ export interface Shop {
    * Consultant chat) are available. Independent of subscription tier — a
    * subscriber can still opt out of AI processing for their shop. */
   aiEnabled?: boolean;
+  /** Owner kill switch for the till's camera barcode scanner. Defaults to on
+   * (see PosScreen) — absent on shops that predate the setting. */
+  barcodeScanningEnabled?: boolean;
   /** The till's payment buttons, owner-managed and ordered. Absent on shops
    * that predate the setting — read it through resolveSaleMethods(), which
    * falls back to Cash + M-PESA. */
@@ -59,6 +62,7 @@ export interface UpdateShopConfigData {
   purchasingEnabled?: boolean;
   purchaseCostAllocationMethod?: 'quantity' | 'value' | 'none';
   aiEnabled?: boolean;
+  barcodeScanningEnabled?: boolean;
   /** Sent as the complete ordered list — array position becomes button order. */
   paymentMethods?: ShopPaymentMethod[];
 }

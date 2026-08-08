@@ -51,6 +51,15 @@ const migrate = (db: SQLiteDatabase): void => {
   if (!hasColumn('offline_queue', 'last_error')) {
     db.execSync(`ALTER TABLE offline_queue ADD COLUMN last_error TEXT`);
   }
+
+  // Dedicated, indexed column for exact barcode lookups at the till — the
+  // rest of a product's fields live only in `payload` (see the table's own
+  // comment above), but a scan needs a direct lookup rather than a LIKE scan
+  // over `search_blob`, so this one field gets pulled out on its own.
+  if (!hasColumn('product_cache', 'barcode')) {
+    db.execSync(`ALTER TABLE product_cache ADD COLUMN barcode TEXT`);
+  }
+  db.execSync(`CREATE INDEX IF NOT EXISTS idx_product_cache_barcode ON product_cache(shop_id, barcode)`);
 };
 
 export const initOfflineDb = (): void => {
@@ -67,8 +76,9 @@ export const initOfflineDb = (): void => {
     // shop, and offline a term the cashier had never searched before returned
     // nothing at all — the offline promise failed at the counter, which is
     // where it has to hold. `search_blob` is a lowercased name + category +
-    // description for one LIKE scan; `payload` is the full Product JSON so the
-    // cart, variant picker, and promotions behave identically online and off.
+    // description + SKU (product-level and per-variant) for one LIKE scan;
+    // `payload` is the full Product JSON so the cart, variant picker, and
+    // promotions behave identically online and off.
     db.execSync(`
       CREATE TABLE IF NOT EXISTS offline_queue (
         id TEXT PRIMARY KEY,

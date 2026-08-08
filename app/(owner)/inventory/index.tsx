@@ -157,6 +157,7 @@ export default function OwnerInventory() {
       p.name,
       p.category,
       p.description,
+      p.sku,
       // Search variant SKUs so "SKU-123" still finds the right product
       ...(p.variants?.map((v) => v.sku).filter(Boolean) ?? []),
     ]);

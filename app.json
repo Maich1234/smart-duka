@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.nifulabs.dukana",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Dukana uses the camera to capture your business logo.",
+        "NSCameraUsageDescription": "Dukana uses the camera to capture your business logo and scan product barcodes.",
         "NSPhotoLibraryUsageDescription": "Dukana accesses your photo library to set a business logo.",
         "NSPhotoLibraryAddUsageDescription": "Dukana saves images to your photo library.",
         "NSBluetoothAlwaysUsageDescription": "Dukana connects to your Bluetooth receipt printer to print sale receipts."
@@ -104,6 +104,12 @@
         {
           "photosPermission": "Allow Dukana to access your photos to set a business logo.",
           "cameraPermission": "Allow Dukana to use the camera to capture a business logo."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Dukana uses your camera to scan product barcodes."
         }
       ],
       [

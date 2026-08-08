@@ -31,6 +31,7 @@ import { isOfflineQueued, isOfflineUnavailable, mutationErrorMessage } from '@/u
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 import { usePermission } from '@/utils/permissions';
 import {
   CASH_METHOD_KEY,
@@ -41,6 +42,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCartStore, cartKey } from '@/store/staffCartStore';
 import { isOfflineDbAvailable } from '@/utils/offlineDb';
 import { syncProductCache, searchCachedProducts, applyOfflineStockDelta, PRODUCT_CACHE_STALE_MS } from '@/utils/productCache';
+import { addOrIncrementCartItem } from '@/utils/cartOperations';
 
 /**
  * The till. Product search, cart, payment (cash / M-Pesa), receipt, and the
@@ -72,6 +74,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const canRefundOwn = usePermission('refund_own_sales');
   const canRefundAll = usePermission('refund_all_sales');
   const canRefundSale = canRefundOwn || canRefundAll;
+  const canCreateProduct = usePermission('create_product');
   const { toast, alert } = useAlert();
 
   const {
@@ -284,6 +287,10 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     enabled: canRecordSale,
   });
   const mpesaEnabled = paymentStatusData?.data?.mpesa?.isConfigured ?? false;
+  // Owner kill switch, not an opt-in — scanning has to work with zero setup,
+  // so a shop synced before this field existed (or offline before its first
+  // sync) still sees the button.
+  const barcodeScanningEnabled = shopConfigData?.data?.barcodeScanningEnabled ?? true;
 
   // The shop's own till buttons. Falls back to Cash + M-PESA for shops that
   // never opened the setting, so nobody is ever left without a way to sell.
@@ -462,51 +469,14 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   const confirmAdd = (quantity: number, unitPrice?: number) => {
     if (!selectedProduct) return;
-    const existing = cart.find((item) => item._id === selectedProduct._id && !item.cartVariantId);
-    if (existing) {
-      updateItem(cartKey(existing), {
-        cartQuantity: existing.cartQuantity + quantity,
-        cartUnitPrice: unitPrice ?? existing.cartUnitPrice,
-      });
-    } else {
-      addItem({
-        ...selectedProduct,
-        cartQuantity: quantity,
-        cartUnitPrice: unitPrice,
-        // Product-level preview, for every type that isn't variant-picked.
-        //
-        // Withheld when the cashier set their own price: the preview is
-        // computed server-side at list price, and the floor it is derived from
-        // is deliberately never sent to staff, so it cannot be recomputed here.
-        // The sale still pays the correct amount on the negotiated price — a
-        // quiet omission beats quoting a figure that won't match the payout.
-        cartVariantCommission:
-          unitPrice != null && unitPrice !== selectedProduct.sellingPrice
-            ? undefined
-            : selectedProduct.commissionPreview,
-      });
-    }
+    addOrIncrementCartItem({ cart, product: selectedProduct, quantity, unitPrice, addItem, updateItem });
     setQuantityModalVisible(false);
     setSelectedProduct(null);
   };
 
   const confirmVariantAdd = (variant: ProductVariant, quantity: number) => {
     if (!selectedProduct) return;
-    const existing = cart.find(
-      (item) => item._id === selectedProduct._id && item.cartVariantId === variant._id
-    );
-    if (existing) {
-      updateItem(cartKey(existing), { cartQuantity: existing.cartQuantity + quantity });
-    } else {
-      addItem({
-        ...selectedProduct,
-        cartQuantity: quantity,
-        cartUnitPrice: variant.sellingPrice,
-        cartVariantId: variant._id,
-        cartVariantName: variant.name,
-        cartVariantCommission: variant.commissionPreview,
-      });
-    }
+    addOrIncrementCartItem({ cart, product: selectedProduct, quantity, variant, addItem, updateItem });
     setVariantModalVisible(false);
     setSelectedProduct(null);
   };
@@ -682,16 +652,28 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         backgroundColor={Colors.background}
       />
       <ActiveShiftBar />
-      <ContextualSearchBar
-        value={search}
-        onChangeText={setSearch}
-        onSubmit={onSearchSubmit}
-        recentSearches={productRecentSearches}
-        onSelectRecent={selectProductRecent}
-        onClearRecent={clearProductRecentSearches}
-        placeholder="Search products…"
-        style={styles.searchBar}
-      />
+      <View style={styles.searchRow}>
+        <ContextualSearchBar
+          value={search}
+          onChangeText={setSearch}
+          onSubmit={onSearchSubmit}
+          recentSearches={productRecentSearches}
+          onSelectRecent={selectProductRecent}
+          onClearRecent={clearProductRecentSearches}
+          placeholder="Search products…"
+          style={styles.searchBar}
+        />
+        {barcodeScanningEnabled && (
+          <AnimatedPressable
+            onPress={() => router.push(user?.role === 'staff' ? '/(staff)/scan' : '/(owner)/scan')}
+            style={styles.scanBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Scan barcode"
+          >
+            <Ionicons name="barcode-outline" size={22} color={Colors.primary} />
+          </AnimatedPressable>
+        )}
+      </View>
 
       <FlatList
         showsVerticalScrollIndicator={false}
@@ -708,6 +690,26 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={onPullRefresh} tintColor={Colors.primary} />}
+        // Search used to fail silently here — zero matches rendered nothing
+        // between the header and footer, indistinguishable from a stuck
+        // search. This makes "no match" an explicit, distinct state from
+        // "still typing" or "broken".
+        ListEmptyComponent={
+          <EmptyState
+            title={search.trim() ? 'No matching products' : 'No products yet'}
+            subtitle={
+              search.trim()
+                ? `Nothing matches "${search.trim()}" by name, SKU, barcode, or category.`
+                : 'Add your first product to start selling.'
+            }
+            actionLabel={canCreateProduct ? 'Add Product' : undefined}
+            onAction={
+              canCreateProduct
+                ? () => router.push(user?.role === 'staff' ? '/(staff)/inventory/new' : '/(owner)/inventory/new')
+                : undefined
+            }
+          />
+        }
         ListHeaderComponent={
           <View>
             {cart.length > 0 && (
@@ -927,7 +929,24 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  searchBar: { marginHorizontal: Spacing.lg, marginBottom: Spacing.sm },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  searchBar: { flex: 1 },
+  scanBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
   restrictedText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: Typography.size.body, textAlign: 'center' },
   cartSection: {

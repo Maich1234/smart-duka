@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAlert } from '@/context/AlertContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { getProducts, createProduct } from '@/services/products';
 import { getShopConfig } from '@/services/shop';
 import { Screen } from '@/components/ui/Screen';
@@ -17,7 +17,10 @@ import { isOfflineQueued, mutationErrorMessage } from '@/utils/errors';
  */
 export function NewProductScreen() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<ProductFormData>(EMPTY_PRODUCT_FORM);
+  // Set when reached from the scanner's unknown-barcode panel — prefills the
+  // code so the cashier/owner never has to type what was just scanned.
+  const { barcode: scannedBarcode } = useLocalSearchParams<{ barcode?: string }>();
+  const [form, setForm] = useState<ProductFormData>({ ...EMPTY_PRODUCT_FORM, barcode: scannedBarcode ?? '' });
   const { toast } = useAlert();
   const isOwner = useAuthStore((s: AuthState) => s.user?.role) === 'owner';
   // Commission and variants stay owner-only. Cost price is different on a
@@ -70,6 +73,7 @@ export function NewProductScreen() {
         currency={currency}
         canManageMargins={marginAccess.canManageMargins}
         canSetCostPrice={marginAccess.canSetCostPrice}
+        barcodePrefilled={!!scannedBarcode}
       />
     </Screen>
   );

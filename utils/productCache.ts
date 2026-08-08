@@ -1,5 +1,5 @@
 import { getDb, isOfflineDbAvailable } from '@/utils/offlineDb';
-import { getProducts, type Product } from '@/services/products';
+import { getProducts, type Product, type ProductVariant } from '@/services/products';
 
 /** Server page size used while filling the cache. Bounded by the API's maxLimit. */
 const SYNC_PAGE_SIZE = 100;
@@ -23,7 +23,19 @@ export const PRODUCT_CACHE_STALE_MS = 10 * 60 * 1000;
  */
 
 const searchBlobFor = (product: Product) =>
-  [product.name, product.category, product.description ?? '']
+  [
+    product.name,
+    product.category,
+    product.description ?? '',
+    // SKU and barcode are both "what a cashier scans or types" — some shops
+    // have historically used SKU as their barcode (see findProductByBarcode),
+    // and either can be typed into the search bar directly, so both need to
+    // be in the blob or a valid search returns nothing.
+    product.sku ?? '',
+    product.barcode ?? '',
+    ...(product.variants?.map((v) => v.sku).filter(Boolean) ?? []),
+    ...(product.variants?.map((v) => v.barcode).filter(Boolean) ?? []),
+  ]
     .join(' ')
     .toLowerCase();
 
@@ -39,14 +51,15 @@ function writeProducts(shopId: string, products: Product[]): void {
     db.runSync('DELETE FROM product_cache WHERE shop_id = ?', [shopId]);
     for (const product of products) {
       db.runSync(
-        `INSERT INTO product_cache (id, shop_id, name, search_blob, category, payload, synced_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO product_cache (id, shop_id, name, search_blob, category, barcode, payload, synced_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           product._id,
           shopId,
           product.name,
           searchBlobFor(product),
           product.category ?? null,
+          product.barcode || null,
           JSON.stringify(product),
           now,
         ],
@@ -79,13 +92,62 @@ export async function syncProductCache(shopId: string): Promise<number | null> {
 }
 
 /**
+ * Ranks a product against an already-lowercased, already-trimmed query term.
+ * Higher is better; 0 means "shouldn't have matched" (defensive — every row
+ * reaching this already passed the SQL LIKE prefilter on the same fields).
+ *
+ *   6 — exact SKU/barcode match (product-level or a variant's)
+ *   5 — exact product name match
+ *   4 — name starts with the query
+ *   3 — name contains the query
+ *   2 — SKU/barcode contains the query
+ *   1 — category/description contains the query (catalogue browsing fallback)
+ */
+function scoreProduct(product: Product, term: string): number {
+  const name = (product.name ?? '').toLowerCase();
+  const sku = (product.sku ?? '').trim().toLowerCase();
+  const barcode = (product.barcode ?? '').trim().toLowerCase();
+  const variantSkus = (product.variants ?? [])
+    .map((v) => (v.sku ?? '').trim().toLowerCase())
+    .filter(Boolean);
+  const variantBarcodes = (product.variants ?? [])
+    .map((v) => (v.barcode ?? '').trim().toLowerCase())
+    .filter(Boolean);
+
+  if (sku === term || barcode === term || variantSkus.includes(term) || variantBarcodes.includes(term)) return 6;
+  if (name === term) return 5;
+  if (name.startsWith(term)) return 4;
+  if (name.includes(term)) return 3;
+  if (
+    sku.includes(term) ||
+    barcode.includes(term) ||
+    variantSkus.some((s) => s.includes(term)) ||
+    variantBarcodes.some((b) => b.includes(term))
+  ) return 2;
+
+  const category = (product.category ?? '').toLowerCase();
+  const description = (product.description ?? '').toLowerCase();
+  if (category.includes(term) || description.includes(term)) return 1;
+
+  return 0;
+}
+
+/**
  * Searches the local catalogue. An empty query returns everything (the till's
  * default browse view), name-ordered.
  *
- * Matching is a substring scan over name + category + description, which is
- * what a cashier actually does: type three letters of a product and expect it
- * to appear. `limit` exists to keep the FlatList bounded on a very large
- * catalogue, not to paginate — there is no "next page" at the counter.
+ * SQLite does the cheap part — a single LIKE scan over the precomputed
+ * `search_blob` (name + category + description + SKUs) narrows a catalogue of
+ * thousands down to the handful that mention the term at all. Ranking that
+ * candidate set into the priority a cashier expects (an exact SKU/barcode hit
+ * before a loose name match) is intentionally done here in JS rather than in
+ * SQL: it only has to run over the already-narrowed set, and it's the same
+ * shape of scoring `localFilter` already uses elsewhere in the app.
+ *
+ * `CANDIDATE_CAP` is a safety valve against a pathological single-letter
+ * query matching most of the catalogue, not a real limit — real result sets
+ * for a useful search term are a small fraction of the shop's SKUs.
+ * `limit` bounds what's finally handed to the FlatList.
  */
 export function searchCachedProducts(shopId: string, query: string, limit = 200): Product[] {
   if (!isOfflineDbAvailable()) return [];
@@ -94,27 +156,76 @@ export function searchCachedProducts(shopId: string, query: string, limit = 200)
     const db = getDb();
     const term = query.trim().toLowerCase();
 
-    const rows = term
-      ? db.getAllSync<{ payload: string }>(
-        `SELECT payload FROM product_cache
-           WHERE shop_id = ? AND search_blob LIKE ?
-           ORDER BY name COLLATE NOCASE LIMIT ?`,
-        // Escaping isn't needed for correctness here (% and _ in a product
-        // name only ever widen this shop's own results) but the parameter
-        // binding keeps it injection-safe regardless.
-        [shopId, `%${term}%`, limit],
-      )
-      : db.getAllSync<{ payload: string }>(
+    if (!term) {
+      const rows = db.getAllSync<{ payload: string }>(
         `SELECT payload FROM product_cache
            WHERE shop_id = ?
            ORDER BY name COLLATE NOCASE LIMIT ?`,
         [shopId, limit],
       );
+      return rows.map((row) => JSON.parse(row.payload) as Product);
+    }
 
-    return rows.map((row) => JSON.parse(row.payload) as Product);
+    const CANDIDATE_CAP = Math.max(limit * 5, 1000);
+    const rows = db.getAllSync<{ payload: string }>(
+      `SELECT payload FROM product_cache
+         WHERE shop_id = ? AND search_blob LIKE ?
+         LIMIT ?`,
+      // Escaping isn't needed for correctness here (% and _ in a product
+      // name only ever widen this shop's own results) but the parameter
+      // binding keeps it injection-safe regardless.
+      [shopId, `%${term}%`, CANDIDATE_CAP],
+    );
+
+    return rows
+      .map((row) => JSON.parse(row.payload) as Product)
+      .map((product) => ({ product, score: scoreProduct(product, term) }))
+      .sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name))
+      .slice(0, limit)
+      .map(({ product }) => product);
   } catch (err) {
     console.warn('[productCache] search failed:', (err as Error).message);
     return [];
+  }
+}
+
+/**
+ * Exact-match barcode lookup for the scanner — never fuzzy, unlike
+ * `searchCachedProducts`. Two tiers:
+ *
+ *  1. The indexed `barcode` column, direct equality — instant even against a
+ *     large catalogue, and covers the common case (a product-level barcode).
+ *  2. A fallback through the same scored search used for typed input, which
+ *     also catches a variant's own barcode/SKU and a product whose barcode
+ *     was historically entered into its SKU field. Catalogues here are small
+ *     (a shop's SKU count), so this stays effectively instant too.
+ *
+ * Returns `null` on no match — the caller is expected to offer "Add Product"
+ * with the code prefilled rather than silently doing nothing.
+ */
+export function findProductByBarcode(
+  shopId: string,
+  code: string
+): { product: Product; variant?: ProductVariant } | null {
+  if (!isOfflineDbAvailable() || !shopId || !code) return null;
+
+  try {
+    const db = getDb();
+    const row = db.getFirstSync<{ payload: string }>(
+      'SELECT payload FROM product_cache WHERE shop_id = ? AND barcode = ? LIMIT 1',
+      [shopId, code],
+    );
+    if (row) return { product: JSON.parse(row.payload) as Product };
+
+    for (const product of searchCachedProducts(shopId, code, 25)) {
+      if (product.sku === code || product.barcode === code) return { product };
+      const variant = product.variants?.find((v) => v.sku === code || v.barcode === code);
+      if (variant) return { product, variant };
+    }
+    return null;
+  } catch (err) {
+    console.warn('[productCache] barcode lookup failed:', (err as Error).message);
+    return null;
   }
 }
 

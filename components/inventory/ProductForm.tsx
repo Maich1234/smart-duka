@@ -60,6 +60,7 @@ export interface ProductFormData {
   name: string;
   category: string;
   sku?: string;
+  barcode?: string;
   sellingPrice: string;
   costPrice: string;
   quantity: string;
@@ -104,6 +105,8 @@ interface ProductFormProps {
    * See MarginAccess in productPayload.ts.
    */
   canSetCostPrice?: boolean;
+  /** True when `form.barcode` was seeded from a scanned code, not typed — shows a small confirmation hint under the field. */
+  barcodePrefilled?: boolean;
 }
 
 const TYPE_OPTIONS: {
@@ -134,6 +137,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   currency = 'KES',
   canManageMargins = true,
   canSetCostPrice = true,
+  barcodePrefilled = false,
 }) => {
   const update = (patch: Partial<ProductFormData>) => setForm({ ...form, ...patch });
 
@@ -358,6 +362,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               />
             </View>
           </View>
+          <Input
+            label="Barcode (Optional)"
+            placeholder="e.g. 6161101234567"
+            value={form.barcode || ''}
+            onChangeText={(t) => update({ barcode: t })}
+            rightIcon="scan-outline"
+            hint={barcodePrefilled ? 'Filled from the scanned barcode' : undefined}
+          />
         </View>
 
         {/* ── Pricing ── */}

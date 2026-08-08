@@ -134,7 +134,10 @@
       "Bash(echo \"server up, exit:$?\")",
       "Bash(eas update *)",
       "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; head -20 {}')",
-      "Bash(node --test tests/reconciliation.test.js)"
+      "Bash(node --test tests/reconciliation.test.js)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('expo',{}\\).get\\('plugins',[]\\), indent=2\\)\\)\")",
+      "Bash(node --check src/models/Product.js)",
+      "Bash(node --check src/validations/productValidation.js)"
     ],
     "additionalDirectories": [
       "/tmp",

@@ -23,6 +23,7 @@ export interface ProductVariant {
   costPrice?: number;
   quantity: number;
   sku?: string;
+  barcode?: string;
   lowStockAlert: number;
   /** Present in owner-facing responses only. */
   commission?: VariantCommission;
@@ -43,6 +44,8 @@ export interface Product {
   name: string;
   description?: string;
   category: string;
+  sku?: string;
+  barcode?: string;
   sellingPrice: number;
   costPrice?: number;
   quantity: number;
@@ -86,6 +89,8 @@ export interface CreateProductData {
   name: string;
   description?: string;
   category: string;
+  sku?: string;
+  barcode?: string;
   productType?: ProductType;
   sellingPrice: number;
   /**
@@ -121,6 +126,8 @@ export interface UpdateProductData {
   name?: string;
   description?: string;
   category?: string;
+  sku?: string;
+  barcode?: string;
   productType?: ProductType;
   sellingPrice?: number;
   costPrice?: number;

@@ -232,6 +232,7 @@ export default function OwnerProfile() {
   const [togglingShifts, setTogglingShifts] = useState(false);
   const [togglingCommissionVisibility, setTogglingCommissionVisibility] = useState(false);
   const [togglingPurchasing, setTogglingPurchasing] = useState(false);
+  const [togglingBarcodeScanning, setTogglingBarcodeScanning] = useState(false);
   const [togglingAi, setTogglingAi] = useState(false);
   const savedPrinter = usePrinterStore((s) => s.printer);
 
@@ -345,6 +346,31 @@ export default function OwnerProfile() {
       toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
     } finally {
       setTogglingPurchasing(false);
+    }
+  };
+
+  // Defaults on (unlike the flags above) — scanning has to work with zero
+  // setup, so a shop that hasn't touched this yet still sees it enabled.
+  const barcodeScanningEnabled = shopConfigData?.data?.barcodeScanningEnabled ?? true;
+  const handleToggleBarcodeScanning = async (enabled: boolean) => {
+    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
+
+    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
+      old ? { ...old, data: { ...old.data, barcodeScanningEnabled: enabled } } : old
+    );
+    setTogglingBarcodeScanning(true);
+    try {
+      await updateShopConfig({ barcodeScanningEnabled: enabled });
+      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
+      toast({
+        type: 'success',
+        message: enabled ? 'Barcode scanning is on' : 'Barcode scanning is off and hidden from the till',
+      });
+    } catch (error: any) {
+      queryClient.setQueryData(['shopConfig'], previous);
+      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
+    } finally {
+      setTogglingBarcodeScanning(false);
     }
   };
 
@@ -729,6 +755,25 @@ export default function OwnerProfile() {
                 disabled={togglingPurchasing || loadingShop}
                 trackColor={{ false: Colors.border, true: Colors.primaryLight }}
                 thumbColor={purchasingEnabled ? Colors.primary : Colors.textTertiary}
+              />
+            </View>
+
+            <View style={styles.prefDivider} />
+
+            <View style={styles.prefRow}>
+              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
+                <Ionicons name="scan-outline" size={17} color={Colors.primary} />
+              </View>
+              <View style={styles.prefText}>
+                <Text style={styles.prefTitle}>Barcode Scanning</Text>
+                <Text style={styles.prefSub}>Let cashiers scan products to add them to a sale</Text>
+              </View>
+              <Switch
+                value={barcodeScanningEnabled}
+                onValueChange={handleToggleBarcodeScanning}
+                disabled={togglingBarcodeScanning || loadingShop}
+                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+                thumbColor={barcodeScanningEnabled ? Colors.primary : Colors.textTertiary}
               />
             </View>
 

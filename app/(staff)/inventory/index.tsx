@@ -46,6 +46,7 @@ export default function StaffInventory() {
     return localFilter(allProducts, searchQuery, (p) => [
       p.name,
       p.category,
+      p.sku,
       ...(p.variants?.map((v) => v.sku).filter(Boolean) ?? []),
     ]);
   }, [allProducts, searchQuery]);
