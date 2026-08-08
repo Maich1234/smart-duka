@@ -131,7 +131,10 @@
       "Bash(node --input-type=module -e ' *)",
       "Bash(awk '/^commit /{c=$2} /RESUME_SPLASH_AFTER_MS = 5/{print c}')",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
-      "Bash(echo \"server up, exit:$?\")"
+      "Bash(echo \"server up, exit:$?\")",
+      "Bash(eas update *)",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; head -20 {}')",
+      "Bash(node --test tests/reconciliation.test.js)"
     ],
     "additionalDirectories": [
       "/tmp",

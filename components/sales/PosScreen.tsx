@@ -244,7 +244,10 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const onPullRefresh = async () => {
     setPullRefreshing(true);
     try {
-      await (usingCache ? resyncCatalogue() : refetchProducts());
+      await Promise.all([
+        usingCache ? resyncCatalogue() : refetchProducts(),
+        refetchShopConfig(),
+      ]);
     } finally {
       setPullRefreshing(false);
     }
@@ -256,13 +259,24 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     enabled: canViewSales,
   });
 
-  const { data: shopConfigData } = useQuery({
+  const { data: shopConfigData, refetch: refetchShopConfig } = useQuery({
     queryKey: ['shopConfig'],
     queryFn: getShopConfig,
   });
   const thankYouNote = shopConfigData?.data.receiptThankYouNote;
   const shopLogoUrl = shopConfigData?.data.logoUrl;
   const shopMotto = shopConfigData?.data.motto;
+
+  // Till buttons are owner-edited from a separate screen (and often a
+  // separate device — the owner's phone vs. a cashier's). The tab staying
+  // mounted means React Query's own staleness clock never gets a chance to
+  // fire a refetch, so a removed payment method could otherwise sit on the
+  // till indefinitely. Refetch on every focus instead of trusting staleTime.
+  useFocusEffect(
+    React.useCallback(() => {
+      refetchShopConfig();
+    }, [refetchShopConfig])
+  );
 
   const { data: paymentStatusData } = useQuery({
     queryKey: ['paymentStatus'],
@@ -293,6 +307,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['mySales'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['myCommission'] });
       // Stock moved — refresh the local mirror so the till shows real levels.
       resyncCatalogue();
       clearCart();
@@ -337,6 +352,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mySales'] });
       queryClient.invalidateQueries({ queryKey: ['products'] }); // stock restored
+      queryClient.invalidateQueries({ queryKey: ['myCommission'] }); // voided sales earn no commission
       resyncCatalogue();
       setDetailsModalVisible(false);
       toast({ type: 'success', message: 'Sale voided — stock restored.' });
@@ -368,6 +384,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['mySales'] });
       queryClient.invalidateQueries({ queryKey: ['products'] }); // stock restored (cash refunds)
+      queryClient.invalidateQueries({ queryKey: ['myCommission'] }); // refunded sales earn no commission
       resyncCatalogue();
       setDetailsModalVisible(false);
       toast({ type: 'success', message: res.message || 'Refund processed.' });
