@@ -119,7 +119,8 @@
           "neverForLocation": true,
           "bluetoothAlwaysPermission": "Dukana connects to your Bluetooth receipt printer to print sale receipts."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

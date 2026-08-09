@@ -45,6 +45,14 @@ const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
 /** Routes reachable from the tab bar — the only ones without a back button. */
 const TAB_ROUTE_NAMES = new Set(TAB_CONFIGS.map((tc) => tc.name));
 
+/** Full-screen routes that draw their own chrome — the floating tab bar has
+ * no `display:'none'` escape hatch in this custom implementation, so it has
+ * to opt out by route name instead. Scan is a dark camera view edge-to-edge;
+ * without this the bar floats on top of it and anything the screen anchors
+ * to its own bottom edge (e.g. the "barcode not registered" panel) renders
+ * partly underneath the bar instead of above it. */
+const HIDDEN_TAB_BAR_ROUTES = new Set(['scan']);
+
 interface AnimatedTabIconProps {
   config: TabConfig;
   isFocused: boolean;
@@ -122,6 +130,11 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
   }));
 
   const tabBarHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
+
+  // After the hooks above, not before — an early return has to come after
+  // every hook call runs on every render, or the hook count changes between
+  // renders depending on the active route.
+  if (activeRoute && HIDDEN_TAB_BAR_ROUTES.has(activeRoute.name)) return null;
 
   return (
     <View style={[styles.tabBar, { height: tabBarHeight }]}>
@@ -393,6 +406,24 @@ export default function OwnerLayout() {
         options={{
           title: 'Payment Methods',
           href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="setup-guide"
+        options={{
+          title: 'Setup Guide',
+          href: null,
+          // Draws its own ScreenHeader (with WebView-aware back handling) — see setup-guide.tsx.
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          href: null,
+          // Draws its own ScreenHeader per screen — see settings/_layout.tsx.
+          headerShown: false,
         }}
       />
       <Tabs.Screen

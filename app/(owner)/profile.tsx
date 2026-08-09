@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Switch,
   RefreshControl,
   ScrollView,
   Dimensions,
@@ -16,31 +15,18 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/AuthContext';
-import { getShopConfig, updateShopConfig, uploadShopLogo, type ShopConfigResponse } from '@/services/shop';
-import { changePassword } from '@/services/auth';
+import { getShopConfig } from '@/services/shop';
 import { getOwnerDashboard } from '@/services/dashboard';
 import { getStaff } from '@/services/staff';
-import {
-  getNotificationsPreference,
-  setNotificationsPreference,
-  registerDeviceForNotifications,
-  unregisterDeviceFromNotifications,
-} from '@/services/notifications';
-import { ShopSettingsForm } from '@/components/profile/ShopSettingsForm';
 import { AccountInfo } from '@/components/profile/AccountInfo';
-import { ChangePasswordForm } from '@/components/profile/ChangePasswordForm';
 import { DeleteAccountSection } from '@/components/profile/DeleteAccountSection';
 import { LegalSection } from '@/components/profile/LegalSection';
-import { DukanaAiSection } from '@/components/profile/DukanaAiSection';
-import { useAiAccess } from '@/hooks/useAiAccess';
+import { SettingsCard, SettingsRow, SettingsRowDivider } from '@/components/settings/SettingsRow';
 import { useSubscription } from '@/hooks/useSubscription';
 import { describeSubscription, type SubscriptionTone } from '@/utils/subscriptionStatus';
-import { usePrinterStore } from '@/store/printerStore';
-import { resolveSaleMethods } from '@/constants/paymentMethods';
 import { openHelp } from '@/utils/openHelp';
 import { openWebPage } from '@/utils/openWebPage';
 import { useWarmUpBrowser } from '@/hooks/useWarmUpBrowser';
@@ -208,8 +194,7 @@ const HELP_ITEMS: HelpItem[] = [
 export default function OwnerProfile() {
   const { user, logout } = useAuth();
   const tabBarHeight = useTabBarHeight();
-  const { toast, alert } = useAlert();
-  const queryClient = useQueryClient();
+  const { alert } = useAlert();
   useWarmUpBrowser();
 
   const handleLogout = () => {
@@ -223,18 +208,6 @@ export default function OwnerProfile() {
       ],
     });
   };
-
-  const [shopEdits, setShopEdits] = useState<Record<string, string | number>>({});
-  const [updatingShop, setUpdatingShop] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [updatingPassword, setUpdatingPassword] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [togglingShifts, setTogglingShifts] = useState(false);
-  const [togglingCommissionVisibility, setTogglingCommissionVisibility] = useState(false);
-  const [togglingPurchasing, setTogglingPurchasing] = useState(false);
-  const [togglingBarcodeScanning, setTogglingBarcodeScanning] = useState(false);
-  const [togglingAi, setTogglingAi] = useState(false);
-  const savedPrinter = usePrinterStore((s) => s.printer);
 
   const { data: shopConfigData, isLoading: loadingShop } = useQuery({
     queryKey: ['shopConfig'],
@@ -251,154 +224,6 @@ export default function OwnerProfile() {
     queryFn: () => getStaff(),
   });
 
-  useEffect(() => {
-    getNotificationsPreference().then(setNotificationsEnabled);
-  }, []);
-
-  const shop = {
-    name: shopConfigData?.data.name ?? '',
-    address: shopConfigData?.data.address ?? '',
-    phone: shopConfigData?.data.phone ?? '',
-    email: shopConfigData?.data.email ?? '',
-    taxRate: shopConfigData?.data.taxRate ?? 0,
-    country: (shopConfigData?.data as any)?.country ?? 'KE',
-    currency: shopConfigData?.data.currency ?? 'KES',
-    receiptThankYouNote: shopConfigData?.data.receiptThankYouNote ?? '',
-    logoUrl: (shopConfigData?.data as any)?.logoUrl ?? '',
-    motto: (shopConfigData?.data as any)?.motto ?? '',
-  };
-  const displayShop = { ...shop, ...shopEdits };
-
-  const handleToggleNotifications = async (enabled: boolean) => {
-    setNotificationsEnabled(enabled);
-    await setNotificationsPreference(enabled);
-    if (enabled) await registerDeviceForNotifications();
-    else await unregisterDeviceFromNotifications();
-  };
-
-  const handleGrantMediaAccess = async () => {
-    const [camera, media] = await Promise.all([
-      ImagePicker.requestCameraPermissionsAsync(),
-      ImagePicker.requestMediaLibraryPermissionsAsync(),
-    ]);
-    const granted = camera.granted && media.granted;
-    toast({
-      type: granted ? 'success' : 'warning',
-      message: granted
-        ? 'Camera and photo access granted'
-        : 'Some access wasn\'t granted — you can allow it from your device Settings.',
-    });
-  };
-
-  // Names the buttons the till is currently offering, so the owner can see the
-  // setup without opening the screen.
-  const paymentMethodsSummary = useMemo(() => {
-    const active = resolveSaleMethods(shopConfigData?.data?.paymentMethods);
-    if (active.length <= 3) return active.map((m) => m.label).join(' · ');
-    return `${active.slice(0, 2).map((m) => m.label).join(' · ')} + ${active.length - 2} more`;
-  }, [shopConfigData]);
-
-  const shiftManagementEnabled = shopConfigData?.data?.shiftManagementEnabled ?? false;
-  const handleToggleShiftManagement = async (enabled: boolean) => {
-    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
-
-    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
-      old ? { ...old, data: { ...old.data, shiftManagementEnabled: enabled } } : old
-    );
-    setTogglingShifts(true);
-    try {
-      await updateShopConfig({ shiftManagementEnabled: enabled });
-      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
-      queryClient.invalidateQueries({ queryKey: ['activeShift'] });
-      toast({
-        type: 'success',
-        message: enabled
-          ? 'Shift management is on — staff clock in before selling'
-          : 'Shift management is off',
-      });
-    } catch (error: any) {
-      queryClient.setQueryData(['shopConfig'], previous);
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
-    } finally {
-      setTogglingShifts(false);
-    }
-  };
-
-  const purchasingEnabled = shopConfigData?.data?.purchasingEnabled ?? false;
-  const handleTogglePurchasing = async (enabled: boolean) => {
-    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
-
-    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
-      old ? { ...old, data: { ...old.data, purchasingEnabled: enabled } } : old
-    );
-    setTogglingPurchasing(true);
-    try {
-      await updateShopConfig({ purchasingEnabled: enabled });
-      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
-      toast({
-        type: 'success',
-        message: enabled
-          ? 'Purchasing is on — record stock purchases from the Purchases tab'
-          : 'Purchasing is off and hidden from navigation',
-      });
-    } catch (error: any) {
-      queryClient.setQueryData(['shopConfig'], previous);
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
-    } finally {
-      setTogglingPurchasing(false);
-    }
-  };
-
-  // Defaults on (unlike the flags above) — scanning has to work with zero
-  // setup, so a shop that hasn't touched this yet still sees it enabled.
-  const barcodeScanningEnabled = shopConfigData?.data?.barcodeScanningEnabled ?? true;
-  const handleToggleBarcodeScanning = async (enabled: boolean) => {
-    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
-
-    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
-      old ? { ...old, data: { ...old.data, barcodeScanningEnabled: enabled } } : old
-    );
-    setTogglingBarcodeScanning(true);
-    try {
-      await updateShopConfig({ barcodeScanningEnabled: enabled });
-      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
-      toast({
-        type: 'success',
-        message: enabled ? 'Barcode scanning is on' : 'Barcode scanning is off and hidden from the till',
-      });
-    } catch (error: any) {
-      queryClient.setQueryData(['shopConfig'], previous);
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
-    } finally {
-      setTogglingBarcodeScanning(false);
-    }
-  };
-
-  const showStaffCommission = shopConfigData?.data?.showStaffCommission ?? false;
-  const handleToggleStaffCommission = async (enabled: boolean) => {
-    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
-
-    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
-      old ? { ...old, data: { ...old.data, showStaffCommission: enabled } } : old
-    );
-    setTogglingCommissionVisibility(true);
-    try {
-      await updateShopConfig({ showStaffCommission: enabled });
-      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
-      toast({
-        type: 'success',
-        message: enabled
-          ? 'Staff can now preview and track their commission'
-          : 'Commission is now hidden from staff',
-      });
-    } catch (error: any) {
-      queryClient.setQueryData(['shopConfig'], previous);
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
-    } finally {
-      setTogglingCommissionVisibility(false);
-    }
-  };
-
   // Free-tier shops have no other running countdown, so the profile is where
   // "how long do I have left?" gets answered — in the hero and on the
   // subscription row. Recomputed each render so the day-count follows the
@@ -410,83 +235,6 @@ export default function OwnerProfile() {
   } = useSubscription();
   const subStatus = describeSubscription(subscriptionAccess, subscriptionPlan);
 
-  const { state: aiAccessState, aiEnabled } = useAiAccess();
-  const handleToggleAi = async (enabled: boolean) => {
-    const previous = queryClient.getQueryData<ShopConfigResponse>(['shopConfig']);
-
-    queryClient.setQueryData<ShopConfigResponse>(['shopConfig'], (old) =>
-      old ? { ...old, data: { ...old.data, aiEnabled: enabled } } : old
-    );
-    setTogglingAi(true);
-    try {
-      await updateShopConfig({ aiEnabled: enabled });
-      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
-      queryClient.invalidateQueries({ queryKey: ['aiInsight'] });
-      toast({
-        type: 'success',
-        message: enabled ? 'Dukana AI is on' : 'Dukana AI is off — no data is sent to Gemini',
-      });
-    } catch (error: any) {
-      queryClient.setQueryData(['shopConfig'], previous);
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not update the setting' });
-    } finally {
-      setTogglingAi(false);
-    }
-  };
-
-  const handleShopUpdate = async () => {
-    setUpdatingShop(true);
-    try {
-      const { name, address, phone, email, taxRate, country, currency, receiptThankYouNote, logoUrl, motto } = displayShop;
-      await updateShopConfig({ name, address, phone, email, taxRate, country, currency, receiptThankYouNote, logoUrl, motto } as any);
-      toast({ type: 'success', message: 'Shop information updated' });
-      setShopEdits({});
-      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
-    } catch (error: any) {
-      toast({ type: 'error', message: error.response?.data?.message || 'Update failed' });
-    } finally {
-      setUpdatingShop(false);
-    }
-  };
-
-  const handlePickLogo = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      toast({ type: 'warning', message: 'Please allow access to your photo library to upload a logo.' });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets?.length) return;
-    const asset = result.assets[0];
-    setUploadingLogo(true);
-    try {
-      const { logoUrl } = await uploadShopLogo(asset.uri, asset.mimeType ?? 'image/jpeg');
-      setShopEdits((prev) => ({ ...prev, logoUrl }));
-      queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
-    } catch (error: any) {
-      toast({ type: 'error', message: error.response?.data?.message || 'Could not upload logo' });
-    } finally {
-      setUploadingLogo(false);
-    }
-  };
-
-  const handlePasswordChange = async (current: string, newPwd: string) => {
-    setUpdatingPassword(true);
-    try {
-      await changePassword(current, newPwd);
-      toast({ type: 'success', message: 'Password changed successfully' });
-    } catch (error: any) {
-      toast({ type: 'error', message: error.response?.data?.message || 'Password change failed' });
-    } finally {
-      setUpdatingPassword(false);
-    }
-  };
-
   const handleRefresh = () => {
     refetchDash();
     refetchStaff();
@@ -497,7 +245,8 @@ export default function OwnerProfile() {
 
   const dashboard = dashData?.data;
   const staffCount = staffData?.data?.length ?? 0;
-  const currency = shop.currency || 'KES';
+  const currency = shopConfigData?.data.currency || 'KES';
+  const shopName = shopConfigData?.data.name ?? '';
   const userInitials = getInitials(user?.name ?? '');
   const lowStockCount = dashboard?.lowStockItems?.length ?? 0;
 
@@ -558,7 +307,7 @@ export default function OwnerProfile() {
               <View style={styles.heroShopRow}>
                 <Ionicons name="storefront-outline" size={13} color="rgba(255,255,255,0.45)" />
                 <Text style={styles.heroShopName} numberOfLines={1}>
-                  {shop.name || user?.shop?.name || 'Dukana'}
+                  {shopName || user?.shop?.name || 'Dukana'}
                 </Text>
               </View>
               {/* Was a hardcoded "Active" chip. It now carries the real
@@ -650,236 +399,93 @@ export default function OwnerProfile() {
           />
         </Animated.View>
 
-        {/* ── BUSINESS SETTINGS ─────────────────────────────────────────── */}
-        <SectionLabel label="BUSINESS SETTINGS" />
-        <Animated.View entering={FadeInUp.duration(360).delay(100)} style={styles.sectionWrap}>
-          <ShopSettingsForm
-            shop={displayShop}
-            onChange={(field, value) => setShopEdits((prev) => ({ ...prev, [field]: value }))}
-            onSave={handleShopUpdate}
-            onPickLogo={handlePickLogo}
-            uploadingLogo={uploadingLogo}
-            loading={updatingShop}
-          />
-        </Animated.View>
-
-        {/* ── PREFERENCES ───────────────────────────────────────────────── */}
-        <SectionLabel label="PREFERENCES" />
-        <Animated.View entering={FadeInUp.duration(360).delay(120)} style={styles.sectionWrap}>
-          <View style={styles.prefCard}>
-            <View style={styles.prefRow}>
-              <View style={[styles.prefIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="notifications-outline" size={17} color="#B45309" />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Push Notifications</Text>
-                <Text style={styles.prefSub}>Low stock alerts & sales anomalies</Text>
-              </View>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={handleToggleNotifications}
-                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                thumbColor={notificationsEnabled ? Colors.primary : Colors.textTertiary}
-              />
-            </View>
-
-            <View style={styles.prefDivider} />
-
-            <AnimatedPressable
-              style={styles.prefRow}
-              onPress={handleGrantMediaAccess}
-              accessibilityRole="button"
-              accessibilityLabel="Allow camera and photo access"
-            >
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
-                <Ionicons name="camera-outline" size={17} color={Colors.primary} />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Photo & Camera Access</Text>
-                <Text style={styles.prefSub}>Needed to set your business logo</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </AnimatedPressable>
-
-            <View style={styles.prefDivider} />
-
-            <View style={styles.prefRow}>
-              <View style={[styles.prefIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="time-outline" size={17} color="#B91C1C" />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Shift Management</Text>
-                <Text style={styles.prefSub}>Staff clock in & reconcile the till; daily summary at close</Text>
-              </View>
-              <Switch
-                value={shiftManagementEnabled}
-                onValueChange={handleToggleShiftManagement}
-                disabled={togglingShifts || loadingShop}
-                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                thumbColor={shiftManagementEnabled ? Colors.primary : Colors.textTertiary}
-              />
-            </View>
-
-            <View style={styles.prefDivider} />
-
-            <View style={styles.prefRow}>
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
-                <Ionicons name="cash-outline" size={17} color={Colors.primary} />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Show Commission to Staff</Text>
-                <Text style={styles.prefSub}>Let staff preview and track their earned commission</Text>
-              </View>
-              <Switch
-                value={showStaffCommission}
-                onValueChange={handleToggleStaffCommission}
-                disabled={togglingCommissionVisibility || loadingShop}
-                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                thumbColor={showStaffCommission ? Colors.primary : Colors.textTertiary}
-              />
-            </View>
-
-            <View style={styles.prefDivider} />
-
-            <View style={styles.prefRow}>
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
-                <Ionicons name="cart-outline" size={17} color={Colors.primary} />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Enable Purchasing Module</Text>
-                <Text style={styles.prefSub}>Record stock purchases from suppliers and update inventory automatically</Text>
-              </View>
-              <Switch
-                value={purchasingEnabled}
-                onValueChange={handleTogglePurchasing}
-                disabled={togglingPurchasing || loadingShop}
-                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                thumbColor={purchasingEnabled ? Colors.primary : Colors.textTertiary}
-              />
-            </View>
-
-            <View style={styles.prefDivider} />
-
-            <View style={styles.prefRow}>
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
-                <Ionicons name="scan-outline" size={17} color={Colors.primary} />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Barcode Scanning</Text>
-                <Text style={styles.prefSub}>Let cashiers scan products to add them to a sale</Text>
-              </View>
-              <Switch
-                value={barcodeScanningEnabled}
-                onValueChange={handleToggleBarcodeScanning}
-                disabled={togglingBarcodeScanning || loadingShop}
-                trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                thumbColor={barcodeScanningEnabled ? Colors.primary : Colors.textTertiary}
-              />
-            </View>
-
-            <View style={styles.prefDivider} />
-
-            <AnimatedPressable
-              style={styles.prefRow}
-              onPress={() => router.push('/(owner)/payment-methods')}
-              accessibilityRole="button"
-              accessibilityLabel="Choose the payment buttons shown at the till"
-            >
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
-                <Ionicons name="wallet-outline" size={17} color={Colors.primary} />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Payment Methods</Text>
-                <Text style={styles.prefSub}>
-                  {paymentMethodsSummary}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </AnimatedPressable>
-
-            <View style={styles.prefDivider} />
-
-            <AnimatedPressable
-              style={styles.prefRow}
-              onPress={() => router.push('/(owner)/printer')}
-              accessibilityRole="button"
-              accessibilityLabel="Set up a Bluetooth receipt printer"
-            >
-              <View style={[styles.prefIconWrap, { backgroundColor: Colors.primarySubtle }]}>
-                <Ionicons name="print-outline" size={17} color={Colors.primary} />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Receipt Printer</Text>
-                <Text style={styles.prefSub}>
-                  {savedPrinter
-                    ? `${savedPrinter.name} · ${savedPrinter.paperWidth}mm`
-                    : 'Print straight to a Bluetooth thermal printer'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </AnimatedPressable>
-
-            <View style={styles.prefDivider} />
-
-            <AnimatedPressable
-              style={styles.prefRow}
-              onPress={() => router.push('/(owner)/subscription')}
-              accessibilityRole="button"
-              accessibilityLabel={
-                subStatus ? `Subscription. ${subStatus.detail}` : 'Manage subscription'
+        {/* ── SETTINGS ──────────────────────────────────────────────────── */}
+        <SectionLabel label="SETTINGS" />
+        {/* No sectionWrap here — SettingsCard applies its own horizontal margin. */}
+        <Animated.View entering={FadeInUp.duration(360).delay(100)}>
+          <SettingsCard>
+            <SettingsRow
+              icon="business-outline"
+              title="Business"
+              subtitle="Profile, tax rate & receipt branding"
+              onPress={() => router.push('/(owner)/settings/business')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="cart-outline"
+              title="POS & Sales"
+              subtitle="Payment methods, printer & shift management"
+              onPress={() => router.push('/(owner)/settings/pos-sales')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="scan-outline"
+              title="Scanning"
+              subtitle="Barcode scanning, sound & vibration"
+              onPress={() => router.push('/(owner)/settings/scanning')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="cube-outline"
+              title="Inventory"
+              subtitle="Purchasing module"
+              onPress={() => router.push('/(owner)/settings/inventory')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="people-outline"
+              title="Staff & Security"
+              subtitle="Staff access, commission visibility & password"
+              onPress={() => router.push('/(owner)/settings/staff-security')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="link-outline"
+              iconColor="#16A34A"
+              iconBg="#DCFCE7"
+              title="Integrations"
+              subtitle="M-Pesa Business"
+              onPress={() => router.push('/(owner)/settings/integrations')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="notifications-outline"
+              iconColor="#B45309"
+              iconBg="#FEF3C7"
+              title="Notifications"
+              subtitle="Low stock alerts & sales anomalies"
+              onPress={() => router.push('/(owner)/settings/notifications')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="bar-chart-outline"
+              title="Data & Reports"
+              subtitle="Reports, business books & reconciliation"
+              onPress={() => router.push('/(owner)/settings/data-reports')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="sparkles-outline"
+              title="Dukana AI"
+              subtitle="Gemini-powered insights & chat"
+              onPress={() => router.push('/(owner)/settings/ai')}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="shield-checkmark-outline"
+              iconColor={ROW_TONE[subStatus?.tone ?? 'neutral'].fg}
+              iconBg={ROW_TONE[subStatus?.tone ?? 'neutral'].bg}
+              title="Subscription"
+              subtitle={subStatus?.detail ?? 'Plan, free trial & M-PESA payments'}
+              subtitleColor={
+                subStatus?.tone === 'warn' || subStatus?.tone === 'urgent'
+                  ? ROW_TONE[subStatus.tone].fg
+                  : undefined
               }
-            >
-              <View
-                style={[
-                  styles.prefIconWrap,
-                  { backgroundColor: ROW_TONE[subStatus?.tone ?? 'neutral'].bg },
-                ]}
-              >
-                <Ionicons
-                  name="shield-checkmark-outline"
-                  size={17}
-                  color={ROW_TONE[subStatus?.tone ?? 'neutral'].fg}
-                />
-              </View>
-              <View style={styles.prefText}>
-                <Text style={styles.prefTitle}>Subscription</Text>
-                <Text
-                  style={[
-                    styles.prefSub,
-                    subStatus?.tone === 'warn' || subStatus?.tone === 'urgent'
-                      ? { color: ROW_TONE[subStatus.tone].fg, fontFamily: Typography.fontFamilySemiBold }
-                      : null,
-                  ]}
-                >
-                  {/* Falls back to the old static line only while the
-                      subscription query is still in flight. */}
-                  {subStatus?.detail ?? 'Plan, free trial & M-PESA payments'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </AnimatedPressable>
-          </View>
-        </Animated.View>
-
-        {/* ── DUKANA AI ─────────────────────────────────────────────────── */}
-        <SectionLabel label="DUKANA AI" />
-        <Animated.View entering={FadeInUp.duration(360).delay(130)} style={styles.sectionWrap}>
-          <DukanaAiSection
-            state={aiAccessState}
-            aiEnabled={aiEnabled}
-            toggling={togglingAi}
-            loadingShop={loadingShop}
-            onToggle={handleToggleAi}
-          />
-        </Animated.View>
-
-        {/* ── SECURITY ──────────────────────────────────────────────────── */}
-        <SectionLabel label="SECURITY" />
-        <Animated.View entering={FadeInUp.duration(360).delay(140)} style={styles.sectionWrap}>
-          <ChangePasswordForm
-            onChangePassword={handlePasswordChange}
-            loading={updatingPassword}
-          />
+              onPress={() => router.push('/(owner)/subscription')}
+              accessibilityLabel={subStatus ? `Subscription. ${subStatus.detail}` : 'Manage subscription'}
+            />
+          </SettingsCard>
         </Animated.View>
 
         {/* ── HELP & LEARNING ───────────────────────────────────────────── */}
@@ -1117,36 +723,6 @@ const styles = StyleSheet.create({
 
   // Section wrapper
   sectionWrap: { marginHorizontal: Spacing.lg },
-
-  // Preferences
-  prefCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
-  },
-  prefRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  prefDivider: { height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
-  prefIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  prefText: { flex: 1 },
-  prefTitle: {
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textPrimary,
-  },
-  prefSub: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontFamily: Typography.fontFamily,
-    marginTop: 2,
-  },
 
   // Help
   setupGuideRow: {

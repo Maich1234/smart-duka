@@ -20,8 +20,10 @@ import { HelpLink } from '../help/HelpLink';
 import { ScreenHeader } from '../ui/ScreenHeader';
 import { CommissionModal, type CommissionValue } from './CommissionModal';
 import { useAlert } from '@/context/AlertContext';
+import { useAuthStore, type AuthState } from '@/store/authStore';
 import { formatCurrency } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
+import { openBarcodeCapture } from '@/utils/barcodeCapture';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -146,7 +148,23 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   barcodePrefilled = false,
 }) => {
   const { alert } = useAlert();
+  const role = useAuthStore((s: AuthState) => s.user?.role);
   const update = (patch: Partial<ProductFormData>) => setForm({ ...form, ...patch });
+
+  // Set only for a code captured via the camera *during this session* — the
+  // `barcodePrefilled` prop covers the other seeding path (arriving from the
+  // scanner's "Barcode not registered" panel), and the hint below covers both.
+  const [justScanned, setJustScanned] = useState(false);
+  // Deliberately not wrapped in useCallback: it needs `update`'s current
+  // closure over `form` at the moment the button is tapped, not whatever was
+  // current the first time this ran — a memoized version would silently
+  // overwrite any edits made after that first render with a stale form.
+  const scanBarcode = () => {
+    openBarcodeCapture(role === 'staff' ? 'staff' : 'owner', (code) => {
+      setJustScanned(true);
+      update({ barcode: code });
+    });
+  };
 
   // Snapshot of the form as this screen was entered — an edit compares
   // against the real saved values, a create against the (possibly
@@ -249,11 +267,39 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         errs.costPrice = 'Enter a valid cost price';
       }
     }
+    if (form.productType === 'variable' && form.minPrice.trim() && form.maxPrice.trim()) {
+      const min = parseFloat(form.minPrice);
+      const max = parseFloat(form.maxPrice);
+      // A swapped/negative range doesn't just look wrong here — it makes
+      // QuantityModal's own bounds check permanently unsatisfiable, silently
+      // blocking every sale of this product until someone notices why.
+      if (!isNaN(min) && min < 0) errs.minPrice = 'Min price cannot be negative';
+      else if (!isNaN(max) && max < 0) errs.maxPrice = 'Max price cannot be negative';
+      else if (!isNaN(min) && !isNaN(max) && min > max) {
+        errs.maxPrice = 'Max price must be greater than or equal to min price';
+      }
+    }
     if (form.productType === 'bundle' && form.bundleItems.length === 0) {
       errs.bundleItems = 'Add at least one item to the bundle';
     }
-    if (form.productType === 'configurable' && form.variants.length === 0) {
-      errs.variants = 'Add at least one variant';
+    if (form.productType === 'configurable') {
+      if (form.variants.length === 0) {
+        errs.variants = 'Add at least one variant';
+      } else {
+        // A blank/zero price here silently becomes a free ($0) product at
+        // save time (see productPayload.ts's `parseFloat(v.sellingPrice) || 0`)
+        // — catch it here instead of letting a cashier sell it for nothing.
+        const namelessIndex = form.variants.findIndex((v) => !v.name.trim());
+        const badPriceIndex = form.variants.findIndex((v) => {
+          const price = parseFloat(v.sellingPrice);
+          return v.sellingPrice.trim() === '' || isNaN(price) || price <= 0;
+        });
+        if (namelessIndex !== -1) {
+          errs.variants = `Variant ${namelessIndex + 1} needs a name`;
+        } else if (badPriceIndex !== -1) {
+          errs.variants = `Variant ${badPriceIndex + 1} needs a price greater than 0`;
+        }
+      }
     }
     return errs;
   };
@@ -308,6 +354,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const updateVariant = (index: number, patch: Partial<VariantForm>) => {
     const next = form.variants.map((v, i) => (i === index ? { ...v, ...patch } : v));
     update({ variants: next });
+    if (errors.variants) setErrors((e) => ({ ...e, variants: '' }));
   };
   const removeVariant = (index: number) => {
     update({ variants: form.variants.filter((_, i) => i !== index) });
@@ -432,9 +479,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             label="Barcode (Optional)"
             placeholder="e.g. 6161101234567"
             value={form.barcode || ''}
-            onChangeText={(t) => update({ barcode: t })}
+            onChangeText={(t) => { update({ barcode: t }); setJustScanned(false); }}
             rightIcon="scan-outline"
-            hint={barcodePrefilled ? 'Filled from the scanned barcode' : undefined}
+            onRightIconPress={scanBarcode}
+            hint={barcodePrefilled || justScanned ? 'Filled from the scanned barcode' : undefined}
           />
         </View>
 
@@ -541,16 +589,28 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <Input
                   label="Min Price (optional)"
                   value={form.minPrice}
-                  onChangeText={(t) => update({ minPrice: t })}
+                  onChangeText={(t) => {
+                    update({ minPrice: t });
+                    if (errors.minPrice || errors.maxPrice) {
+                      setErrors((e) => ({ ...e, minPrice: '', maxPrice: '' }));
+                    }
+                  }}
                   keyboardType="numeric"
+                  error={errors.minPrice}
                 />
               </View>
               <View style={styles.flexInput}>
                 <Input
                   label="Max Price (optional)"
                   value={form.maxPrice}
-                  onChangeText={(t) => update({ maxPrice: t })}
+                  onChangeText={(t) => {
+                    update({ maxPrice: t });
+                    if (errors.minPrice || errors.maxPrice) {
+                      setErrors((e) => ({ ...e, minPrice: '', maxPrice: '' }));
+                    }
+                  }}
                   keyboardType="numeric"
+                  error={errors.maxPrice}
                 />
               </View>
             </View>

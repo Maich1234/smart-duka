@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
-import { router, useIsFocused } from 'expo-router';
+import { useAudioPlayer } from 'expo-audio';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
@@ -12,7 +13,11 @@ import { useCartStore } from '@/store/staffCartStore';
 import { usePermission } from '@/utils/permissions';
 import { findProductByBarcode } from '@/utils/productCache';
 import { addOrIncrementCartItem } from '@/utils/cartOperations';
+import { consumeBarcodeCapture, cancelBarcodeCapture } from '@/utils/barcodeCapture';
 import { haptics } from '@/utils/haptics';
+import { useScanFeedbackStore } from '@/store/scanFeedbackStore';
+import { QuantityModal } from './QuantityModal';
+import type { Product, ProductVariant } from '@/services/products';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -42,8 +47,53 @@ export function BarcodeScannerScreen() {
   const { cart, addItem, updateItem } = useCartStore();
   const shopId = user?.shop?._id ?? '';
 
+  // Pushed with ?mode=capture from ProductForm's "scan barcode" field button —
+  // just returns whatever code the camera reads, no product lookup or cart
+  // involved. Everything else about the screen (permission gate, cooldown,
+  // header, close button) is shared.
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isCapture = mode === 'capture';
+
   const [permission, requestPermission] = useCameraPermissions();
   const [unmatchedCode, setUnmatchedCode] = useState<string | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const toggleTorch = useCallback(() => setTorchOn((v) => !v), []);
+
+  // The frame is centered by flexbox, not a fixed coordinate, so its actual
+  // screen rect has to come from measuring it rather than being computed —
+  // it shifts a few px depending on rendered text height. Drives the four
+  // dimming strips below; null until the first layout pass, at which point
+  // there's nothing to mask yet anyway.
+  const [frameLayout, setFrameLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  // Scan-recognition feedback — device-local prefs (Settings > Scanning),
+  // gated separately from the unrelated warning haptics on an unmatched
+  // code or out-of-stock item below, which are error alerts, not "scan
+  // feedback," and always fire regardless of these two settings.
+  const soundEnabled = useScanFeedbackStore((s) => s.soundEnabled);
+  const vibrationEnabled = useScanFeedbackStore((s) => s.vibrationEnabled);
+  const beepPlayer = useAudioPlayer(require('@/assets/sounds/scan-beep.wav'));
+  // Split out so confirmPendingScan below — which repeats only the haptic
+  // half on quantity-modal confirm, since the beep already played when the
+  // scan was first recognized — shares this instead of re-checking
+  // vibrationEnabled inline and silently drifting from it over time.
+  const playScanHaptic = useCallback(() => {
+    if (vibrationEnabled) haptics.success();
+  }, [vibrationEnabled]);
+  const playScanFeedback = useCallback(async () => {
+    playScanHaptic();
+    if (soundEnabled) {
+      // seekTo is async — calling play() before it resolves risks starting
+      // from wherever the previous beep's playhead was left, not from 0
+      // (noticeable on two scans of an already-in-cart item within ~a second).
+      await beepPlayer.seekTo(0);
+      beepPlayer.play();
+    }
+  }, [playScanHaptic, soundEnabled, beepPlayer]);
+  // Set when a scan resolves to a product not yet in the cart — the quantity
+  // modal needs a decision before scanning continues, same as the unmatched
+  // panel. A product already in the cart skips this and increments directly.
+  const [pendingScan, setPendingScan] = useState<{ product: Product; variant?: ProductVariant; stockLimit: number } | null>(null);
   const lastCodeRef = useRef<string | null>(null);
   const lastScanAtRef = useRef(0);
 
@@ -62,6 +112,16 @@ export function BarcodeScannerScreen() {
     if (isFocused && unmatchedCode) setUnmatchedCode(null);
   }
 
+  const close = useCallback(() => {
+    // No-op if a capture already fired (consumeBarcodeCapture already
+    // cleared it) — only matters when the user backs out via the header
+    // button without ever scanning anything, which would otherwise leave a
+    // stale callback for the next unrelated capture to accidentally invoke.
+    if (isCapture) cancelBarcodeCapture();
+    if (router.canGoBack()) router.back();
+    else router.replace(user?.role === 'staff' ? '/(staff)/dashboard' : '/(owner)/dashboard');
+  }, [user?.role, isCapture]);
+
   const handleScan = useCallback(
     (result: BarcodeScanningResult) => {
       // A barcode is a string, full stop — trimmed only, never parsed as a
@@ -71,9 +131,27 @@ export function BarcodeScannerScreen() {
       if (!code) return;
 
       const now = Date.now();
-      if (code === lastCodeRef.current && now - lastScanAtRef.current < SCAN_COOLDOWN_MS) return;
-      lastCodeRef.current = code;
+      if (code === lastCodeRef.current) {
+        if (now - lastScanAtRef.current < SCAN_COOLDOWN_MS) {
+          // Still the same barcode, still within the window — refresh the
+          // timestamp so continuous dwelling keeps extending the suppression
+          // instead of expiring at a fixed point after the *first* sighting.
+          // Without this, holding the camera steady over one barcode for
+          // longer than SCAN_COOLDOWN_MS silently added it a second time.
+          lastScanAtRef.current = now;
+          return;
+        }
+      } else {
+        lastCodeRef.current = code;
+      }
       lastScanAtRef.current = now;
+
+      if (isCapture) {
+        playScanFeedback();
+        consumeBarcodeCapture(code);
+        close();
+        return;
+      }
 
       const match = findProductByBarcode(shopId, code);
       if (!match) {
@@ -112,12 +190,53 @@ export function BarcodeScannerScreen() {
         return;
       }
 
-      addOrIncrementCartItem({ cart, product, quantity: 1, variant, addItem, updateItem });
-      haptics.success();
-      toast({ type: 'success', message: `✓ ${product.name}${variant ? ` — ${variant.name}` : ''} added` });
+      if (inCart > 0) {
+        // Already on the sale — just bump the line, no modal. A second
+        // decision for the same product mid-basket would only slow the
+        // cashier down for no benefit.
+        addOrIncrementCartItem({ cart, product, quantity: 1, variant, addItem, updateItem });
+        playScanFeedback();
+        toast({
+          type: 'success',
+          message: `${product.name}${variant ? ` — ${variant.name}` : ''} · Qty ${inCart + 1}`,
+        });
+        return;
+      }
+
+      // First time this product's on the sale — the barcode itself was still
+      // successfully recognized, so scan feedback fires now rather than
+      // waiting on the quantity modal below (a manual button tap, not a scan
+      // event). Ask how many — same modal the manual tap-to-add flow uses.
+      // Pauses the camera (see onBarcodeScanned below) until it's answered.
+      playScanFeedback();
+      setPendingScan({ product, variant, stockLimit });
     },
-    [shopId, cart, addItem, updateItem, toast]
+    [shopId, cart, addItem, updateItem, toast, isCapture, close, playScanFeedback]
   );
+
+  const confirmPendingScan = useCallback(
+    (quantity: number) => {
+      if (!pendingScan) return;
+      const { product, variant } = pendingScan;
+      addOrIncrementCartItem({ cart, product, quantity, variant, addItem, updateItem });
+      // The beep already played when the scan was first recognized (see the
+      // comment above setPendingScan) — only the haptic half of scan feedback
+      // repeats here, on confirm, shared via playScanHaptic so it can't drift
+      // from the setting the way a second inline check would.
+      playScanHaptic();
+      toast({ type: 'success', message: `✓ ${product.name}${variant ? ` — ${variant.name}` : ''} added` });
+      setPendingScan(null);
+      // Otherwise the P0-4 dwell guard would block an immediate intentional
+      // rescan of the same barcode right after confirming this one.
+      lastCodeRef.current = null;
+    },
+    [pendingScan, cart, addItem, updateItem, toast, playScanHaptic]
+  );
+
+  const cancelPendingScan = useCallback(() => {
+    setPendingScan(null);
+    lastCodeRef.current = null;
+  }, []);
 
   const scanAgain = () => {
     setUnmatchedCode(null);
@@ -130,11 +249,6 @@ export function BarcodeScannerScreen() {
       pathname: user?.role === 'staff' ? '/(staff)/inventory/new' : '/(owner)/inventory/new',
       params: { barcode: unmatchedCode },
     });
-  };
-
-  const close = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace(user?.role === 'staff' ? '/(staff)/dashboard' : '/(owner)/dashboard');
   };
 
   // ── Permission gates ─────────────────────────────────────────────────
@@ -187,8 +301,16 @@ export function BarcodeScannerScreen() {
         <CameraView
           style={StyleSheet.absoluteFill}
           facing="back"
+          enableTorch={torchOn}
+          // 'off' is expo-camera's confusing name for continuous autofocus
+          // ("automatically focus when needed") — 'on' would instead lock
+          // focus after a single shot, which is wrong for a scanner working
+          // through a basket of items at different distances. Named
+          // explicitly since the default already matches, so a future
+          // dependency bump silently flipping it would be easy to miss.
+          autofocus="off"
           barcodeScannerSettings={{ barcodeTypes: [...BARCODE_TYPES] }}
-          onBarcodeScanned={unmatchedCode ? undefined : handleScan}
+          onBarcodeScanned={unmatchedCode || pendingScan ? undefined : handleScan}
         />
       )}
 
@@ -197,16 +319,55 @@ export function BarcodeScannerScreen() {
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </AnimatedPressable>
         <Text style={styles.headerTitle}>Scan barcode</Text>
-        <AnimatedPressable onPress={close} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Close scanner">
-          <Ionicons name="close" size={22} color="#FFFFFF" />
-        </AnimatedPressable>
+        <View style={styles.headerRight}>
+          <AnimatedPressable
+            onPress={toggleTorch}
+            style={[styles.headerBtn, torchOn && styles.headerBtnActive]}
+            accessibilityRole="button"
+            accessibilityLabel={torchOn ? 'Turn off flashlight' : 'Turn on flashlight'}
+          >
+            <Ionicons name={torchOn ? 'flash' : 'flash-off'} size={20} color={torchOn ? '#FBBF24' : '#FFFFFF'} />
+          </AnimatedPressable>
+          <AnimatedPressable onPress={close} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Close scanner">
+            <Ionicons name="close" size={22} color="#FFFFFF" />
+          </AnimatedPressable>
+        </View>
       </View>
 
       {!unmatchedCode && (
-        <View style={styles.frameWrap} pointerEvents="none">
-          <View style={styles.frame} />
-          <Text style={styles.instruction}>Align the barcode within the frame</Text>
-        </View>
+        <>
+          {/* Positioned off `frameLayout`, measured off the frame below — safe
+              because frameWrap is the container's only flow child (everything
+              else is position:absolute), so it shares the container's origin
+              and the frame's onLayout coordinates need no further translation. */}
+          {frameLayout && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <View style={[styles.maskStrip, { top: 0, left: 0, right: 0, height: frameLayout.y }]} />
+              <View
+                style={[
+                  styles.maskStrip,
+                  { top: frameLayout.y + frameLayout.height, left: 0, right: 0, bottom: 0 },
+                ]}
+              />
+              <View
+                style={[
+                  styles.maskStrip,
+                  { top: frameLayout.y, height: frameLayout.height, left: 0, width: frameLayout.x },
+                ]}
+              />
+              <View
+                style={[
+                  styles.maskStrip,
+                  { top: frameLayout.y, height: frameLayout.height, left: frameLayout.x + frameLayout.width, right: 0 },
+                ]}
+              />
+            </View>
+          )}
+          <View style={styles.frameWrap} pointerEvents="none">
+            <View style={styles.frame} onLayout={(e) => setFrameLayout(e.nativeEvent.layout)} />
+            <Text style={styles.instruction}>Align the barcode within the frame</Text>
+          </View>
+        </>
       )}
 
       {unmatchedCode && (
@@ -225,6 +386,19 @@ export function BarcodeScannerScreen() {
           </AnimatedPressable>
         </View>
       )}
+
+      <QuantityModal
+        visible={!!pendingScan}
+        onClose={cancelPendingScan}
+        onConfirm={confirmPendingScan}
+        productName={
+          pendingScan
+            ? `${pendingScan.product.name}${pendingScan.variant ? ` — ${pendingScan.variant.name}` : ''}`
+            : ''
+        }
+        maxStock={pendingScan?.stockLimit ?? Infinity}
+        unitOfMeasure={pendingScan?.product.unitOfMeasure}
+      />
     </View>
   );
 }
@@ -252,7 +426,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerBtnActive: {
+    backgroundColor: 'rgba(251,191,36,0.25)',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
     color: '#FFFFFF',
     fontSize: Typography.size.body,
     fontFamily: Typography.fontFamilySemiBold,
@@ -269,6 +453,10 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     borderWidth: 2.5,
     borderColor: 'rgba(255,255,255,0.85)',
+  },
+  maskStrip: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   instruction: {
     color: '#FFFFFF',
