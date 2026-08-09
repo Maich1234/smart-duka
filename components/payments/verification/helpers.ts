@@ -12,6 +12,22 @@ export interface OtpError {
 }
 
 export function mapOtpError(err: unknown, fallback: string): OtpError {
+  // services/api.ts's interceptors reject with plain, non-Axios objects in
+  // several cases: `{ offlineQueued }` / `{ offlineUnavailable }` from the
+  // offline outbox, `{ offlineRealtime }` for REALTIME_ONLY endpoints, and a
+  // bare `{ message }` connection error when a request in NEVER_QUEUE (which
+  // /otp/request and /otp/verify are) fails mid-flight. None of these ever
+  // reached the backend, so none of them mean "wrong code" — without this
+  // check they fell through to the generic branch below, which used to
+  // discard the real message and could read like a rejected code.
+  const queued = err as { offlineQueued?: boolean; offlineUnavailable?: boolean; offlineRealtime?: boolean; message?: string };
+  if (queued?.offlineQueued || queued?.offlineUnavailable || queued?.offlineRealtime) {
+    return {
+      kind: 'offline',
+      message: queued.message || "You're offline. Check your connection and try again.",
+    };
+  }
+
   const ax = err as AxiosError<{ message?: string }>;
   const serverMsg = ax?.response?.data?.message ?? '';
 
@@ -20,6 +36,12 @@ export function mapOtpError(err: unknown, fallback: string): OtpError {
       kind: 'offline',
       message: "You're offline. Check your connection and try again.",
     };
+  }
+  if (!ax?.isAxiosError && !ax?.response && ax?.message) {
+    // The plain connection-error object from the response interceptor's
+    // NEVER_QUEUE path (e.g. a client-side timeout despite the extended
+    // budget) — same treatment, but keep its specific message.
+    return { kind: 'offline', message: ax.message };
   }
   if (ax?.response?.status === 429 || /too many/i.test(serverMsg)) {
     return {

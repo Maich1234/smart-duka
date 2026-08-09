@@ -37,7 +37,14 @@ export function storeVerificationToken(token: string) {
 
 type ConfigView = 'locked' | 'loading' | 'no_config' | 'configured' | 'form';
 
-export const PaymentsSection: React.FC = () => {
+interface Props {
+  /** Fired after a successful save or disconnect, so an embedding screen with
+   * its own cached "is M-Pesa configured" query (e.g. PaymentMethodsScreen)
+   * can invalidate it — this component doesn't share that cache itself. */
+  onChange?: () => void;
+}
+
+export const PaymentsSection: React.FC<Props> = ({ onChange }) => {
   // Lazily 'loading' when a stored session exists, so the mount effect below
   // has no state to set — it used to open on 'locked' and immediately correct
   // itself, which both flashed the wrong panel and cascaded a render.
@@ -98,6 +105,7 @@ export const PaymentsSection: React.FC = () => {
       await saveMpesaConfig(data, token);
       toast({ type: 'success', message: 'M-Pesa Business account connected successfully.' });
       await loadConfig(token);
+      onChange?.();
     } catch (err: any) {
       toast({ type: 'error', message: err.response?.data?.message || 'Failed to save configuration' });
     } finally {
@@ -122,6 +130,7 @@ export const PaymentsSection: React.FC = () => {
               await disconnectMpesa(token);
               setConfig(null);
               setView('no_config');
+              onChange?.();
             } catch (err: any) {
               toast({ type: 'error', message: err.response?.data?.message || 'Failed to disconnect' });
             }

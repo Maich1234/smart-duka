@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect } from 'react'
 import { router } from 'expo-router';
 import axios from 'axios';
 import * as Haptics from 'expo-haptics';
+import { useQueryClient } from '@tanstack/react-query';
 import { clearProductCache } from '@/utils/productCache';
 import { useAuthStore } from '@/store/authStore';
 import { login as loginApi, getProfile } from '@/services/auth';
@@ -37,6 +38,7 @@ let logoutInProgress = false;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, setAuth, logout: storeLogout, isLoading, setLoading } = useAuthStore();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const initAuth = async () => {
@@ -62,6 +64,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // cached session must survive, or offline-first is dead on arrival
         // (the login screen can't authenticate without a connection).
         if (error?.response?.status === 401) {
+          // Same reasoning as the manual logout below: an invalid session
+          // must not leave its cached shop data (payment methods, sales,
+          // everything else) sitting in memory for whoever uses the device
+          // next.
+          queryClient.clear();
           await clearAll();
           storeLogout();
         }
@@ -70,9 +77,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
     initAuth();
-    // Both deps are zustand actions, created once by the store, so declaring
-    // them keeps this mount-only rather than silencing the rule.
-  }, [setLoading, storeLogout]);
+    // setLoading/storeLogout are zustand actions (stable); queryClient is the
+    // single app-wide instance from _layout.tsx (also stable) — listing it
+    // keeps this mount-only rather than silencing the rule.
+  }, [setLoading, storeLogout, queryClient]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -121,9 +129,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       // Must run before clearAll/storeLogout — it needs the still-valid auth token.
       await unregisterDeviceFromNotifications();
-      // The cached catalogue is shop data on a shared device — a staff member
-      // signing out must not leave the next person able to browse it.
+      // Shop data on a shared device — a staff member signing out must not
+      // leave the next person able to browse it. clearAll() only wipes the
+      // AsyncStorage-persisted React Query cache; the live in-memory
+      // queryClient (shop config incl. payment methods, sales, products,
+      // everything) survives logout untouched unless cleared here too —
+      // without this, a payment method removed and saved right before
+      // logging out (or logging in as someone else on the same device)
+      // could still read back from the stale in-memory cache.
       clearProductCache();
+      queryClient.clear();
       await clearAll();
       storeLogout();
       router.replace('/(auth)/login');
@@ -131,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Reset after navigation settles so a fresh login can log out again.
       setTimeout(() => { logoutInProgress = false; }, 2000);
     }
-  }, [storeLogout]);
+  }, [storeLogout, queryClient]);
 
   const refreshUser = async () => {
     try {

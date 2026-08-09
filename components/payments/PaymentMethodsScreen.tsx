@@ -10,6 +10,7 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useAlert } from '@/context/AlertContext';
 import { getShopConfig, updateShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
+import { PaymentsSection } from './PaymentsSection';
 import {
   CASH_METHOD_KEY,
   DEFAULT_SALE_METHODS,
@@ -50,7 +51,16 @@ export const PaymentMethodsScreen: React.FC = () => {
     queryKey: ['paymentStatus'],
     queryFn: getPaymentStatus,
   });
+  // Credentials present — used to decide whether the connect button says
+  // "Connect" or "Settings".
   const mpesaConfigured = paymentStatus?.data?.mpesa?.isConfigured ?? false;
+  // Actually usable for an STK prompt: credentials present AND not switched
+  // off server-side. These are two separate stored booleans (PaymentConfig's
+  // `enabled` vs. derived `isConfigured`) that stay in sync only by
+  // convention today — checking both here means a future divergence fails
+  // safe instead of silently offering STK the backend will reject.
+  const mpesaUsable = mpesaConfigured && paymentStatus?.data?.mpesa?.enabled !== false;
+  const [mpesaSetupOpen, setMpesaSetupOpen] = useState(false);
 
   // null means "untouched, follow the server". Once the owner edits anything
   // the draft takes over, so a background refetch can't wipe unsaved changes.
@@ -255,7 +265,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                     />
                     {isMpesa && (
                       <Text style={styles.rowHint}>
-                        {mpesaConfigured
+                        {mpesaUsable
                           ? 'Connected — sends an STK prompt to the customer'
                           : 'Records the sale and prints. Connect M-Pesa Business for STK prompts.'}
                       </Text>
@@ -335,16 +345,43 @@ export const PaymentMethodsScreen: React.FC = () => {
           </Text>
         </View>
 
+        {/* Used to route to /(owner)/payments — that's the M-Pesa transaction
+            ledger, not a setup screen, so tapping "Connect" was a dead end.
+            Opens the real connect/verify/credentials flow inline instead. */}
         <AnimatedPressable
           style={styles.linkRow}
-          onPress={() => router.push('/(owner)/payments')}
+          onPress={() => setMpesaSetupOpen((v) => !v)}
           accessibilityRole="button"
-          accessibilityLabel="Open M-Pesa Business setup"
+          accessibilityState={{ expanded: mpesaSetupOpen }}
+          accessibilityLabel={mpesaSetupOpen ? 'Close M-Pesa Business setup' : 'Open M-Pesa Business setup'}
         >
           <Ionicons name="link-outline" size={16} color={Colors.primary} />
           <Text style={styles.linkText}>
             {mpesaConfigured ? 'M-Pesa Business settings' : 'Connect M-Pesa Business for STK prompts'}
           </Text>
+          <Ionicons
+            name={mpesaSetupOpen ? 'chevron-up' : 'chevron-forward'}
+            size={15}
+            color={Colors.textTertiary}
+          />
+        </AnimatedPressable>
+
+        {mpesaSetupOpen && (
+          <Animated.View entering={FadeInUp.duration(220)} style={styles.mpesaSetupPanel}>
+            <PaymentsSection
+              onChange={() => queryClient.invalidateQueries({ queryKey: ['paymentStatus'] })}
+            />
+          </Animated.View>
+        )}
+
+        <AnimatedPressable
+          style={styles.linkRow}
+          onPress={() => router.push('/(owner)/payments')}
+          accessibilityRole="button"
+          accessibilityLabel="View M-Pesa transactions"
+        >
+          <Ionicons name="receipt-outline" size={16} color={Colors.textSecondary} />
+          <Text style={[styles.linkText, styles.linkTextSecondary]}>View M-Pesa transactions</Text>
           <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
         </AnimatedPressable>
       </ScrollView>
@@ -474,6 +511,15 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
+  },
+  linkTextSecondary: { color: Colors.textSecondary },
+  mpesaSetupPanel: {
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
   footer: {
     padding: Spacing.md,

@@ -240,7 +240,12 @@ const TransactionDetailSheet: React.FC<{ tx: MpesaTransaction; onClose: () => vo
           <Text style={styles.detailTitle}>
             {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)} Transaction
           </Text>
-          <AnimatedPressable onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <AnimatedPressable
+            onPress={onClose}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel="Close transaction details"
+          >
             <Ionicons name="close" size={20} color={Colors.textTertiary} />
           </AnimatedPressable>
         </View>

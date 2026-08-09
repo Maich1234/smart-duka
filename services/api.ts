@@ -31,7 +31,12 @@ const REALTIME_ONLY = ['/mpesa/initiate', '/mpesa/verify-receipt', '/refund', '/
 // Auth requests carry credentials and only make sense interactively — never
 // write them (and the password inside) to the offline outbox. Fail fast with
 // a connection error instead of "saved offline".
-const NEVER_QUEUE = ['/auth/'];
+// OTP request/verify are session-bound and time-sensitive: silently replaying
+// a "send me a code" call minutes later (after a slow-email timeout) sends a
+// second code that invalidates the first mid-read, and replaying a "verify
+// this code" call later is meaningless once the code has moved on. Both must
+// fail fast and visibly instead of queuing.
+const NEVER_QUEUE = ['/auth/', '/otp/request', '/otp/verify'];
 
 const isRealtimeOnly = (url: string) =>
   REALTIME_ONLY.some(p => url.includes(p));

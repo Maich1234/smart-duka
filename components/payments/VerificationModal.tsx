@@ -388,7 +388,9 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
                       <View style={styles.sendingRow}>
                         <ActivityIndicator size="small" color={Colors.primary} />
                         <Text style={styles.sendingText} maxFontSizeMultiplier={1.6}>
-                          Sending your code to {methods[0]?.destination}…
+                          {methods[0]?.method === 'email'
+                            ? `Sending your code to ${methods[0]?.destination}… this can take up to a minute.`
+                            : `Sending your code to ${methods[0]?.destination}…`}
                         </Text>
                       </View>
                     </Animated.View>

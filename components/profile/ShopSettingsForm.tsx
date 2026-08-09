@@ -14,7 +14,6 @@ import { SelectPicker, type PickerOption } from '../ui/SelectPicker';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { PaymentsSection } from '@/components/payments/PaymentsSection';
 import { COUNTRIES, CURRENCIES, getCountryByCode } from '@/constants/presets';
 
 interface ShopSettingsFormProps {
@@ -137,6 +136,26 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
   uploadingLogo = false,
   loading = false,
 }) => {
+  const [errors, setErrors] = useState<{ phone?: string; taxRate?: string }>({});
+
+  const handleSavePress = () => {
+    const errs: typeof errors = {};
+    // Loose on purpose — this form spans every country in COUNTRIES (not just
+    // Kenya), so a strict per-country format isn't safe to enforce here. This
+    // only catches the kind of typo that would silently break the shop-phone
+    // SMS-OTP flow later (see ShopSettingsForm's phone feeding VerificationModal).
+    const phoneDigits = shop.phone.replace(/\D/g, '');
+    if (shop.phone.trim() && phoneDigits.length < 7) {
+      errs.phone = 'Enter a valid phone number';
+    }
+    if (shop.taxRate < 0 || shop.taxRate > 100) {
+      errs.taxRate = 'Tax rate must be between 0 and 100';
+    }
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    onSave();
+  };
+
   return (
     <View style={styles.card}>
 
@@ -164,9 +183,10 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
         <Input
           label="Phone"
           value={shop.phone}
-          onChangeText={(t) => onChange('phone', t)}
+          onChangeText={(t) => { onChange('phone', t); if (errors.phone) setErrors((e) => ({ ...e, phone: undefined })); }}
           leftIcon="call-outline"
           keyboardType="phone-pad"
+          error={errors.phone}
         />
         <Input
           label="Email"
@@ -218,9 +238,13 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
         <Input
           label="Tax Rate (%)"
           value={String(shop.taxRate)}
-          onChangeText={(t) => onChange('taxRate', parseFloat(t) || 0)}
+          onChangeText={(t) => {
+            onChange('taxRate', parseFloat(t) || 0);
+            if (errors.taxRate) setErrors((e) => ({ ...e, taxRate: undefined }));
+          }}
           leftIcon="receipt-outline"
           keyboardType="numeric"
+          error={errors.taxRate}
         />
       </CollapsibleSection>
 
@@ -231,6 +255,7 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
         icon="document-text-outline"
         iconColor={Colors.info}
         iconBg="#EFF6FF"
+        isLast
       >
         {/* Logo picker */}
         <Text style={styles.fieldLabel}>Business Logo</Text>
@@ -276,21 +301,9 @@ export const ShopSettingsForm: React.FC<ShopSettingsFormProps> = ({
         />
       </CollapsibleSection>
 
-      {/* ── Payments ───────────────────────────────────────────────── */}
-      <CollapsibleSection
-        title="Payments"
-        description="M-Pesa Business integration"
-        icon="card-outline"
-        iconColor="#16A34A"
-        iconBg="#DCFCE7"
-        isLast
-      >
-        <PaymentsSection />
-      </CollapsibleSection>
-
       <Button
         title="Save Business Settings"
-        onPress={onSave}
+        onPress={handleSavePress}
         loading={loading}
         leftIcon="checkmark-circle-outline"
         style={styles.saveBtn}

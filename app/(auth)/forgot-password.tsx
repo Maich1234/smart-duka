@@ -163,6 +163,8 @@ export default function ForgotPasswordScreen() {
             onPress={() => (step === 'request' ? router.back() : setStep('request'))}
             style={styles.backButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
             <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
           </AnimatedPressable>
