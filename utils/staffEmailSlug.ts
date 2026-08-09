@@ -29,12 +29,6 @@ export function buildSystemEmailDomain(shopName: string): string {
   return `${slugifyShopName(shopName)}.${SYSTEM_EMAIL_ROOT}`;
 }
 
-/** True when `email` belongs to this shop's own system-generated domain. */
-export function isSystemGeneratedEmail(email: string, shopName: string): boolean {
-  const domain = buildSystemEmailDomain(shopName);
-  return (email || '').toLowerCase().trim().endsWith(`@${domain}`);
-}
-
 /** Suggested local-part from a staff member's name, e.g. "Jane Otieno" -> "jane.otieno". */
 export function slugifyLocalPart(name: string): string {
   return wordsOf(name).join('.');

@@ -61,6 +61,11 @@ export default function SetupGuideScreen() {
           ref={webViewRef}
           source={{ uri }}
           style={styles.flex}
+          // Confines navigation to our own web origin — the page carries a
+          // scoped auth token in its URL, so an off-domain redirect (a stray
+          // link on the guide page, a compromised ad, etc.) must not be able
+          // to load third-party content inside this authenticated WebView.
+          originWhitelist={[`${WEB_URL}/*`]}
           onNavigationStateChange={(nav: WebViewNavigation) => setCanGoBack(nav.canGoBack)}
           onMessage={handleMessage}
           startInLoadingState

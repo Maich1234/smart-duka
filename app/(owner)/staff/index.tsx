@@ -180,11 +180,25 @@ export default function OwnerStaffList() {
       {/* Pagination */}
       {totalPages > 1 && (
         <View style={styles.paginationBar}>
-          <AnimatedPressable onPress={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}>
+          <AnimatedPressable
+            onPress={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel={`Previous page, page ${page - 1}`}
+            accessibilityState={{ disabled: page <= 1 }}
+          >
             <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
           </AnimatedPressable>
           <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-          <AnimatedPressable onPress={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}>
+          <AnimatedPressable
+            onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel={`Next page, page ${page + 1}`}
+            accessibilityState={{ disabled: page >= totalPages }}
+          >
             <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
           </AnimatedPressable>
         </View>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
@@ -59,10 +60,19 @@ const ExpenseFormSheetBody: React.FC<Omit<ExpenseFormSheetProps, 'visible'>> = (
   const [paymentMethod, setPaymentMethod] = useState<MoneyOutMethod>(expense?.paymentMethod || 'cash');
   const [date, setDate] = useState(() => (expense ? new Date(expense.date) : new Date()));
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const { toast } = useAlert();
+
+  const parsedAmount = parseFloat(amount);
+  const amountValid = !isNaN(parsedAmount) && parsedAmount > 0;
+  // Only shown once the field has content — an untouched blank field on open
+  // isn't an error yet, just an empty required field.
+  const amountError = amount.trim() !== '' && !amountValid ? 'Enter an amount greater than 0' : undefined;
 
   const handleSave = () => {
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+    if (!amountValid) {
+      toast({ type: 'error', message: amountError ?? 'Enter an amount first' });
+      return;
+    }
     onSave({
       category,
       amount: parsedAmount,
@@ -93,7 +103,7 @@ const ExpenseFormSheetBody: React.FC<Omit<ExpenseFormSheetProps, 'visible'>> = (
         })}
       </ScrollView>
 
-      <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="0.00" />
+      <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="0.00" error={amountError} />
       <Input label="Description (optional)" value={description} onChangeText={setDescription} placeholder="What was this for?" />
 
       <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
@@ -112,7 +122,13 @@ const ExpenseFormSheetBody: React.FC<Omit<ExpenseFormSheetProps, 'visible'>> = (
 
       <View style={styles.buttonRow}>
         <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button title={expense ? 'Save Changes' : 'Add Expense'} onPress={handleSave} loading={loading} style={styles.flexBtn} />
+        <Button
+          title={expense ? 'Save Changes' : 'Add Expense'}
+          onPress={handleSave}
+          loading={loading}
+          disabled={!amountValid}
+          style={styles.flexBtn}
+        />
       </View>
     </>
   );

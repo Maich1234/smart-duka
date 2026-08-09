@@ -6,6 +6,8 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import { z } from 'zod';
 import { createStaff, updateStaffPermissions, checkStaffEmailAvailability, previewSeatAddition } from '@/services/staff';
 import { formatCurrency } from '@/utils/formatters';
 import { Input } from '@/components/ui/Input';
@@ -62,9 +64,20 @@ export default function NewStaffScreen() {
   const localPart = localPartTouched ? typedLocalPart : slugifyLocalPart(form.name);
 
   const systemEmail = `${localPart}@${domain}`;
+  // A system-generated address isn't a real inbox — there's no verification
+  // email to fall back on, so the owner is the only channel these credentials
+  // reach the new hire through (WhatsApp, SMS, in person). Real-email accounts
+  // benefit too: it saves re-typing the password into a message by hand.
+  const resolvedEmail = emailMode === 'system' ? systemEmail : form.email;
+  const canCopyCredentials = !!resolvedEmail.trim() && !!form.password;
   const successMessage = emailMode === 'system'
     ? 'Staff added — they can sign in right away.'
     : 'Staff added — ask them to check their email to verify before signing in.';
+
+  const handleCopyCredentials = async () => {
+    await Clipboard.setStringAsync(`Email: ${resolvedEmail}\nPassword: ${form.password}`);
+    toast({ type: 'success', message: 'Credentials copied' });
+  };
 
   const checkAvailability = async () => {
     if (!localPart) return;
@@ -118,6 +131,13 @@ export default function NewStaffScreen() {
     }
     if (emailMode === 'real' && !form.email) {
       return toast({ type: 'error', message: 'Email is required' });
+    }
+    // A malformed address here either bounces at the API with a confusing
+    // server error, or — worse — saves and locks the new hire out, since
+    // 'real' mode requires them to verify this exact address before they
+    // can sign in (see the copy below). Same check register.tsx uses.
+    if (emailMode === 'real' && !z.string().email().safeParse(form.email).success) {
+      return toast({ type: 'error', message: 'Enter a valid email address' });
     }
     if (emailMode === 'system' && !localPart) {
       return toast({ type: 'error', message: 'Enter a username for the generated email' });
@@ -224,6 +244,19 @@ export default function NewStaffScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>ACCOUNT</Text>
           <Input label="Password" value={form.password} onChangeText={(t) => setForm({ ...form, password: t })} secureTextEntry />
+          <AnimatedPressable
+            style={[styles.copyCredentialsRow, !canCopyCredentials && styles.copyCredentialsRowDisabled]}
+            onPress={handleCopyCredentials}
+            disabled={!canCopyCredentials}
+            accessibilityRole="button"
+            accessibilityLabel="Copy email and password to share with this staff member"
+            accessibilityState={{ disabled: !canCopyCredentials }}
+          >
+            <Ionicons name="copy-outline" size={16} color={canCopyCredentials ? Colors.primary : Colors.textTertiary} />
+            <Text style={[styles.copyCredentialsText, !canCopyCredentials && styles.copyCredentialsTextDisabled]}>
+              Copy email &amp; password
+            </Text>
+          </AnimatedPressable>
         </View>
 
         <View style={styles.section}>
@@ -350,6 +383,24 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     marginBottom: Spacing.md,
   },
+  copyCredentialsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: Spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.primarySubtle,
+  },
+  copyCredentialsRowDisabled: { backgroundColor: 'transparent' },
+  copyCredentialsText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
+  },
+  copyCredentialsTextDisabled: { color: Colors.textTertiary },
   permissionsRow: {
     flexDirection: 'row',
     alignItems: 'center',

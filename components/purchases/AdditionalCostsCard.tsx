@@ -32,7 +32,7 @@ interface AdditionalCostsCardProps {
  * feature's own "avoid modal overload" requirement.
  */
 export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs, onAdd, onUpdate, onRemove }) => {
-  const { alert } = useAlert();
+  const { alert, toast } = useAlert();
   const [expanded, setExpanded] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -76,9 +76,15 @@ export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs,
     setFormOpen(true);
   };
 
+  const parsedAmount = parseFloat(amount);
+  const amountValid = !isNaN(parsedAmount) && parsedAmount > 0;
+  const amountError = amount.trim() !== '' && !amountValid ? 'Enter an amount greater than 0' : undefined;
+
   const handleSave = () => {
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+    if (!amountValid) {
+      toast({ type: 'error', message: amountError ?? 'Enter an amount first' });
+      return;
+    }
     const payload = {
       category,
       description: description.trim() || undefined,
@@ -142,10 +148,22 @@ export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs,
                   {!!cost.description && <Text style={styles.costDescription} numberOfLines={1}>{cost.description}</Text>}
                 </View>
                 <Text style={styles.costAmount}>{formatCurrency(cost.amount)}</Text>
-                <AnimatedPressable onPress={() => openEditForm(cost)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.costActionBtn}>
+                <AnimatedPressable
+                  onPress={() => openEditForm(cost)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.costActionBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit ${meta.label} cost`}
+                >
                   <Ionicons name="pencil-outline" size={15} color={Colors.primary} />
                 </AnimatedPressable>
-                <AnimatedPressable onPress={() => handleDelete(cost)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.costActionBtn}>
+                <AnimatedPressable
+                  onPress={() => handleDelete(cost)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.costActionBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${meta.label} cost`}
+                >
                   <Ionicons name="trash-outline" size={15} color={Colors.danger} />
                 </AnimatedPressable>
               </Animated.View>
@@ -175,13 +193,13 @@ export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs,
                 })}
               </ScrollView>
 
-              <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" />
+              <Input label="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" error={amountError} />
               <Input label="Description (optional)" value={description} onChangeText={setDescription} placeholder="e.g. Nairobi to shop" />
               <Input label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="Anything else worth remembering" />
 
               <View style={styles.formButtonRow}>
                 <Button title="Cancel" variant="outline" size="sm" onPress={() => { resetForm(); setFormOpen(false); }} style={styles.flexBtn} />
-                <Button title={editingKey ? 'Save' : 'Add'} size="sm" onPress={handleSave} style={styles.flexBtn} />
+                <Button title={editingKey ? 'Save' : 'Add'} size="sm" onPress={handleSave} disabled={!amountValid} style={styles.flexBtn} />
               </View>
             </Animated.View>
           )}

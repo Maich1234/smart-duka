@@ -61,7 +61,11 @@ interface OptimisticBatch {
  * the full list, so this needed no API change.
  */
 export default function AiChatScreen() {
-  const { seed } = useLocalSearchParams<{ seed?: string }>();
+  // `new` triggers handleNewChat() below on arrival — the Help Center's "Ask
+  // Dukana" link (dukana://chat?new=1) uses this so a visitor coming from an
+  // old conversation's context always lands on a blank thread, not whatever
+  // was last open.
+  const { seed, new: newChatParam } = useLocalSearchParams<{ seed?: string; new?: string }>();
   const tabBarHeight = useTabBarHeight();
 
   // Same gate as /(owner)/insights.tsx — subscription state, plan feature,
@@ -206,6 +210,20 @@ export default function AiChatScreen() {
     setOptimistic(null);
     setInputText('');
   };
+
+  // Same re-arrival problem the seed effect above solves: chat is a tab
+  // route, so a second deep link while it's already mounted wouldn't re-run
+  // a useState initializer. Applied once per distinct param value.
+  const appliedNewChatParam = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof newChatParam === 'string' && newChatParam && newChatParam !== appliedNewChatParam.current) {
+      appliedNewChatParam.current = newChatParam;
+      handleNewChat();
+    }
+    // handleNewChat isn't memoized, so it's deliberately omitted — this must
+    // only re-run when the param itself changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newChatParam]);
 
   const handleDelete = () => {
     if (!conversationId || sendMutation.isPending) return;

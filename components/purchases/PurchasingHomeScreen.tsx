@@ -66,7 +66,7 @@ export function PurchasingHomeScreen() {
   const canView = usePermission('view_purchases');
   const canCreate = usePermission('create_purchases');
 
-  const { data: shopConfigData, isLoading: loadingShopConfig } = useQuery({
+  const { data: shopConfigData, isLoading: loadingShopConfig, isError: shopConfigError, refetch: refetchShopConfig } = useQuery({
     queryKey: ['shopConfig'],
     queryFn: getShopConfig,
   });
@@ -95,6 +95,13 @@ export function PurchasingHomeScreen() {
 
   if (loadingShopConfig) {
     return <ListSkeleton rows={3} heroHeight={140} />;
+  }
+
+  // A failed config fetch must not read as "the owner turned this off" —
+  // the copy below tells staff to go bother the owner about a setting that
+  // was never actually touched.
+  if (shopConfigError && !shopConfigData) {
+    return <QueryError onRetry={refetchShopConfig} />;
   }
 
   if (!purchasingEnabled) {

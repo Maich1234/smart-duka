@@ -28,6 +28,7 @@ export const useSubscription = () => {
     access: query.data?.data?.access,
     renewal: query.data?.data?.renewal ?? null,
     isLoading: query.isLoading,
+    isError: query.isError,
     refetch: query.refetch,
   };
 };

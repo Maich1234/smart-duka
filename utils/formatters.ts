@@ -65,20 +65,6 @@ export const formatRelativeTime = (dateString: string | Date, now: Date = new Da
 };
 
 /**
- * Format phone number in local notation (e.g., 254712345678 → 0712 345 678)
- */
-export const formatPhoneNumber = (phone: string): string => {
-  const cleaned = phone.replace(/\D/g, '');
-  if (cleaned.length === 12 && cleaned.startsWith('254')) {
-    return `0${cleaned.slice(3, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
-  }
-  if (cleaned.length === 10 && cleaned.startsWith('07')) {
-    return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7)}`;
-  }
-  return phone;
-};
-
-/**
  * Format a Kenyan phone number for display in E.164 style with spaces.
  * Handles +254XXXXXXXXX, 254XXXXXXXXX and 07XXXXXXXX inputs.
  * Falls back to the raw value if the number doesn't match.
@@ -93,19 +79,4 @@ export const formatKenyanPhone = (phone: string): string => {
     return `+254 ${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
   }
   return phone;
-};
-
-/**
- * Truncate text with ellipsis
- */
-export const truncate = (text: string, maxLength: number): string => {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '…';
-};
-
-/**
- * Capitalize first letter of each word
- */
-export const capitalizeWords = (str: string): string => {
-  return str.replace(/\b\w/g, (char) => char.toUpperCase());
 };

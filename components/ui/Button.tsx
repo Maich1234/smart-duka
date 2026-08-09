@@ -132,6 +132,11 @@ export const Button: React.FC<ButtonProps> = ({
               },
               textStyle,
             ]}
+            // Caps growth inside this button's fixed padding — same reasoning
+            // as VerifyButton, which this component has no shared base with.
+            // Matters most for owner-typed payment-method button labels
+            // (CartSummary's payment row), which aren't length-controlled.
+            maxFontSizeMultiplier={1.3}
           >
             {title}
           </Text>

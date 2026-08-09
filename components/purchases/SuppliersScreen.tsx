@@ -110,7 +110,7 @@ export function SuppliersScreen() {
     placeholderData: keepPreviousData,
   });
 
-  const { data: detailData, isLoading: loadingDetail } = useQuery({
+  const { data: detailData, isLoading: loadingDetail, isError: detailError, refetch: refetchDetail } = useQuery({
     queryKey: ['supplier', selectedId],
     queryFn: () => getSupplierById(selectedId!),
     enabled: !!selectedId,
@@ -408,8 +408,10 @@ export function SuppliersScreen() {
           </View>
         ) : (
           <View style={styles.sheet}>
-            {loadingDetail || !detail ? (
+            {loadingDetail ? (
               <ActivityIndicator color={Colors.primary} style={styles.sheetLoading} />
+            ) : detailError || !detail ? (
+              <QueryError onRetry={refetchDetail} message="Could not load this supplier. Check your connection and try again." />
             ) : (
               <>
                 <View style={styles.sheetHeader}>

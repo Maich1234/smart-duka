@@ -117,7 +117,14 @@ export default function ReceiptVerificationScreen() {
             <Text style={styles.ratePrompt}>How was your service today?</Text>
             <View style={styles.starRow}>
               {STAR_VALUES.map((s) => (
-                <AnimatedPressable key={s} onPress={() => setStars(s)} hitSlop={8}>
+                <AnimatedPressable
+                  key={s}
+                  onPress={() => setStars(s)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Rate ${s} star${s === 1 ? '' : 's'}`}
+                  accessibilityState={{ selected: s <= stars }}
+                >
                   <Ionicons
                     name={s <= stars ? 'star' : 'star-outline'}
                     size={36}

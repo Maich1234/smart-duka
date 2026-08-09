@@ -84,8 +84,8 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
               <Text style={styles.promoLabel} numberOfLines={1}>{item.appliedPromotionLabel}</Text>
             )}
           </View>
-          <Text style={[styles.itemMeta, styles.center, { width: 36 }]}>x{item.quantity}</Text>
-          <Text style={[styles.itemMeta, styles.right, { width: 90 }]}>{formatCurrency(item.subtotal, currency)}</Text>
+          <Text style={[styles.itemMeta, styles.center, { width: 36 }]} numberOfLines={1}>x{item.quantity}</Text>
+          <Text style={[styles.itemMeta, styles.right, { width: 90 }]} numberOfLines={1}>{formatCurrency(item.subtotal, currency)}</Text>
         </View>
       ))}
 

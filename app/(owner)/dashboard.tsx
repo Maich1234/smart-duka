@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -122,6 +122,9 @@ export default function OwnerDashboard() {
   const dashboard = data?.data;
   const attentionItems = useOwnerAttention(dashboard);
   const unreadCount = useUnreadNotificationsCount();
+  // Stable reference so the 60s unread-count poll (see useUnreadNotificationsCount)
+  // doesn't defeat DashboardHeader's React.memo on every tick.
+  const handleBellPress = useCallback(() => router.push('/(owner)/notifications'), []);
 
   if (isLoading) {
     return (
@@ -173,7 +176,7 @@ export default function OwnerDashboard() {
             formattedDate={timeContext.formattedDate}
             shopInitials={shopInitials}
             unreadCount={unreadCount}
-            onBellPress={() => router.push('/(owner)/notifications')}
+            onBellPress={handleBellPress}
             profileRoute="/(owner)/profile"
             insetsTop={insets.top}
           />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -38,10 +38,10 @@ interface QuickActionsProps {
  */
 export const QuickActions: React.FC<QuickActionsProps> = React.memo(
   ({ primaryTitle = 'New Sale', primaryIcon = 'cart', primaryRoute, tiles }) => {
-    const go = (route: string) => {
+    const go = useCallback((route: string) => {
       haptics.light();
       router.push(route as never);
-    };
+    }, []);
 
     return (
       <View style={styles.section}>

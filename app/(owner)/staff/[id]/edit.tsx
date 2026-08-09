@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Swi
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { QueryError } from '@/components/ui/QueryError';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -35,7 +36,7 @@ export default function EditStaffScreen() {
   const [edits, setEdits] = useState<Partial<StaffForm>>({});
   const { toast } = useAlert();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['staff', id],
     queryFn: () => getStaffById(id),
   });
@@ -90,8 +91,12 @@ export default function EditStaffScreen() {
     saveMutation.mutate();
   };
 
-  if (isLoading || !staff) {
+  if (isLoading) {
     return <LoadingState />;
+  }
+
+  if (isError || !staff) {
+    return <QueryError onRetry={refetch} message="Could not load this staff member. Check your connection and try again." />;
   }
 
   return (

@@ -236,7 +236,12 @@ export const ExpensesScreen: React.FC = () => {
             trailing={
               <View style={styles.expenseRight}>
                 <Text style={styles.expenseAmount}>{formatCurrency(item.amount, currency)}</Text>
-                <AnimatedPressable onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <AnimatedPressable
+                  onPress={() => handleDelete(item)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete expense: ${item.description}`}
+                >
                   <Ionicons name="trash-outline" size={16} color={Colors.danger} />
                 </AnimatedPressable>
               </View>
@@ -268,6 +273,9 @@ export const ExpensesScreen: React.FC = () => {
                 onPress={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
                 style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel={`Previous page, page ${page - 1}`}
+                accessibilityState={{ disabled: page <= 1 }}
               >
                 <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
               </AnimatedPressable>
@@ -276,6 +284,9 @@ export const ExpensesScreen: React.FC = () => {
                 onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
                 style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel={`Next page, page ${page + 1}`}
+                accessibilityState={{ disabled: page >= totalPages }}
               >
                 <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
               </AnimatedPressable>

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Switch } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { QueryError } from '@/components/ui/QueryError';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -63,7 +64,7 @@ export default function StaffDetailsScreen() {
   const [commissionPeriod, setCommissionPeriod] = useState<CommissionPeriod>('today');
   const { alert, toast } = useAlert();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['staff', id],
     queryFn: () => getStaffById(id),
   });
@@ -160,8 +161,12 @@ export default function StaffDetailsScreen() {
     });
   };
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <LoadingState />;
+  }
+
+  if (isError || !data) {
+    return <QueryError onRetry={refetch} message="Could not load this staff member. Check your connection and try again." />;
   }
 
   const staff = data.data;

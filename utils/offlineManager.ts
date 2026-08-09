@@ -63,10 +63,3 @@ export const setupOfflineListener = () => {
     }
   });
 };
-
-export const isOnline = async (): Promise<boolean> => {
-  const netInfo = await NetInfo.fetch();
-  // null (unknown) counts as online — an attempted request that fails gets
-  // queued/backed off anyway, whereas assuming offline blocks it entirely.
-  return netInfo.isConnected !== false;
-};

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +27,13 @@ export default function Personalize() {
   const [step, setStep] = useState(0);
   const { answers, setAnswer } = useOnboardingStore();
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // A choice tapped right before navigating away (back button, deep link)
+  // must not fire goNext() on an unmounted screen — matches the timersRef
+  // cleanup pattern used by the other onboarding screens (demo.tsx etc).
+  useEffect(() => () => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+  }, []);
 
   const goNext = () => {
     haptics.light();

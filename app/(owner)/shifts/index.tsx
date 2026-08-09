@@ -8,6 +8,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
+import { QueryError } from '@/components/ui/QueryError';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { getShifts, type Shift } from '@/services/shifts';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
@@ -52,7 +53,7 @@ const DiscrepancyBadge: React.FC<{ value: number | null | undefined }> = ({ valu
 export default function ShiftsList() {
   const tabBarHeight = useTabBarHeight();
   const [page, setPage] = useState(1);
-  const { data, isLoading, isRefetching, refetch } = useQuery({
+  const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ['shifts', page],
     queryFn: () => getShifts({ page, limit: 10 }),
     // Keep the current page's shifts mounted while the next page loads,
@@ -64,6 +65,9 @@ export default function ShiftsList() {
   const totalPages = data?.pagination?.pages ?? 1;
 
   if (isLoading && shifts.length === 0) return <ListSkeleton />;
+  // Only when there's nothing to fall back on — a page-switch error with
+  // keepPreviousData still has the prior page's shifts to show.
+  if (isError && shifts.length === 0) return <QueryError onRetry={refetch} />;
 
   return (
     <FlashList

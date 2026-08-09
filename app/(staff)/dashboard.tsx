@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -107,6 +107,9 @@ export default function StaffDashboard() {
   }, [canManageExpenses, showPurchasesTile, showCommissionTile, showReconciliationTile]);
 
   const unreadCount = useUnreadNotificationsCount();
+  // Stable reference so the 60s unread-count poll (see useUnreadNotificationsCount)
+  // doesn't defeat DashboardHeader's React.memo on every tick.
+  const handleBellPress = useCallback(() => router.push('/(staff)/notifications'), []);
 
   if (isLoading) {
     return <ListSkeleton rows={4} heroHeight={180} />;
@@ -147,7 +150,7 @@ export default function StaffDashboard() {
             formattedDate={timeContext.formattedDate}
             shopInitials={initials}
             unreadCount={unreadCount}
-            onBellPress={() => router.push('/(staff)/notifications')}
+            onBellPress={handleBellPress}
             profileRoute="/(staff)/profile"
             insetsTop={insets.top}
           />

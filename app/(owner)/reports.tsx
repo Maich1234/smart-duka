@@ -30,6 +30,7 @@ import {
   PeakActivitySection,
 } from '@/components/reports/ReportSections';
 import { ReportsSkeleton } from '@/components/reports/ReportsSkeleton';
+import { QueryError } from '@/components/ui/QueryError';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { haptics } from '@/utils/haptics';
@@ -57,7 +58,7 @@ export default function OwnerReports() {
   const currency = user?.shop?.currency;
   const [period, setPeriod] = useState<ReportPeriod>('daily');
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['salesReport', period],
     queryFn: () => getSalesReport(period),
     // Keep showing the current period's report while the next one loads,
@@ -83,8 +84,9 @@ export default function OwnerReports() {
   const showPurchasesShortcut = canViewPurchases && (shopConfigData?.data?.purchasingEnabled ?? false);
 
   if (isLoading) return <ReportsSkeleton />;
+  if (isError || !data) return <QueryError onRetry={refetch} />;
 
-  const report = data?.data;
+  const report = data.data;
   const ratingsSummary = ratingsData?.data;
   const depletion = depletionData?.data;
   const series = report?.series ?? [];

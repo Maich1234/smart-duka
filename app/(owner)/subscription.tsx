@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { QueryError } from '@/components/ui/QueryError';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSubscription, useInvalidateSubscription } from '@/hooks/useSubscription';
 import { type SubscriptionPlan } from '@/services/subscription';
@@ -41,7 +42,7 @@ const STATE_META = {
  */
 export default function SubscriptionScreen() {
   const tabBarHeight = useTabBarHeight();
-  const { subscription, access, isLoading, refetch } = useSubscription();
+  const { subscription, access, isLoading, isError, refetch } = useSubscription();
   const invalidate = useInvalidateSubscription();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -65,6 +66,10 @@ export default function SubscriptionScreen() {
   };
 
   if (isLoading) return <LoadingState />;
+  // access is never undefined on a successful response (see SubscriptionAccess
+  // in services/subscription.ts) — this is a real fetch failure, not a shop
+  // with no subscription, and must not be told apart from STATE_META.none.
+  if (isError || !access) return <QueryError onRetry={refetch} message="Could not load your subscription status. Check your connection and try again." />;
 
   return (
     <ScrollView

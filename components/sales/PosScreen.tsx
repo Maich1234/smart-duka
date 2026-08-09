@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useFocusEffect, useNavigation } from "expo-router/react-navigation";
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useAlert } from '@/context/AlertContext';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -109,6 +109,14 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const [receiptVisible, setReceiptVisible] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [mpesaModalVisible, setMpesaModalVisible] = useState(false);
+  // Mirrors mpesaModalVisible for checkPendingPayment's in-flight `.then()`
+  // below, which closes over state at call time — a plain read of the state
+  // variable there would see whatever was current when the background poll
+  // *started*, not whether the modal has opened for this transaction since.
+  const mpesaModalVisibleRef = React.useRef(mpesaModalVisible);
+  useEffect(() => {
+    mpesaModalVisibleRef.current = mpesaModalVisible;
+  }, [mpesaModalVisible]);
   const [mpesaMode, setMpesaMode] = useState<'stk' | 'manual'>('stk');
   const [manualReceiptCode, setManualReceiptCode] = useState('');
   // Set when reopening the M-Pesa modal against a payment recovered from a
@@ -282,19 +290,26 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     enabled: canViewSales,
   });
 
+  const isFocused = useIsFocused();
   const { data: shopConfigData, refetch: refetchShopConfig } = useQuery({
     queryKey: ['shopConfig'],
     queryFn: getShopConfig,
+    // Till buttons are owner-edited from a separate screen (and often a
+    // separate device — the owner's phone vs. a cashier's) while this screen
+    // stays mounted for a whole shift without ever losing focus. Without a
+    // poll, a payment method removed mid-shift would sit on the till until
+    // the cashier happened to navigate away and back. Only polls while this
+    // screen is actually the one on-screen, so it doesn't burn battery/data
+    // in the background.
+    refetchInterval: isFocused ? 30_000 : false,
   });
   const thankYouNote = shopConfigData?.data.receiptThankYouNote;
   const shopLogoUrl = shopConfigData?.data.logoUrl;
   const shopMotto = shopConfigData?.data.motto;
 
-  // Till buttons are owner-edited from a separate screen (and often a
-  // separate device — the owner's phone vs. a cashier's). The tab staying
-  // mounted means React Query's own staleness clock never gets a chance to
-  // fire a refetch, so a removed payment method could otherwise sit on the
-  // till indefinitely. Refetch on every focus instead of trusting staleTime.
+  // Covers the gap the poll above can't: an edit made in the few seconds
+  // between polls, or the till having sat backgrounded past its interval.
+  // Refetch on every focus instead of trusting staleTime.
   useFocusEffect(
     React.useCallback(() => {
       refetchShopConfig();
@@ -306,7 +321,13 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     queryFn: getPaymentStatus,
     enabled: canRecordSale,
   });
-  const mpesaEnabled = paymentStatusData?.data?.mpesa?.isConfigured ?? false;
+  // Credential presence AND the backend's own enabled flag — these are two
+  // separately-stored booleans that only stay in sync by convention today,
+  // so checking both means a future divergence fails safe (button hidden)
+  // rather than offering an STK prompt the backend would reject.
+  const mpesaEnabled =
+    (paymentStatusData?.data?.mpesa?.isConfigured ?? false) &&
+    paymentStatusData?.data?.mpesa?.enabled !== false;
   // Owner kill switch, not an opt-in — scanning has to work with zero setup,
   // so a shop synced before this field existed (or offline before its first
   // sync) still sees the button.
@@ -368,6 +389,17 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         // Nothing was saved anywhere — say so plainly instead of the
         // reassuring offline message, and keep the cart so it isn't retyped.
         toast({ type: 'error', message: error.message });
+        return;
+      }
+      if (error?.response?.data?.code === 'PAYMENT_METHOD_UNAVAILABLE') {
+        // The owner removed/disabled this method after it was selected but
+        // before the poll or a focus refetch caught up — the sale was
+        // correctly rejected server-side (it can never land in the DB with a
+        // method the shop doesn't currently accept). Refetch right away so
+        // the button is gone by the time the cashier looks back at the till,
+        // instead of leaving it tappable until the next poll.
+        refetchShopConfig();
+        toast({ type: 'error', message: 'That payment method was just removed. Pick another to complete the sale.' });
         return;
       }
       toast({ type: 'error', message: mutationErrorMessage(error, 'Sale failed') });
@@ -601,6 +633,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const checkPendingPayment = React.useCallback((payment: PendingMpesaPayment) => {
     return getTransactionStatus(payment.transactionId)
       .then((res) => {
+        // The modal can open for this same transaction (via the banner's
+        // "Check" button) while this call is still in flight — it's already
+        // polling and will surface the outcome itself. Acting here too would
+        // pop a second, conflicting confirm dialog on top of it.
+        if (mpesaModalVisibleRef.current) return;
         const s = res.data.status;
         if (s === 'success') {
           setPendingBanner(null);
@@ -636,6 +673,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         }
       })
       .catch(() => {
+        if (mpesaModalVisibleRef.current) return;
         // Outcome unknown (no connection right now) — keep watching/showing
         // the banner rather than guessing either way.
         setPendingBanner(payment);
@@ -726,11 +764,25 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           ListFooterComponent={
             salesTotalPages > 1 ? (
               <View style={salesPaginationStyle}>
-                <AnimatedPressable onPress={() => setSalesPage((p) => Math.max(1, p - 1))} disabled={salesPage <= 1} style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}>
+                <AnimatedPressable
+                  onPress={() => setSalesPage((p) => Math.max(1, p - 1))}
+                  disabled={salesPage <= 1}
+                  style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Previous page, page ${salesPage - 1}`}
+                  accessibilityState={{ disabled: salesPage <= 1 }}
+                >
                   <Ionicons name="chevron-back" size={16} color={salesPage <= 1 ? '#94A3B8' : '#0F766E'} />
                 </AnimatedPressable>
                 <Text style={pageLabelStyle}>Page {salesPage} of {salesTotalPages}</Text>
-                <AnimatedPressable onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))} disabled={salesPage >= salesTotalPages} style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}>
+                <AnimatedPressable
+                  onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
+                  disabled={salesPage >= salesTotalPages}
+                  style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Next page, page ${salesPage + 1}`}
+                  accessibilityState={{ disabled: salesPage >= salesTotalPages }}
+                >
                   <Ionicons name="chevron-forward" size={16} color={salesPage >= salesTotalPages ? '#94A3B8' : '#0F766E'} />
                 </AnimatedPressable>
               </View>
