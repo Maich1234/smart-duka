@@ -388,6 +388,13 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="refer"
+        options={{
+          title: 'Refer & Earn',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="notifications"
         options={{
           title: 'Notifications',

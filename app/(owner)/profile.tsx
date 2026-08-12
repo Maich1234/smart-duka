@@ -485,6 +485,15 @@ export default function OwnerProfile() {
               onPress={() => router.push('/(owner)/subscription')}
               accessibilityLabel={subStatus ? `Subscription. ${subStatus.detail}` : 'Manage subscription'}
             />
+            <SettingsRowDivider />
+            <SettingsRow
+              icon="gift-outline"
+              iconColor="#0F766E"
+              iconBg="#CCFBF1"
+              title="Refer & Earn"
+              subtitle="Share your code, save on your next payment"
+              onPress={() => router.push('/(owner)/refer')}
+            />
           </SettingsCard>
         </Animated.View>
 

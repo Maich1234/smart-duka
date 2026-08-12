@@ -85,3 +85,17 @@ export const uploadShopLogo = async (uri: string, mimeType: string): Promise<{ l
   });
   return res.data.data;
 };
+
+export interface ReferralData {
+  code: string;
+  shareUrl: string;
+  enabled: boolean;
+  perReferralPercent: number;
+  discountPercentBanked: number;
+  referrals: { shopName: string; status: 'pending' | 'converted'; joinedAt: string }[];
+}
+
+export const getShopReferrals = async (): Promise<ReferralData> => {
+  const res = await api.get('/shop/referrals');
+  return res.data.data;
+};
