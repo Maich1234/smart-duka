@@ -43,7 +43,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
       <Text style={styles.shopName}>{shopName}</Text>
       {!!motto && <Text style={styles.motto}>{motto}</Text>}
       {!!shopPhone && <Text style={styles.shopPhone}>{shopPhone}</Text>}
-      <Text style={styles.poweredBy}>Dukana POS</Text>
+      <Text style={styles.poweredBy}>DuQana POS</Text>
 
       <Text style={styles.dash}>{DASH}</Text>
 

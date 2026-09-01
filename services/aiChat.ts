@@ -48,7 +48,7 @@ export const sendChatMessage = async (params: { conversationId?: string; message
     return response.data;
   } catch (err: any) {
     if (err?.code === 'ECONNABORTED') {
-      throw { message: 'Dukana AI is taking longer than usual. Please try again.' };
+      throw { message: 'DuQana AI is taking longer than usual. Please try again.' };
     }
     throw err;
   }

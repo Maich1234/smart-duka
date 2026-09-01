@@ -18,6 +18,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
+import { useAlert } from '@/context/AlertContext';
 import { useCartStore } from '@/store/staffCartStore';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Typography } from '@/constants/Typography';
@@ -128,7 +129,11 @@ interface PremiumTabBarProps {
 
 const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
-  const cartCount = useCartStore((s) => s.cart.reduce((sum, i) => sum + i.cartQuantity, 0));
+  const cart = useCartStore((s) => s.cart);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const resetSaleFields = useCartStore((s) => s.resetSaleFields);
+  const cartCount = cart.reduce((sum, i) => sum + i.cartQuantity, 0);
+  const { alert } = useAlert();
 
   const visibleRoutes = state.routes.filter((route) =>
     TAB_CONFIGS.some((tc) => tc.name === route.name),
@@ -185,10 +190,36 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
               target: route.key,
               canPreventDefault: true,
             });
-            if (!isFocused && !event.defaultPrevented) {
-              haptics.light();
-              navigation.navigate({ name: route.name, merge: true });
+            if (isFocused || event.defaultPrevented) return;
+
+            // Leaving Sales mid-sale loses the cashier's place in an
+            // in-progress sale — confirm rather than switch tabs straight
+            // through the till. (Switching *into* Sales is never blocked;
+            // the cart itself is persisted regardless of which tab is up.)
+            if (activeRoute?.name === 'sales' && cart.length > 0) {
+              alert({
+                type: 'confirm',
+                title: 'Leave Sale?',
+                message: 'You have items in your cart. Leaving this screen will clear your current sale.',
+                buttons: [
+                  { label: 'Stay', variant: 'ghost' },
+                  {
+                    label: 'Leave',
+                    variant: 'danger',
+                    onPress: () => {
+                      clearCart();
+                      resetSaleFields();
+                      haptics.light();
+                      navigation.navigate({ name: route.name, merge: true });
+                    },
+                  },
+                ],
+              });
+              return;
             }
+
+            haptics.light();
+            navigation.navigate({ name: route.name, merge: true });
           };
 
           return (
@@ -242,7 +273,7 @@ export default function StaffLayout() {
         ),
       }}
     >
-      <Tabs.Screen name="dashboard" options={{ title: 'Dukana', headerShown: false }} />
+      <Tabs.Screen name="dashboard" options={{ title: 'DuQana', headerShown: false }} />
       <Tabs.Screen name="inventory" options={{ title: 'Stock', headerShown: false }} />
       <Tabs.Screen name="sales"     options={{ title: 'Sales',  headerShown: false }} />
       <Tabs.Screen name="profile"   options={{ title: 'Profile' }} />
@@ -254,6 +285,7 @@ export default function StaffLayout() {
       <Tabs.Screen name="purchases" options={{ title: 'Purchases', href: null, headerShown: false }} />
       <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
       <Tabs.Screen name="commission" options={{ title: 'My Commission', href: null }} />
+      <Tabs.Screen name="refer" options={{ title: 'Refer & Earn', href: null }} />
       <Tabs.Screen name="reconciliation" options={{ title: 'My Reconciliation', href: null }} />
       <Tabs.Screen name="printer" options={{ title: 'Receipt Printer', href: null }} />
     </Tabs>

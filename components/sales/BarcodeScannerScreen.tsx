@@ -247,7 +247,9 @@ export function BarcodeScannerScreen() {
     if (!unmatchedCode) return;
     router.push({
       pathname: user?.role === 'staff' ? '/(staff)/inventory/new' : '/(owner)/inventory/new',
-      params: { barcode: unmatchedCode },
+      // returnTo=back: come back to the scanner afterwards rather than the
+      // Inventory list, which is where this flow lands by default.
+      params: { barcode: unmatchedCode, returnTo: 'back' },
     });
   };
 
@@ -271,7 +273,7 @@ export function BarcodeScannerScreen() {
         <Text style={styles.permissionBody}>
           {permanentlyDenied
             ? 'Turn on camera access in Settings to scan product barcodes.'
-            : 'Dukana uses your camera to scan product barcodes.'}
+            : 'DuQana uses your camera to scan product barcodes.'}
         </Text>
         <AnimatedPressable
           style={styles.permissionPrimaryBtn}

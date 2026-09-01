@@ -299,7 +299,7 @@ export const printBytes = async (printer: SavedPrinter, bytes: Uint8Array): Prom
     throw new PrinterError('bluetooth_off', 'Bluetooth is switched off. Turn it on and try again.');
   }
   if (!(await ensurePrinterPermissions())) {
-    throw new PrinterError('permission_denied', 'Dukana needs Bluetooth permission to reach the printer.');
+    throw new PrinterError('permission_denied', 'DuQana needs Bluetooth permission to reach the printer.');
   }
   return printer.transport === 'ble' ? printViaBle(printer, bytes) : printViaClassic(printer, bytes);
 };
@@ -319,7 +319,7 @@ const toPrinterError = (error: unknown, fallback: string): PrinterError => {
     case 'ERR_BT_DISABLED':
       return new PrinterError('bluetooth_off', 'Bluetooth is switched off. Turn it on and try again.', error);
     case 'ERR_BT_PERMISSION':
-      return new PrinterError('permission_denied', 'Dukana needs Bluetooth permission to find printers.', error);
+      return new PrinterError('permission_denied', 'DuQana needs Bluetooth permission to find printers.', error);
     case 'ERR_BT_UNSUPPORTED':
       return new PrinterError('unsupported', 'This phone has no Bluetooth radio.', error);
     default:

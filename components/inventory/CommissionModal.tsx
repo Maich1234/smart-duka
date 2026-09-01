@@ -8,6 +8,7 @@ import { formatCurrency } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BorderRadius } from '@/constants/BorderRadius';
 
 export interface CommissionValue {
   enabled: boolean;
@@ -28,6 +29,13 @@ interface CommissionModalProps {
    *  are an illustration at list price rather than a fixed outcome. */
   priceVaries?: boolean;
   initialValue: CommissionValue;
+  /**
+   * False when `initialValue.basePrice` is derived from elsewhere (a Variable
+   * Price product's Min Price) rather than being this commission's own value —
+   * shows it read-only instead of asking the owner to retype the same floor.
+   * Defaults to true.
+   */
+  basePriceEditable?: boolean;
 }
 
 /**
@@ -49,6 +57,7 @@ const CommissionModalBody: React.FC<Omit<CommissionModalProps, 'visible'>> = ({
   sellingPrice,
   priceVaries = false,
   initialValue,
+  basePriceEditable = true,
 }) => {
   const [enabled, setEnabled] = useState(initialValue.enabled);
   const [basePrice, setBasePrice] = useState(initialValue.basePrice);
@@ -105,13 +114,21 @@ const CommissionModalBody: React.FC<Omit<CommissionModalProps, 'visible'>> = ({
 
       {enabled && (
         <>
-          <Input
-            label="Shop's base price"
-            value={basePrice}
-            onChangeText={setBasePrice}
-            keyboardType="numeric"
-            placeholder="e.g. 400"
-          />
+          {basePriceEditable ? (
+            <Input
+              label="Shop's base price"
+              value={basePrice}
+              onChangeText={setBasePrice}
+              keyboardType="numeric"
+              placeholder="e.g. 400"
+            />
+          ) : (
+            <View style={styles.derivedBaseRow}>
+              <Text style={styles.derivedBaseLabel}>Shop's base price</Text>
+              <Text style={styles.derivedBaseValue}>{formatCurrency(parsedBase || 0)}</Text>
+              <Text style={styles.derivedBaseHint}>Matches this product's Min Price</Text>
+            </View>
+          )}
           <Input
             label="Employee's share of the excess (%)"
             value={employeeSharePercent}
@@ -159,6 +176,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
     marginBottom: Spacing.xs,
+  },
+  derivedBaseRow: {
+    backgroundColor: Colors.primarySubtle,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  derivedBaseLabel: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
+  },
+  derivedBaseValue: {
+    fontSize: Typography.size.h3,
+    fontFamily: Typography.fontFamilyBold,
+    color: Colors.textPrimary,
+    marginTop: 2,
+  },
+  derivedBaseHint: {
+    fontSize: Typography.size.caption,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   error: {
     fontSize: Typography.size.caption,

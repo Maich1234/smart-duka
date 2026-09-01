@@ -1,31 +1,39 @@
 import React from 'react';
-import { Stack, usePathname } from 'expo-router';
+import { Stack } from 'expo-router';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { useTheme } from '@/hooks/useTheme';
 
 export default function SettingsStackLayout() {
   const { colors } = useTheme();
-  // This nested Stack lives under a hidden tab, and React Navigation keeps a
-  // tab's nested navigator state alive across visits — so whichever category
-  // got pushed first (e.g. Scanning) stays stranded at the bottom of its
-  // history forever, and every other category pushed afterward reveals it on
-  // the way back instead of the hub. None of these screens are ever chained
-  // to one another (always entered fresh from the Settings hub in
-  // profile.tsx, always exited back to it) — keying the Stack by pathname
-  // forces React to tear down and rebuild it on every category visit, so it
-  // never carries history it shouldn't, and `router.back()` correctly finds
-  // nothing to pop and falls through to fallbackHref every time.
-  const pathname = usePathname();
 
   return (
     <Stack
-      key={pathname}
       screenOptions={{
         header: ({ route, options }) => (
           <ScreenHeader title={options.title ?? route.name} fallbackHref="/(owner)/profile" />
         ),
         contentStyle: { backgroundColor: colors.background },
       }}
+      screenListeners={({ navigation }) => ({
+        // This nested Stack lives under a hidden tab, so React Navigation
+        // keeps it mounted (and its history intact) across visits — a
+        // category pushed on a previous visit stays stranded below the one
+        // pushed next. Separately, since no `initialRouteName` is set,
+        // navigating straight to any non-`business` screen makes React
+        // Navigation silently prepend `business` (the first declared
+        // Stack.Screen) below it too. Either way an extra entry ends up
+        // under the current screen, so `router.back()` pops into it instead
+        // of falling through to fallbackHref. None of these screens ever
+        // navigate to one another (always entered fresh from the Settings
+        // hub in profile.tsx, always exited back to it), so on focus we
+        // just drop everything below the current screen.
+        focus: () => {
+          const state = navigation.getState();
+          if (state.index > 0) {
+            navigation.reset({ ...state, index: 0, routes: [state.routes[state.index]] });
+          }
+        },
+      })}
     >
       <Stack.Screen name="business" options={{ title: 'Business' }} />
       <Stack.Screen name="pos-sales" options={{ title: 'POS & Sales' }} />
@@ -35,7 +43,7 @@ export default function SettingsStackLayout() {
       <Stack.Screen name="integrations" options={{ title: 'Integrations' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notification Settings' }} />
       <Stack.Screen name="data-reports" options={{ title: 'Data & Reports' }} />
-      <Stack.Screen name="ai" options={{ title: 'Dukana AI' }} />
+      <Stack.Screen name="ai" options={{ title: 'DuQana AI' }} />
     </Stack>
   );
 }

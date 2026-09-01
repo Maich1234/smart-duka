@@ -115,7 +115,7 @@ export default function OwnerDashboard() {
   }, []);
 
   const shopInitials = useMemo(
-    () => getShopInitials(user?.shop?.name ?? 'Dukana'),
+    () => getShopInitials(user?.shop?.name ?? 'DuQana'),
     [user?.shop?.name],
   );
 
@@ -172,7 +172,7 @@ export default function OwnerDashboard() {
           {/* 1 · Who and when */}
           <DashboardHeader
             greeting={timeContext.greeting}
-            shopName={user?.shop?.name ?? 'Dukana'}
+            shopName={user?.shop?.name ?? 'DuQana'}
             formattedDate={timeContext.formattedDate}
             shopInitials={shopInitials}
             unreadCount={unreadCount}

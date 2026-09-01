@@ -201,7 +201,7 @@ export default function OwnerProfile() {
     alert({
       type: 'confirm',
       title: 'Sign out?',
-      message: 'You\'ll need to sign back in to access your Dukana account.',
+      message: 'You\'ll need to sign back in to access your DuQana account.',
       buttons: [
         { label: 'Cancel', variant: 'ghost' },
         { label: 'Sign out', variant: 'danger', onPress: logout },
@@ -307,7 +307,7 @@ export default function OwnerProfile() {
               <View style={styles.heroShopRow}>
                 <Ionicons name="storefront-outline" size={13} color="rgba(255,255,255,0.45)" />
                 <Text style={styles.heroShopName} numberOfLines={1}>
-                  {shopName || user?.shop?.name || 'Dukana'}
+                  {shopName || user?.shop?.name || 'DuQana'}
                 </Text>
               </View>
               {/* Was a hardcoded "Active" chip. It now carries the real
@@ -466,7 +466,7 @@ export default function OwnerProfile() {
             <SettingsRowDivider />
             <SettingsRow
               icon="sparkles-outline"
-              title="Dukana AI"
+              title="DuQana AI"
               subtitle="Gemini-powered insights & chat"
               onPress={() => router.push('/(owner)/settings/ai')}
             />
@@ -543,7 +543,7 @@ export default function OwnerProfile() {
               <View style={styles.signOutIconWrap}>
                 <Ionicons name="log-out-outline" size={17} color={Colors.danger} />
               </View>
-              <Text style={styles.signOutText}>Sign out of Dukana</Text>
+              <Text style={styles.signOutText}>Sign out of DuQana</Text>
             </View>
             <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
           </AnimatedPressable>

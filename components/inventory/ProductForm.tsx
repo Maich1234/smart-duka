@@ -392,6 +392,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   const isComposite = form.productType === 'bundle' || form.productType === 'configurable';
 
+  // A Variable Price product already has a Min Price floor; once one is set,
+  // it doubles as the commission floor instead of asking the owner to type
+  // the same number again in the commission modal. Falls back to whatever
+  // was entered there when no Min Price is set, so nothing changes for shops
+  // that don't use it.
+  const minPriceSet = form.productType === 'variable' && form.minPrice.trim() !== '';
+  const effectiveCommissionBasePrice = minPriceSet ? form.minPrice : form.commissionBasePrice;
+
   return (
     <View style={styles.wrapper}>
       {/* The host Screen already applies the top inset, so this header must not. */}
@@ -602,6 +610,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               <View style={styles.flexInput}>
                 <Input
                   label="Max Price (optional)"
+                  placeholder="No limit"
                   value={form.maxPrice}
                   onChangeText={(t) => {
                     update({ maxPrice: t });
@@ -614,6 +623,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 />
               </View>
             </View>
+          )}
+          {form.productType === 'variable' && (
+            <Text style={styles.hint}>
+              Leave Max Price blank if there's no upper limit — the till will accept any price at or above the minimum.
+            </Text>
           )}
         </View>
 
@@ -813,7 +827,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               </Text>
               <Text style={styles.commissionRowSub}>
                 {form.commissionEnabled
-                  ? `Employee gets ${form.commissionEmployeeSharePercent}% of anything above ${formatCurrency(parseFloat(form.commissionBasePrice) || 0, currency)}`
+                  ? `Employee gets ${form.commissionEmployeeSharePercent}% of anything above ${formatCurrency(parseFloat(effectiveCommissionBasePrice) || 0, currency)}`
                   : 'Pay staff a share of what they sell this above your floor price'}
               </Text>
             </View>
@@ -953,9 +967,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             scopeLabel="this product"
             sellingPrice={parseFloat(form.sellingPrice) || 0}
             priceVaries={form.productType === 'variable' || (form.productType === 'service' && form.allowPriceOverride)}
+            basePriceEditable={!minPriceSet}
             initialValue={{
               enabled: form.commissionEnabled,
-              basePrice: form.commissionBasePrice,
+              basePrice: effectiveCommissionBasePrice,
               employeeSharePercent: form.commissionEmployeeSharePercent,
             }}
             onConfirm={(value: CommissionValue) => {

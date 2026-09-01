@@ -389,7 +389,7 @@ export default function BusinessSetup() {
                 <Text style={styles.founderWave}>👋</Text>
                 <Text style={styles.founderText}>
                   Hi{draft.ownerName ? ` ${draft.ownerName.split(' ')[0]}` : ''},{'\n\n'}
-                  We built Dukana because small businesses deserve software that works as hard
+                  We built DuQana because small businesses deserve software that works as hard
                   as they do.{'\n\n'}
                   Thank you for trusting us with yours.
                 </Text>
@@ -400,7 +400,7 @@ export default function BusinessSetup() {
                   accessibilityLabel="Michael Maina's signature"
                 />
                 <Text style={styles.founderSignature}>— Michael Maina</Text>
-                <Text style={styles.founderRole}>Founder, Dukana</Text>
+                <Text style={styles.founderRole}>Founder, DuQana</Text>
               </Animated.View>
             ) : null}
           </ScrollView>

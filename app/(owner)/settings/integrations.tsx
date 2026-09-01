@@ -19,7 +19,7 @@ export default function IntegrationsSettingsScreen() {
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl, paddingTop: Spacing.lg }}>
-        <SettingsSectionLabel label="Connect the services Dukana talks to on your behalf." />
+        <SettingsSectionLabel label="Connect the services DuQana talks to on your behalf." />
 
         <Animated.View entering={FadeInUp.duration(320)} style={styles.wrap}>
           <PaymentsSection />

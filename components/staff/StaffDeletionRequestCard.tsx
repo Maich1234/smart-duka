@@ -119,7 +119,7 @@ export const StaffDeletionRequestCard: React.FC<StaffDeletionRequestCardProps> =
         </View>
 
         <Text style={styles.body}>
-          {staffName} has asked to close their Dukana account. Nothing has changed yet — approving
+          {staffName} has asked to close their DuQana account. Nothing has changed yet — approving
           starts a {graceDays}-day cooling-off period, and your shop&apos;s sales and shift records stay
           in the books either way.
         </Text>

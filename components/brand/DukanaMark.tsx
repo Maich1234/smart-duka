@@ -2,8 +2,8 @@ import React from 'react';
 import Svg, { Path, Defs, LinearGradient, Stop, type SvgProps } from 'react-native-svg';
 
 /**
- * Dukana brand mark — the shopping bag carrying the "D" counter-form, plus the
- * "Dukana" wordmark, as standalone vectors.
+ * DuQana brand mark — the shopping bag carrying the "D" counter-form, plus the
+ * "DuQana" wordmark, as standalone vectors.
  *
  * Geometry comes from the master logo artwork (a 2000x2000 lockup). The bag
  * outline is that artwork simplified from ~57 KB of dense auto-traced curves
@@ -49,7 +49,7 @@ export function DukanaMark({ color, ...props }: SvgProps & { color?: string }) {
   );
 }
 
-/** The "Dukana" wordmark on its own. */
+/** The "DuQana" wordmark on its own. */
 export function DukanaWordmark({ color = BRAND.gold, ...props }: SvgProps & { color?: string }) {
   return (
     <Svg viewBox={WORD_VIEWBOX} {...props}>

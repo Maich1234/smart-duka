@@ -54,7 +54,7 @@ export const PrinterSetupScreen: React.FC = () => {
   const supported = transports.length > 0;
 
   const { data: shopConfig } = useQuery({ queryKey: ['shopConfig'], queryFn: getShopConfig });
-  const shopName = shopConfig?.data.name ?? 'Dukana';
+  const shopName = shopConfig?.data.name ?? 'DuQana';
 
   /**
    * Reads the adapter state and the already-bonded devices. Kept off the render
@@ -105,7 +105,7 @@ export const PrinterSetupScreen: React.FC = () => {
       alert({
         type: 'warning',
         title: 'Bluetooth permission needed',
-        message: 'Dukana needs Bluetooth access to find your printer. Allow it in Settings, then try again.',
+        message: 'DuQana needs Bluetooth access to find your printer. Allow it in Settings, then try again.',
         buttons: [
           { label: 'Not now', variant: 'ghost' },
           { label: 'Open Settings', onPress: () => Linking.openSettings() },

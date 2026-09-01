@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { QueryError } from '@/components/ui/QueryError';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSubscription, useInvalidateSubscription } from '@/hooks/useSubscription';
-import { type SubscriptionPlan } from '@/services/subscription';
+import { resendRenewalLink, type SubscriptionPlan } from '@/services/subscription';
+import { useAlert } from '@/context/AlertContext';
+import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -39,12 +43,20 @@ const STATE_META = {
  * Renewal reminders reach owners through push notifications, the in-app
  * notification inbox, and email — channels *outside* the app binary, where
  * linking to checkout is permitted and where the renewal funnel now lives.
+ *
+ * The one exception below — "Resend payment link" — stays inside that rule:
+ * it doesn't open or display a URL itself, it only asks the backend to
+ * dispatch the same push + email a renewal reminder already sends. It exists
+ * because an owner who dismissed that notification, or whose reminder
+ * hasn't fired yet, had no way back to it before this.
  */
 export default function SubscriptionScreen() {
   const tabBarHeight = useTabBarHeight();
   const { subscription, access, isLoading, isError, refetch } = useSubscription();
   const invalidate = useInvalidateSubscription();
+  const { toast } = useAlert();
   const [refreshing, setRefreshing] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const plan = (subscription?.plan ?? null) as SubscriptionPlan | null;
   const state = access?.state ?? 'none';
@@ -62,6 +74,20 @@ export default function SubscriptionScreen() {
       await refetch();
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const onResendLink = async () => {
+    if (resending) return;
+    haptics.light();
+    setResending(true);
+    try {
+      const res = await resendRenewalLink();
+      toast({ type: res.emailSent === false ? 'warning' : 'success', message: res.message });
+    } catch {
+      toast({ type: 'error', message: 'Could not send the link right now. Check your connection and try again.' });
+    } finally {
+      setResending(false);
     }
   };
 
@@ -116,6 +142,41 @@ export default function SubscriptionScreen() {
           <Text style={styles.detail}>This shop doesn&apos;t have a subscription yet.</Text>
         )}
       </Animated.View>
+
+      {(state === 'grace' || state === 'locked') && (
+        <Animated.View entering={FadeInUp.duration(360).delay(40)} style={styles.noteCard}>
+          <Ionicons name="link-outline" size={20} color={Colors.textSecondary} />
+          <View style={styles.noteText}>
+            <Text style={styles.noteTitle}>Pay from your email or notifications</Text>
+            <Text style={styles.noteBody}>
+              We sent a secure payment link to your email and to your notifications. Open either one and
+              tap through to pay in your browser — it takes about a minute.
+            </Text>
+            <AnimatedPressable
+              onPress={onResendLink}
+              style={styles.resendBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Resend payment link"
+            >
+              {resending ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <>
+                  <Ionicons name="refresh-outline" size={15} color={Colors.primary} />
+                  <Text style={styles.resendBtnText}>Resend payment link</Text>
+                </>
+              )}
+            </AnimatedPressable>
+            <AnimatedPressable
+              onPress={() => router.push('/(owner)/notifications')}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
+            >
+              <Text style={styles.viewNotifText}>View in Notifications</Text>
+            </AnimatedPressable>
+          </View>
+        </Animated.View>
+      )}
 
       {/* Where billing is handled. Named as a fact about the account, with no
           link, address, or call to action — see the note on this component. */}
@@ -211,6 +272,32 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
     lineHeight: 20,
+  },
+  resendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 9,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    minHeight: 34,
+    minWidth: 34,
+  },
+  resendBtnText: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.primary,
+  },
+  viewNotifText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
+    marginTop: Spacing.sm,
+    textDecorationLine: 'underline',
   },
   sectionLabel: {
     fontSize: Typography.size.caption,

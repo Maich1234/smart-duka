@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { useFocusEffect, useNavigation } from "expo-router/react-navigation";
+import { useFocusEffect } from "expo-router/react-navigation";
 import { router, useIsFocused } from 'expo-router';
 import { useAlert } from '@/context/AlertContext';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -98,7 +98,20 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     clearRecent: clearProductRecentSearches,
   } = useSearch('pos_products');
 
-  const { cart, addItem, removeItem, clearCart, updateItem } = useCartStore();
+  const {
+    cart,
+    addItem,
+    removeItem,
+    clearCart,
+    updateItem,
+    customerPhone,
+    setCustomerPhone,
+    mpesaMode,
+    setMpesaMode,
+    manualReceiptCode,
+    setManualReceiptCode,
+    resetSaleFields,
+  } = useCartStore();
   const [chosenMethod, setPaymentMethod] = useState<string>(CASH_METHOD_KEY);
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const [variantModalVisible, setVariantModalVisible] = useState(false);
@@ -107,7 +120,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [receiptVisible, setReceiptVisible] = useState(false);
-  const [customerPhone, setCustomerPhone] = useState('');
   const [mpesaModalVisible, setMpesaModalVisible] = useState(false);
   // Mirrors mpesaModalVisible for checkPendingPayment's in-flight `.then()`
   // below, which closes over state at call time — a plain read of the state
@@ -117,8 +129,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   useEffect(() => {
     mpesaModalVisibleRef.current = mpesaModalVisible;
   }, [mpesaModalVisible]);
-  const [mpesaMode, setMpesaMode] = useState<'stk' | 'manual'>('stk');
-  const [manualReceiptCode, setManualReceiptCode] = useState('');
   // Set when reopening the M-Pesa modal against a payment recovered from a
   // previous app session (see the recovery effect below) — carries its own
   // frozen phone/amount/saleItems rather than reading the live cart, since
@@ -130,7 +140,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const [pendingBanner, setPendingBanner] = useState<PendingMpesaPayment | null>(null);
 
   const queryClient = useQueryClient();
-  const navigation = useNavigation();
 
   const [productsPage, setProductsPage] = useState(1);
 
@@ -144,39 +153,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   };
   const [salesPage, setSalesPage] = useState(1);
 
-  // Block tab navigation mid-sale — confirm before discarding the cart.
-  useEffect(() => {
-    const unsubscribe = (navigation as any).addListener('tabPress', (e: any) => {
-      if (cart.length === 0) return;
-      e.preventDefault();
-      const targetAction = e.data?.action;
-      alert({
-        type: 'confirm',
-        title: 'Leave Sale?',
-        message: 'You have items in your cart. Leaving this screen will clear your current sale.',
-        buttons: [
-          { label: 'Stay', variant: 'ghost' },
-          {
-            label: 'Leave',
-            variant: 'danger',
-            onPress: () => {
-              clearCart();
-              setCustomerPhone('');
-              setMpesaMode('stk');
-              setManualReceiptCode('');
-              if (targetAction) (navigation as any).dispatch(targetAction);
-            },
-          },
-        ],
-      });
-    });
-    return unsubscribe;
-  }, [navigation, cart.length, alert, clearCart]);
-
   // Leaving mid-sale silently loses the cart, so the hardware back gesture and
   // the header's back button both run this. Confirming now also *leaves* —
-  // it used to only empty the cart, so "Discard" left the cashier standing on
-  // the same screen wondering whether anything had happened.
+  // it used to only empty the cart, leaving the cashier standing on the same
+  // screen wondering whether anything had happened. Copy matches the tab
+  // bar's own mid-sale guard (PremiumTabBar in both role layouts) — same
+  // action, same wording, regardless of which control triggers it.
   const confirmLeave = React.useCallback(() => {
     // Nothing to lose — leave straight away, if there is anywhere to go.
     if (cart.length === 0) {
@@ -185,24 +167,22 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     }
     alert({
       type: 'confirm',
-      title: 'Discard Sale?',
+      title: 'Leave Sale?',
       message: 'You have items in your cart. Going back will clear your current sale.',
       buttons: [
         { label: 'Stay', variant: 'ghost' },
         {
-          label: 'Discard',
+          label: 'Leave',
           variant: 'danger',
           onPress: () => {
             clearCart();
-            setCustomerPhone('');
-            setMpesaMode('stk');
-            setManualReceiptCode('');
+            resetSaleFields();
             if (router.canGoBack()) router.back();
           },
         },
       ],
     });
-  }, [alert, cart.length, clearCart]);
+  }, [alert, cart.length, clearCart, resetSaleFields]);
 
   // Intercept Android back button when mid-sale to prevent silent cart loss.
   useFocusEffect(
@@ -793,7 +773,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           visible={detailsModalVisible}
           onClose={() => setDetailsModalVisible(false)}
           sale={selectedSale}
-          shopName={user?.shop?.name || 'Dukana'}
+          shopName={user?.shop?.name || 'DuQana'}
           shopPhone={user?.shop?.phone}
           currency={user?.shop?.currency}
           thankYouNote={thankYouNote}
@@ -903,7 +883,13 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             actionLabel={canCreateProduct ? 'Add Product' : undefined}
             onAction={
               canCreateProduct
-                ? () => router.push(user?.role === 'staff' ? '/(staff)/inventory/new' : '/(owner)/inventory/new')
+                ? () => router.push({
+                    pathname: user?.role === 'staff' ? '/(staff)/inventory/new' : '/(owner)/inventory/new',
+                    // returnTo=back: come back to the till afterwards rather
+                    // than the Inventory list, which is where this flow lands
+                    // by default.
+                    params: { returnTo: 'back' },
+                  })
                 : undefined
             }
           />
@@ -943,9 +929,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                     setPaymentMethod(m);
                     // Leaving M-Pesa drops anything only M-Pesa collects.
                     if (m !== MPESA_METHOD_KEY) {
-                      setCustomerPhone('');
-                      setMpesaMode('stk');
-                      setManualReceiptCode('');
+                      resetSaleFields();
                     }
                   }}
                   onCheckout={handleCheckout}
@@ -1083,7 +1067,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         visible={detailsModalVisible}
         onClose={() => setDetailsModalVisible(false)}
         sale={selectedSale}
-        shopName={user?.shop?.name || 'Dukana'}
+        shopName={user?.shop?.name || 'DuQana'}
         shopPhone={user?.shop?.phone}
         currency={user?.shop?.currency}
         thankYouNote={thankYouNote}
@@ -1101,7 +1085,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         visible={receiptVisible}
         onClose={() => setReceiptVisible(false)}
         sale={completedSale}
-        shopName={user?.shop?.name || 'Dukana'}
+        shopName={user?.shop?.name || 'DuQana'}
         shopPhone={user?.shop?.phone}
         currency={user?.shop?.currency}
         servedByName={user?.name}

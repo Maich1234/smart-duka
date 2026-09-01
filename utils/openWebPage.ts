@@ -3,7 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 /**
  * Opens a URL in an in-app browser tab (Chrome Custom Tabs / SFSafariViewController)
  * instead of handing off to a separate browser app — the user never feels like they
- * left Dukana. Every outbound link to smart-duka-web (Help Center, legal docs,
+ * left DuQana. Every outbound link to smart-duka-web (Help Center, legal docs,
  * contact form, notification actions) should go through this rather than
  * `Linking.openURL`.
  */

@@ -201,7 +201,7 @@ export function AiNarrativeCard({
   const tone = PRIORITY_STYLE[insight.priority];
   return (
     <Animated.View entering={FadeInDown.duration(340).delay(100)}>
-      <SectionHeader icon="sparkles" title="Dukana Says" />
+      <SectionHeader icon="sparkles" title="DuQana Says" />
       <View style={[nc.card, Shadows.sm]}>
         <View style={[nc.priorityChip, { backgroundColor: tone.bg }]}>
           <Text style={[nc.priorityText, { color: tone.fg }]}>{tone.label}</Text>
@@ -223,7 +223,7 @@ export function AiNarrativeCard({
             onPress={onAskWhy}
             style={nc.askWhyRow}
             accessibilityRole="button"
-            accessibilityLabel="Ask Dukana AI why"
+            accessibilityLabel="Ask DuQana AI why"
           >
             <Text style={nc.askWhyText}>Ask why</Text>
             <Ionicons name="arrow-forward" size={13} color={Colors.primary} />
@@ -393,7 +393,7 @@ export function UpsellCard() {
 
 // ─── AiDisabledCard ─────────────────────────────────────────────────────────
 
-/** Shown when the shop is subscribed but has switched Dukana AI off in Profile — distinct from UpsellCard, which is for shops that aren't subscribed at all. */
+/** Shown when the shop is subscribed but has switched DuQana AI off in Profile — distinct from UpsellCard, which is for shops that aren't subscribed at all. */
 export function AiDisabledCard() {
   return (
     <AnimatedPressable
@@ -403,14 +403,14 @@ export function AiDisabledCard() {
       }}
       style={[uc.card, Shadows.sm]}
       accessibilityRole="button"
-      accessibilityLabel="Turn on Dukana AI from your Profile"
+      accessibilityLabel="Turn on DuQana AI from your Profile"
     >
       <View style={uc.iconWrap}>
         <Ionicons name="sparkles" size={22} color={Colors.accentDark} />
       </View>
-      <Text style={uc.title}>Dukana AI is off</Text>
+      <Text style={uc.title}>DuQana AI is off</Text>
       <Text style={uc.body}>
-        You&apos;ve turned this off for your shop. Turn it back on from Profile → Dukana AI to use it again.
+        You&apos;ve turned this off for your shop. Turn it back on from Profile → DuQana AI to use it again.
       </Text>
       <View style={uc.cta}>
         <Text style={uc.ctaText}>Go to Profile</Text>

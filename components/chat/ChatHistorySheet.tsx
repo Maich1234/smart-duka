@@ -30,7 +30,7 @@ function relativeDay(iso: string): string {
 }
 
 /**
- * Past Dukana AI conversations.
+ * Past DuQana AI conversations.
  *
  * The backend has always kept full history; the chat screen just never showed
  * it, so every new chat appeared to destroy the last one. This is the drawer
@@ -51,7 +51,7 @@ export const ChatHistorySheet: React.FC<ChatHistorySheetProps> = ({
         <View style={styles.empty}>
           <EmptyState
             title="No past conversations"
-            subtitle="Chats you have with Dukana AI will be listed here."
+            subtitle="Chats you have with DuQana AI will be listed here."
           />
         </View>
       ) : (

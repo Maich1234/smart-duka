@@ -99,7 +99,7 @@ export function describeSubscription(
     default:
       return {
         pill: 'No plan',
-        detail: 'Your free trial is waiting — activate Dukana',
+        detail: 'Your free trial is waiting — activate DuQana',
         tone: 'neutral',
         daysLeft: 0,
         isFree,

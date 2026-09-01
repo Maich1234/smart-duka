@@ -99,3 +99,22 @@ export const getShopReferrals = async (): Promise<ReferralData> => {
   const res = await api.get('/shop/referrals');
   return res.data.data;
 };
+
+// A staff member's own referral code and cash-bonus ledger — separate from
+// ReferralData above, which is the shop's own (owner-facing) code and
+// subscription-credit balance. This one pays real money, settled manually
+// by a platform admin.
+export interface MyReferralData {
+  code: string;
+  shareUrl: string;
+  enabled: boolean;
+  cashAmount: number;
+  payouts: { shopName: string; amount: number; status: 'pending' | 'paid' | 'cancelled'; joinedAt: string }[];
+  totalPending: number;
+  totalPaid: number;
+}
+
+export const getMyReferralData = async (): Promise<MyReferralData> => {
+  const res = await api.get('/shop/referrals/me');
+  return res.data.data;
+};

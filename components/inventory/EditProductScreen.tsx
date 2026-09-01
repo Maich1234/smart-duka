@@ -130,7 +130,7 @@ function EditProductForm({ id, product }: { id: string; product: Product }) {
         form={form}
         setForm={setForm}
         onSave={handleSave}
-        onCancel={() => router.back()}
+        onCancel={() => { setForm(toFormData(product)); router.back(); }}
         isEditing
         loading={updateMutation.isPending}
         availableProducts={availableProducts}

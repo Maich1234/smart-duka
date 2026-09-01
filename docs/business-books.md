@@ -1,11 +1,11 @@
 # Business Books — Phased Specification (July 2026)
 
-Dukana already captures everything a small business does: sales, purchases, purchase costs,
+DuQana already captures everything a small business does: sales, purchases, purchase costs,
 expenses, stock movement. This module turns that operational record into **downloadable business
 books** the owner can hand to a bank, a SACCO, a landlord, or KRA — without ever asking them to
 keep an accounting record by hand.
 
-The guiding rule: **the user records business activity; Dukana produces the books.**
+The guiding rule: **the user records business activity; DuQana produces the books.**
 
 ---
 
@@ -14,7 +14,7 @@ The guiding rule: **the user records business activity; Dukana produces the book
 | Decision | Choice | Why |
 |---|---|---|
 | **Monetization** | One feature flag, `books`, on the existing `SubscriptionPlan.features[]`. Sold as a third plan tier (§4) — **not** an à-la-carte add-on marketplace. | M-Pesa has no card-on-file. Every à-la-carte toggle is a fresh STK Push and a new subscription amount; 14 independent SKUs is a combinatorial reconciliation surface on top of the tier + seat-billing axes that already exist. Unbundling later is easy; re-bundling is not. |
-| **What ships first** | Only books that are **100 % derivable from data Dukana already captures**. | Six of the sixteen books in the original concept (Trial Balance, Balance Sheet, Cash Flow, Customer Ledger, Supplier Ledger, Tax Summary) have no inputs in the current schema. Shipping an approximated Balance Sheet that a shopkeeper takes to a lender is worse than not shipping one. |
+| **What ships first** | Only books that are **100 % derivable from data DuQana already captures**. | Six of the sixteen books in the original concept (Trial Balance, Balance Sheet, Cash Flow, Customer Ledger, Supplier Ledger, Tax Summary) have no inputs in the current schema. Shipping an approximated Balance Sheet that a shopkeeper takes to a lender is worse than not shipping one. |
 | **Where books are computed** | Server-side, always. Client caches the generated file for offline viewing. | A financial statement is a document, not a view. On-device computation from partially-synced SQLite would produce numbers that disagree with the server's — for figures that go to a bank. |
 | **Ledger posting** | Not gated. Every shop's data is book-ready from day one; only the **output** is gated. | If posting were behind the paywall, a shop activating in November would have no books for the ten months before it. |
 | **AI's role** | Reads finished books. Never writes a record, never computes a figure that appears in a book. | Preserved from the original concept — it is the correct rule. |

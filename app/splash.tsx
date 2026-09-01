@@ -168,7 +168,7 @@ export default function SplashScreen() {
         style={styles.centerContent}
         accessible
         accessibilityRole="image"
-        accessibilityLabel="Dukana"
+        accessibilityLabel="DuQana"
       >
         <Animated.View style={markStyle}>
           <DukanaMark width={MARK_W} height={MARK_H} />

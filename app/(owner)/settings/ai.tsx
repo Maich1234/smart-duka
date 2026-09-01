@@ -13,7 +13,7 @@ export default function AiSettingsScreen() {
   const { state: aiAccessState, aiEnabled, isLoading: loadingShop } = useAiAccess();
   const { toggling, handleToggle: handleToggleAi } = useShopConfigToggle(
     'aiEnabled',
-    { on: 'Dukana AI is on', off: 'Dukana AI is off — no data is sent to Gemini' },
+    { on: 'DuQana AI is on', off: 'DuQana AI is off — no data is sent to Gemini' },
     [['aiInsight']],
   );
 

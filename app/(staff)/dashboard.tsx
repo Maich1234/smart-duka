@@ -15,6 +15,7 @@ import { getStaffDashboard } from '@/services/dashboard';
 import { getShopConfig } from '@/services/shop';
 import { useStaffAttention } from '@/hooks/useAttention';
 import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
+import { StaffLockBanner } from '@/components/subscription/StaffLockBanner';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { TodayCard } from '@/components/dashboard/TodayCard';
 import { QuickActions, type QuickActionTile } from '@/components/dashboard/QuickActions';
@@ -103,6 +104,11 @@ export default function StaffDashboard() {
     if (showReconciliationTile) {
       list.push({ id: 'reconciliation', title: 'My Reconciliation', icon: 'swap-horizontal-outline', tint: Colors.info, tintBg: Colors.primarySubtle, route: '/(staff)/reconciliation' });
     }
+    // Always shown, same as the owner's equivalent tab — whether the
+    // program is currently live is a platform-wide toggle, not a per-person
+    // eligibility check, so refer.tsx itself renders the "not live yet"
+    // state rather than the tile disappearing.
+    list.push({ id: 'refer', title: 'Refer & Earn', icon: 'gift-outline', tint: Colors.primaryDark, tintBg: Colors.primarySubtle, route: '/(staff)/refer' });
     return list;
   }, [canManageExpenses, showPurchasesTile, showCommissionTile, showReconciliationTile]);
 
@@ -154,6 +160,8 @@ export default function StaffDashboard() {
             profileRoute="/(staff)/profile"
             insetsTop={insets.top}
           />
+
+          <StaffLockBanner />
 
           <TodayCard
             total={dashboard?.todaySalesTotal ?? 0}

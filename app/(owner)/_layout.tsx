@@ -7,7 +7,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { Tabs, Redirect, usePathname } from 'expo-router';
+import { Tabs, Redirect, usePathname, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,9 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
+import { useAlert } from '@/context/AlertContext';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useCartStore } from '@/store/staffCartStore';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Typography } from '@/constants/Typography';
 import { TAB_BAR_BASE_HEIGHT } from '@/constants/Layout';
@@ -102,6 +104,10 @@ interface PremiumTabBarProps {
 
 const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
+  const cart = useCartStore((s) => s.cart);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const resetSaleFields = useCartStore((s) => s.resetSaleFields);
+  const { alert } = useAlert();
 
   // Build list of only the visible routes (matching our TAB_CONFIGS)
   const visibleRoutes = state.routes.filter((route) =>
@@ -171,10 +177,36 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
               target: route.key,
               canPreventDefault: true,
             });
-            if (!isFocused && !event.defaultPrevented) {
-              haptics.light();
-              navigation.navigate({ name: route.name, merge: true });
+            if (isFocused || event.defaultPrevented) return;
+
+            // The till (pos) has no tab-bar button of its own, so the bar
+            // floats over it (see HIDDEN_TAB_BAR_ROUTES) and every real tab
+            // stays pressable while mid-sale. Confirm before letting one of
+            // those presses silently detach the owner from an open cart.
+            if (activeRoute?.name === 'pos' && cart.length > 0) {
+              alert({
+                type: 'confirm',
+                title: 'Leave Sale?',
+                message: 'You have items in your cart. Leaving this screen will clear your current sale.',
+                buttons: [
+                  { label: 'Stay', variant: 'ghost' },
+                  {
+                    label: 'Leave',
+                    variant: 'danger',
+                    onPress: () => {
+                      clearCart();
+                      resetSaleFields();
+                      haptics.light();
+                      navigation.navigate({ name: route.name, merge: true });
+                    },
+                  },
+                ],
+              });
+              return;
             }
+
+            haptics.light();
+            navigation.navigate({ name: route.name, merge: true });
           };
 
           return (
@@ -209,17 +241,34 @@ export default function OwnerLayout() {
   const { access } = useSubscription();
   const pathname = usePathname();
 
-  if (!isLoading && (!user || user.role !== 'owner')) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
   // Subscription + grace period exhausted → every owner screen funnels to
   // the paywall until an M-PESA payment lands. Derived server-side; while
   // offline the last-known (persisted) state applies, so a paid-up shop is
   // never locked by a network blip.
+  //
+  // A locked owner still needs a way out of the paywall: to sign out, to
+  // read the resend-me-the-link notification the paywall points them to, or
+  // to reach account/shop settings — none of those are gated server-side
+  // (see requirePaidShop), so trapping them behind the redirect too was a
+  // real bug, not extra safety.
   const isLocked = access?.state === 'locked';
-  if (isLocked && !pathname.includes('subscription')) {
-    return <Redirect href="/(owner)/subscription" />;
+  const isLockExempt = ['subscription', 'profile', 'settings', 'notifications'].some((r) => pathname.includes(r));
+
+  // This redirect fires as an effect, not a render-time `<Redirect>` swapped
+  // in for `<Tabs>` below. `<Tabs>` (and its Reanimated-driven custom tab
+  // bar) stays mounted continuously here, even for one frame on a locked,
+  // non-exempt route — returning `<Redirect>` in its place used to tear down
+  // the whole navigator mid-transition every time a locked owner tapped a
+  // non-exempt tab from an already-mounted exempt screen, which crashed
+  // (caught by the root ErrorBoundary as "Something went wrong").
+  useEffect(() => {
+    if (isLocked && !isLockExempt) {
+      router.replace('/(owner)/subscription');
+    }
+  }, [isLocked, isLockExempt, pathname]);
+
+  if (!isLoading && (!user || user.role !== 'owner')) {
+    return <Redirect href="/(auth)/login" />;
   }
 
   return (
@@ -251,7 +300,7 @@ export default function OwnerLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dukana',
+          title: 'DuQana',
           headerShown: false,
         }}
       />
@@ -315,7 +364,7 @@ export default function OwnerLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: 'Ask Dukana',
+          title: 'Ask DuQana',
           href: null,
           headerShown: false,
         }}

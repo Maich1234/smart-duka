@@ -50,7 +50,7 @@ interface OptimisticBatch {
 }
 
 /**
- * Ask Dukana. Auto-opens the latest non-archived conversation and
+ * Ask DuQana. Auto-opens the latest non-archived conversation and
  * auto-creates one on the first message.
  *
  * Past threads are reachable from the history sheet. They previously were
@@ -62,14 +62,14 @@ interface OptimisticBatch {
  */
 export default function AiChatScreen() {
   // `new` triggers handleNewChat() below on arrival — the Help Center's "Ask
-  // Dukana" link (dukana://chat?new=1) uses this so a visitor coming from an
+  // DuQana" link (duqana://chat?new=1) uses this so a visitor coming from an
   // old conversation's context always lands on a blank thread, not whatever
   // was last open.
   const { seed, new: newChatParam } = useLocalSearchParams<{ seed?: string; new?: string }>();
   const tabBarHeight = useTabBarHeight();
 
   // Same gate as /(owner)/insights.tsx — subscription state, plan feature,
-  // and the shop's own Dukana AI toggle. Matches the backend's
+  // and the shop's own DuQana AI toggle. Matches the backend's
   // requireActiveSubscription + requireFeature + requireAiEnabled on POST /ai/chat.
   const { hasAiAccess: hasAiChat, state: aiAccessState, isLoading: isSubscriptionLoading } = useAiAccess();
   const { plan } = useSubscription();
@@ -231,7 +231,7 @@ export default function AiChatScreen() {
     alert({
       type: 'confirm',
       title: 'Delete this conversation?',
-      message: "It will be removed from Dukana AI. This can't be undone.",
+      message: "It will be removed from DuQana AI. This can't be undone.",
       buttons: [
         { label: 'Cancel', variant: 'ghost' },
         {
@@ -263,7 +263,7 @@ export default function AiChatScreen() {
   if (isSubscriptionLoading) {
     return (
       <Screen scroll={false} padded={false} edges={['left', 'right']} tabBarSpacing>
-        <ScreenHeader title="Ask Dukana" fallbackHref="/(owner)/dashboard" />
+        <ScreenHeader title="Ask DuQana" fallbackHref="/(owner)/dashboard" />
         <LoadingState />
       </Screen>
     );
@@ -272,7 +272,7 @@ export default function AiChatScreen() {
   if (!hasAiChat) {
     return (
       <Screen scroll={false} padded={false} edges={['left', 'right']} tabBarSpacing>
-        <ScreenHeader title="Ask Dukana" fallbackHref="/(owner)/dashboard" />
+        <ScreenHeader title="Ask DuQana" fallbackHref="/(owner)/dashboard" />
         <View style={s.upsellContent}>
           {aiAccessState === 'disabled' ? <AiDisabledCard /> : <UpsellCard />}
         </View>
@@ -300,7 +300,7 @@ export default function AiChatScreen() {
     >
       <StatusBar style="dark" />
       <ScreenHeader
-        title="Ask Dukana"
+        title="Ask DuQana"
         subtitle="Grounded answers about your business"
         fallbackHref="/(owner)/dashboard"
         right={
@@ -348,7 +348,7 @@ export default function AiChatScreen() {
         >
           <EmptyState
             title="Ask anything about your business"
-            subtitle="Dukana reads your own sales, stock and expenses to answer."
+            subtitle="DuQana reads your own sales, stock and expenses to answer."
           />
           <SuggestedPrompts onSelect={setInputText} />
         </ScrollView>

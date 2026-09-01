@@ -197,7 +197,7 @@ export function buildReceiptEscPos(sale: Sale, options: EscPosReceiptOptions): U
   doc.align('center').bold(true).tall(true).wrapped(shopName).tall(false).bold(false);
   if (motto?.trim()) doc.wrapped(motto.trim());
   if (shopPhone?.trim()) doc.line(shopPhone.trim());
-  doc.line('Dukana POS');
+  doc.line('DuQana POS');
 
   doc.align('left').divider();
   doc.columns('Invoice', sale.invoiceNumber);
@@ -267,7 +267,7 @@ export function buildTestPageEscPos(shopName: string, paperWidth: PaperWidth = 5
   const doc = new EscPosBuilder(cols).init();
 
   doc.align('center').bold(true).tall(true).wrapped(shopName).tall(false).bold(false);
-  doc.line('Dukana POS').divider();
+  doc.line('DuQana POS').divider();
   doc.wrapped('Printer connected successfully.');
   doc.line().align('left');
   doc.columns('Paper width', `${paperWidth}mm`);

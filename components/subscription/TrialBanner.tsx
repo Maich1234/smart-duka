@@ -27,7 +27,7 @@ export const TrialBanner: React.FC = () => {
 
   if (access.state === 'none') {
     icon = 'gift-outline';
-    text = 'Your free trial is waiting — activate Dukana.';
+    text = 'Your free trial is waiting — activate DuQana.';
     tone = 'info';
   } else if (access.state === 'trialing' && status.daysLeft <= 7 && !access.cancelled) {
     icon = 'time-outline';

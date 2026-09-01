@@ -20,6 +20,21 @@ interface CartStore {
   removeItem: (key: string) => void;
   clearCart: () => void;
   updateItem: (key: string, updates: Partial<CartEntry>) => void;
+  // In-progress-sale UI state (till screen only). Lives here rather than as
+  // local component state because it must be reachable from the tab bar,
+  // which sits in a different part of the tree and can only intercept a
+  // mid-sale tab switch by talking to this store, not to PosScreen directly.
+  customerPhone: string;
+  setCustomerPhone: (value: string) => void;
+  mpesaMode: 'stk' | 'manual';
+  setMpesaMode: (value: 'stk' | 'manual') => void;
+  manualReceiptCode: string;
+  setManualReceiptCode: (value: string) => void;
+  /** Resets the three fields above. Deliberately separate from clearCart —
+   *  a completed sale clears the cart but keeps customerPhone (a repeat
+   *  customer's number is worth keeping prefilled); only actually *leaving*
+   *  the sale (Discard, or a tab switch mid-sale) should wipe all three. */
+  resetSaleFields: () => void;
 }
 
 /**
@@ -41,6 +56,13 @@ export const useCartStore = create<CartStore>()(
         set((s) => ({
           cart: s.cart.map((i) => (cartKey(i) === key ? { ...i, ...updates } : i)),
         })),
+      customerPhone: '',
+      setCustomerPhone: (value) => set({ customerPhone: value }),
+      mpesaMode: 'stk',
+      setMpesaMode: (value) => set({ mpesaMode: value }),
+      manualReceiptCode: '',
+      setManualReceiptCode: (value) => set({ manualReceiptCode: value }),
+      resetSaleFields: () => set({ customerPhone: '', mpesaMode: 'stk', manualReceiptCode: '' }),
     }),
     {
       name: 'staff-cart-storage',

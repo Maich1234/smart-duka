@@ -23,7 +23,7 @@ export default function Preparing() {
   const [done, setDone] = useState(false);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Echo the quiz answers back as things Dukana has "prepared" — the
+  // Echo the quiz answers back as things DuQana has "prepared" — the
   // moment the product proves it listened.
   const items = useMemo(() => {
     const list: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
@@ -90,8 +90,8 @@ export default function Preparing() {
         </Animated.Text>
         <Animated.Text entering={FadeInDown.duration(500).delay(120)} style={styles.title}>
           {done
-            ? 'Your Dukana is ready to build.'
-            : `We're preparing Dukana for your ${businessLabel(answers.businessType).toLowerCase()}.`}
+            ? 'Your DuQana is ready to build.'
+            : `We're preparing DuQana for your ${businessLabel(answers.businessType).toLowerCase()}.`}
         </Animated.Text>
 
         <View style={styles.ringWrap}>

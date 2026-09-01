@@ -40,6 +40,7 @@ export interface RegisterData {
   shopName: string;
   address?: string;
   phone?: string;
+  referralCode?: string;
 }
 
 export interface RegisterResponse {

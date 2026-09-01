@@ -32,7 +32,7 @@ export default function OwnerInsights() {
   const currency = user?.shop?.currency;
   const shopId = user?.shop?._id;
 
-  // Subscription state, plan feature, and the shop's own Dukana AI
+  // Subscription state, plan feature, and the shop's own DuQana AI
   // toggle. Matches the backend's requireActiveSubscription + requireFeature
   // + requireAiEnabled on GET /ai/insight.
   const { hasAiAccess: hasAiInsights, state: aiAccessState, isLoading: isSubscriptionLoading } = useAiAccess();

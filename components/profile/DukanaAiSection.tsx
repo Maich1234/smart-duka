@@ -19,7 +19,7 @@ interface DukanaAiSectionProps {
 }
 
 /**
- * Profile's "Dukana AI" section — its own card, separate from the plain
+ * Profile's "DuQana AI" section — its own card, separate from the plain
  * PREFERENCES toggles, since this one combines subscription-gated upsell
  * with an owner opt-in/out once subscribed (see hooks/useAiAccess.ts).
  */
@@ -34,13 +34,13 @@ export function DukanaAiSection({ state, aiEnabled, toggling, loadingShop, onTog
           style={s.row}
           onPress={() => router.push('/(owner)/subscription')}
           accessibilityRole="button"
-          accessibilityLabel="Upgrade to unlock Dukana AI"
+          accessibilityLabel="Upgrade to unlock DuQana AI"
         >
           <View style={[s.iconWrap, { backgroundColor: Colors.accentSubtle }]}>
             <Ionicons name="sparkles" size={17} color={Colors.accentDark} />
           </View>
           <View style={s.text}>
-            <Text style={s.title}>Dukana AI</Text>
+            <Text style={s.title}>DuQana AI</Text>
             <Text style={s.sub}>Daily insights and a business chat assistant — included with any active subscription</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
@@ -52,7 +52,7 @@ export function DukanaAiSection({ state, aiEnabled, toggling, loadingShop, onTog
               <Ionicons name="sparkles" size={17} color={Colors.accentDark} />
             </View>
             <View style={s.text}>
-              <Text style={s.title}>Enable Dukana AI</Text>
+              <Text style={s.title}>Enable DuQana AI</Text>
               <Text style={s.sub}>Daily insights and a business chat assistant, powered by Gemini</Text>
             </View>
             <Switch
@@ -90,22 +90,22 @@ export function DukanaAiSection({ state, aiEnabled, toggling, loadingShop, onTog
         style={s.row}
         onPress={() => openHelp('smart-duka-ai')}
         accessibilityRole="button"
-        accessibilityLabel="Help with Dukana AI"
+        accessibilityLabel="Help with DuQana AI"
       >
         <View style={[s.iconWrap, { backgroundColor: Colors.primarySubtle }]}>
           <Ionicons name="help-circle-outline" size={17} color={Colors.primary} />
         </View>
         <View style={s.text}>
-          <Text style={s.title}>Help with Dukana AI</Text>
+          <Text style={s.title}>Help with DuQana AI</Text>
           <Text style={s.sub}>How it works, what it can do, and how to turn it on</Text>
         </View>
         <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
       </AnimatedPressable>
 
       <BottomSheet visible={showPrivacy} onClose={() => setShowPrivacy(false)}>
-        <Text style={p.title}>Dukana AI & your data</Text>
+        <Text style={p.title}>DuQana AI & your data</Text>
         <Text style={p.body}>
-          Dukana AI (powered by Google Gemini) reads a summary of your shop&apos;s sales, inventory, expenses, and aggregated staff performance to answer questions and generate insights. It never sees customer personal data.
+          DuQana AI (powered by Google Gemini) reads a summary of your shop&apos;s sales, inventory, expenses, and aggregated staff performance to answer questions and generate insights. It never sees customer personal data.
           {'\n\n'}
           Conversations are stored securely and linked to your shop so you can revisit them later.
           {'\n\n'}

@@ -10,28 +10,26 @@ import { QueryError } from '@/components/ui/QueryError';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { getShopReferrals } from '@/services/shop';
-import { WEB_URL } from '@/constants/config';
+import { getMyReferralData } from '@/services/shop';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 
 /**
- * Refer & Earn — informational only, same spirit as subscription.tsx: no
- * link or button here points at a payment/checkout page for the current
- * user. The shared link goes to /register, a signup page for someone else
- * entirely; the banked discount is read-only status, applied automatically
- * server-side on this shop's own next payment, never something the current
- * user "redeems" through the app.
+ * Refer & Earn — the staff-member version of app/(owner)/refer.tsx. Same
+ * informational spirit, but the reward here is a fixed cash amount, settled
+ * manually by a platform admin (see EmployeeReferralPayout), never a
+ * subscription credit — so this shows a pending/paid ledger instead of the
+ * owner screen's pending/converted list.
  */
-export default function ReferScreen() {
+export default function StaffReferScreen() {
   const tabBarHeight = useTabBarHeight();
   const { toast } = useAlert();
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['shop', 'referrals'],
-    queryFn: getShopReferrals,
+    queryKey: ['shop', 'referrals', 'me'],
+    queryFn: getMyReferralData,
   });
 
   const copyCode = async () => {
@@ -72,8 +70,8 @@ export default function ReferScreen() {
     >
       <Animated.View entering={FadeInUp.duration(360)}>
         <Text style={styles.intro}>
-          Invite other shop owners to DuQana. When someone you invite becomes a paying customer, you get{' '}
-          {data.perReferralPercent}% off your next subscription payment.
+          Invite a new shop to DuQana. When they sign up with your code and become a paying customer, you earn{' '}
+          KES {data.cashAmount.toLocaleString()} cash — paid out by DuQana, not deducted from your shop.
         </Text>
       </Animated.View>
 
@@ -90,8 +88,9 @@ export default function ReferScreen() {
 
       <Animated.View entering={FadeInUp.duration(360).delay(100)}>
         <Card style={styles.card}>
-          <Text style={styles.label}>Discount banked for your next payment</Text>
-          <Text style={styles.discount}>{data.discountPercentBanked}%</Text>
+          <Text style={styles.label}>Pending</Text>
+          <Text style={styles.discount}>KES {data.totalPending.toLocaleString()}</Text>
+          <Text style={styles.hint}>Paid out {data.totalPaid.toLocaleString()} so far</Text>
         </Card>
       </Animated.View>
 
@@ -99,17 +98,20 @@ export default function ReferScreen() {
         <Card style={styles.card}>
           <View style={styles.referralsHeader}>
             <Ionicons name="people-outline" size={16} color={Colors.textSecondary} />
-            <Text style={styles.label}>People you&apos;ve referred</Text>
+            <Text style={styles.label}>Shops you&apos;ve referred</Text>
           </View>
-          {data.referrals.length === 0 ? (
+          {data.payouts.length === 0 ? (
             <Text style={styles.emptyReferrals}>No referrals yet — share your code to get started.</Text>
           ) : (
-            data.referrals.map((r, i) => (
+            data.payouts.map((p, i) => (
               <View key={i} style={styles.referralRow}>
-                <Text style={styles.referralName}>{r.shopName}</Text>
-                <View style={[styles.statusChip, { backgroundColor: r.status === 'converted' ? Colors.successSubtle : Colors.background }]}>
-                  <Text style={[styles.statusText, { color: r.status === 'converted' ? Colors.success : Colors.textSecondary }]}>
-                    {r.status === 'converted' ? 'Converted' : 'Pending'}
+                <View>
+                  <Text style={styles.referralName}>{p.shopName}</Text>
+                  <Text style={styles.referralAmount}>KES {p.amount.toLocaleString()}</Text>
+                </View>
+                <View style={[styles.statusChip, { backgroundColor: p.status === 'paid' ? Colors.successSubtle : Colors.background }]}>
+                  <Text style={[styles.statusText, { color: p.status === 'paid' ? Colors.success : Colors.textSecondary }]}>
+                    {p.status === 'paid' ? 'Paid' : p.status === 'cancelled' ? 'Cancelled' : 'Pending'}
                   </Text>
                 </View>
               </View>
@@ -151,6 +153,11 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilyBold,
     color: Colors.primary,
   },
+  hint: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+  },
   referralsHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   emptyReferrals: {
     fontSize: Typography.size.small,
@@ -171,6 +178,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.text,
+  },
+  referralAmount: {
+    fontSize: 12,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
   },
   statusChip: {
     paddingHorizontal: 10,

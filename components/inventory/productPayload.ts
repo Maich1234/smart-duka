@@ -69,10 +69,16 @@ export const buildProductPayload = (
   // Product-level commission travels for every product type. Sent even when
   // disabled so turning it off actually clears the stored config.
   if (canManageMargins) {
+    // A Variable Price product's Min Price doubles as its commission floor
+    // (see ProductForm's effectiveCommissionBasePrice) — mirrored here so
+    // what's saved can't drift from what the form displayed, even if
+    // commissionBasePrice itself is stale.
+    const effectiveBasePrice =
+      form.productType === 'variable' && form.minPrice.trim() ? form.minPrice : form.commissionBasePrice;
     payload.commission = form.commissionEnabled
       ? {
           enabled: true,
-          basePrice: parseFloat(form.commissionBasePrice) || 0,
+          basePrice: parseFloat(effectiveBasePrice) || 0,
           employeeSharePercent: parseFloat(form.commissionEmployeeSharePercent) || 100,
         }
       : { enabled: false };

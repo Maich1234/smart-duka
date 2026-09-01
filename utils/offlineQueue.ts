@@ -513,14 +513,23 @@ export const processQueue = async (): Promise<void> => {
   const userId = currentUserId();
   if (!userId) return;
 
-  const { isConnected } = await NetInfo.fetch();
-  if (isConnected === false) return;
-
+  // Claim the lock now, synchronously, before the first `await` below.
+  // Callers fire processQueue() from several independent triggers (NetInfo
+  // reconnect, AppState resume, the 30s periodic timer, manual retry) that
+  // can land in the same tick — e.g. app resume and network reconnect firing
+  // together. The old code awaited NetInfo.fetch() BEFORE setting
+  // isProcessing, so two calls made back-to-back both passed the guard above
+  // while isProcessing was still false, and both went on to process the same
+  // rows concurrently. Setting the flag here, with no await in between,
+  // closes that window.
   isProcessing = true;
   notifySync(true);
-  const db = getDb();
 
   try {
+    const { isConnected } = await NetInfo.fetch();
+    if (isConnected === false) return;
+
+    const db = getDb();
     adoptLegacyRows(db, userId);
     purgeStaleFailures(db);
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useForm, useWatch, Controller } from 'react-hook-form';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { OtpCodeField } from '@/components/ui/OtpCodeField';
+import { OtpCodeField, type OtpStatus } from '@/components/ui/OtpCodeField';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -54,16 +54,22 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpError, setOtpError] = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
   const [formError, setFormError] = useState('');
   const [loading, setLoading] = useState(false);
   const [verifyAttempts, setVerifyAttempts] = useState(0);
   const [verifyCooldown, setVerifyCooldown] = useState(0);
+  const clearOtpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (verifyCooldown <= 0) return;
     const timer = setInterval(() => setVerifyCooldown((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
   }, [verifyCooldown]);
+
+  useEffect(() => () => {
+    if (clearOtpTimer.current) clearTimeout(clearOtpTimer.current);
+  }, []);
 
   const emailForm = useForm<EmailForm>({
     resolver: zodResolver(emailSchema),
@@ -123,17 +129,25 @@ export default function ForgotPasswordScreen() {
     haptics.light();
     try {
       await api.post('/auth/verify-otp', { email, otp });
-      setStep('reset');
+      haptics.success();
+      setLoading(false);
+      setOtpVerified(true);
+      setTimeout(() => setStep('reset'), 900);
     } catch (error: any) {
+      setLoading(false);
       const attempts = verifyAttempts + 1;
       setVerifyAttempts(attempts);
       if (attempts >= 5) setVerifyCooldown(30);
       else if (attempts >= 3) setVerifyCooldown(10);
       setOtpError(error.response?.data?.message || 'Invalid code.');
-    } finally {
-      setLoading(false);
+      // Leave the wrong code visible through the shake, then clear it so a
+      // retap of the same digits doesn't silently no-op — cancelled if the
+      // user starts editing first.
+      clearOtpTimer.current = setTimeout(() => setOtp(''), 650);
     }
   };
+
+  const otpStatus: OtpStatus = otpVerified ? 'success' : loading ? 'loading' : 'idle';
 
   const handleResetPassword = async (data: ResetForm) => {
     setLoading(true);
@@ -210,10 +224,17 @@ export default function ForgotPasswordScreen() {
             <OtpCodeField
               value={otp}
               onChange={(v) => {
+                if (clearOtpTimer.current) {
+                  clearTimeout(clearOtpTimer.current);
+                  clearOtpTimer.current = null;
+                }
                 setOtp(v);
                 if (otpError) setOtpError('');
               }}
               error={otpError}
+              status={otpStatus}
+              disabled={verifyCooldown > 0}
+              onComplete={handleVerifyOtp}
               style={{ marginBottom: Spacing.md }}
             />
             {formError ? <InlineError message={formError} /> : null}
@@ -222,18 +243,11 @@ export default function ForgotPasswordScreen() {
                 Too many attempts — try again in {verifyCooldown}s
               </Text>
             )}
-            <Button
-              title="Verify Code"
-              onPress={handleVerifyOtp}
-              loading={loading}
-              style={styles.button}
-              size="lg"
-              disabled={otp.length < 6 || verifyCooldown > 0}
-            />
             <AnimatedPressable
               onPress={() => {
                 setOtp('');
                 setOtpError('');
+                setOtpVerified(false);
                 setStep('request');
               }}
               style={styles.secondaryLink}

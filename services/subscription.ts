@@ -149,6 +149,19 @@ export async function cancelSubscription(): Promise<{ success: boolean; data: { 
   return res.data;
 }
 
+/**
+ * Re-sends the renewal link via push + email — the same two channels the
+ * reminder cron uses. This is the paywall's "Resend payment link" action for
+ * an owner who dismissed or can't find the original notification. Compliant
+ * with the no-purchase-surface rule below: it never returns or opens a URL
+ * itself, it only asks the backend to dispatch one through channels outside
+ * the app binary.
+ */
+export async function resendRenewalLink(): Promise<{ success: boolean; message: string; emailSent?: boolean }> {
+  const res = await api.post('/subscriptions/resend-link');
+  return res.data;
+}
+
 // NOTE: there is deliberately no pricing preview, promo validation, payment
 // initiation, payment polling, or payment reconciliation in this file.
 //

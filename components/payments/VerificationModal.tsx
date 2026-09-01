@@ -22,7 +22,6 @@ import {
 import Animated, {
   FadeIn,
   FadeInDown,
-  ZoomIn,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -46,8 +45,7 @@ import { BorderRadius } from '@/constants/BorderRadius';
 import { Motion } from '@/constants/Motion';
 import { requestOTP, verifyOTP, type OtpMethod } from '@/services/otp';
 import { useAuthStore, type AuthState } from '@/store/authStore';
-import { OtpCodeField } from '@/components/ui/OtpCodeField';
-import { VerifyButton, type VerifyButtonState } from './verification/VerifyButton';
+import { OtpCodeField, type OtpStatus } from '@/components/ui/OtpCodeField';
 import { MethodCard } from './verification/MethodCard';
 import { ResendSection } from './verification/ResendSection';
 import { mapOtpError, maskEmail, maskPhone } from './verification/helpers';
@@ -58,7 +56,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Phase = 'boot' | 'select' | 'enter' | 'success';
+type Phase = 'boot' | 'select' | 'enter';
 type DismissSource = 'backdrop' | 'button' | 'back';
 
 const OTP_LENGTH = 6;
@@ -147,7 +145,7 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
     const [sentTo, setSentTo] = useState('');
     const [code, setCode] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const [btnState, setBtnState] = useState<VerifyButtonState>('idle');
+    const [status, setStatus] = useState<OtpStatus>('idle');
     const [sendingMethod, setSendingMethod] = useState<OtpMethod | null>(null);
     const [cooldownKey, setCooldownKey] = useState(0);
     const [resentFlash, setResentFlash] = useState(false);
@@ -215,10 +213,10 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
         // A stray backdrop tap must not abort an in-flight verification or the
         // success handoff (which would discard the just-issued token); the
         // explicit close button and back gesture always work.
-        if (btnState !== 'idle' && source === 'backdrop') return;
+        if (status !== 'idle' && source === 'backdrop') return;
         closeWith(onClose);
       },
-      [btnState, closeWith, onClose]
+      [status, closeWith, onClose]
     );
 
     useImperativeHandle(ref, () => ({ requestClose: () => dismiss('back') }), [dismiss]);
@@ -235,7 +233,7 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
           setSessionId(res.data.sessionId);
           setSentTo(res.data.sentTo);
           setCode('');
-          setBtnState('idle');
+          setStatus('idle');
           setPhase('enter');
           setCooldownKey((k) => k + 1);
           haptics.light();
@@ -278,19 +276,19 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
         const otpCode = codeArg ?? code;
         if (otpCode.length < OTP_LENGTH || verifyingRef.current) return;
         verifyingRef.current = true;
-        setBtnState('loading');
+        setStatus('loading');
         setError(null);
         try {
           const res = await verifyOTP(sessionId, otpCode);
-          setBtnState('success');
+          setStatus('success');
           haptics.success();
-          AccessibilityInfo.announceForAccessibility('Identity verified');
-          schedule(() => setPhase('success'), 700);
-          schedule(() => closeWith(() => onVerified(res.data.verificationToken)), 2100);
+          // Let the field's own spin-to-checkmark animation play out before
+          // handing off — OtpCodeField announces "Code verified" itself.
+          schedule(() => closeWith(() => onVerified(res.data.verificationToken)), 1600);
         } catch (err) {
           const e = mapOtpError(err, 'Verification failed. Please try again.');
           haptics.error();
-          setBtnState('idle');
+          setStatus('idle');
           setError(e.message);
           // Leave the wrong code visible through the shake, then clear it —
           // cancelled if the user starts editing first.
@@ -316,7 +314,7 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
       setPhase('select');
       setCode('');
       setError(null);
-      setBtnState('idle');
+      setStatus('idle');
     }, []);
 
     // ── Animated styles ──────────────────────────────────────────────────────
@@ -377,125 +375,126 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {phase === 'success' ? (
-                <SuccessBlock reducedMotion={reducedMotion} />
-              ) : (
-                <>
-                  <Hero phase={phase} reducedMotion={reducedMotion} />
+              <Hero phase={phase} reducedMotion={reducedMotion} />
 
-                  {phase === 'boot' && (
-                    <Animated.View key="boot" entering={stepAnim} style={styles.body}>
-                      <View style={styles.sendingRow}>
-                        <ActivityIndicator size="small" color={Colors.primary} />
-                        <Text style={styles.sendingText} maxFontSizeMultiplier={1.6}>
-                          {methods[0]?.method === 'email'
-                            ? `Sending your code to ${methods[0]?.destination}… this can take up to a minute.`
-                            : `Sending your code to ${methods[0]?.destination}…`}
-                        </Text>
-                      </View>
-                    </Animated.View>
-                  )}
-
-                  {phase === 'select' && (
-                    <Animated.View key="select" entering={stepAnim} style={styles.body}>
-                      {methods.map((m) => (
-                        <MethodCard
-                          key={m.method}
-                          icon={m.icon}
-                          title={m.title}
-                          destination={m.destination}
-                          loading={sendingMethod === m.method}
-                          disabled={!!sendingMethod}
-                          onPress={() => send(m.method)}
-                        />
-                      ))}
-                      {methods.length === 0 && (
-                        <View style={styles.noContactCard}>
-                          <Ionicons
-                            name="alert-circle-outline"
-                            size={18}
-                            color={Colors.warning}
-                          />
-                          <Text style={styles.noContactText}>
-                            {"There's no phone number or email on your account. Add one in your profile to verify your identity."}
-                          </Text>
-                        </View>
-                      )}
-                      {error ? (
-                        <Animated.View
-                          entering={FadeIn.duration(Motion.duration.base)}
-                          style={styles.selectErrorRow}
-                          accessibilityLiveRegion="polite"
-                        >
-                          <Ionicons name="alert-circle" size={14} color={Colors.danger} />
-                          <Text style={styles.selectErrorText}>{error}</Text>
-                        </Animated.View>
-                      ) : null}
-                    </Animated.View>
-                  )}
-
-                  {phase === 'enter' && (
-                    <Animated.View key="enter" entering={stepAnim} style={styles.body}>
-                      <DestinationCard
-                        icon={method === 'email' ? 'mail' : 'chatbubble-ellipses'}
-                        label="Code sent to"
-                        destination={sentTo || currentMethod?.destination || ''}
-                        resentFlash={resentFlash}
-                      />
-
-                      <OtpCodeField
-                        value={code}
-                        onChange={handleCodeChange}
-                        length={OTP_LENGTH}
-                        error={error}
-                        disabled={btnState !== 'idle'}
-                        onComplete={verify}
-                      />
-
-                      <View style={styles.ctaBlock}>
-                        <VerifyButton
-                          state={btnState}
-                          disabled={code.length < OTP_LENGTH}
-                          onPress={() => verify()}
-                        />
-                        <ResendSection
-                          key={cooldownKey}
-                          cooldownSeconds={RESEND_COOLDOWN}
-                          sending={sendingMethod !== null}
-                          disabled={btnState !== 'idle'}
-                          onResend={() => send(method, { isResend: true })}
-                        />
-                      </View>
-
-                      {methods.length > 1 && (
-                        <Pressable
-                          style={styles.changeMethodBtn}
-                          onPress={handleChangeMethod}
-                          disabled={btnState !== 'idle'}
-                          accessibilityRole="button"
-                          accessibilityLabel="Use a different verification method"
-                        >
-                          <Ionicons
-                            name="swap-horizontal-outline"
-                            size={14}
-                            color={Colors.primary}
-                          />
-                          <Text style={styles.changeMethodText} maxFontSizeMultiplier={1.6}>
-                            Verify another way
-                          </Text>
-                        </Pressable>
-                      )}
-                    </Animated.View>
-                  )}
-
-                  <View style={styles.trustRow}>
-                    <Ionicons name="lock-closed" size={12} color={Colors.textSecondary} />
-                    <Text style={styles.trustText} maxFontSizeMultiplier={1.6}>
-                      Codes are single-use and expire after 5 minutes
+              {phase === 'boot' && (
+                <Animated.View key="boot" entering={stepAnim} style={styles.body}>
+                  <View style={styles.sendingRow}>
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                    <Text style={styles.sendingText} maxFontSizeMultiplier={1.6}>
+                      {methods[0]?.method === 'email'
+                        ? `Sending your code to ${methods[0]?.destination}… this can take up to a minute.`
+                        : `Sending your code to ${methods[0]?.destination}…`}
                     </Text>
                   </View>
-                </>
+                </Animated.View>
               )}
+
+              {phase === 'select' && (
+                <Animated.View key="select" entering={stepAnim} style={styles.body}>
+                  {methods.map((m) => (
+                    <MethodCard
+                      key={m.method}
+                      icon={m.icon}
+                      title={m.title}
+                      destination={m.destination}
+                      loading={sendingMethod === m.method}
+                      disabled={!!sendingMethod}
+                      onPress={() => send(m.method)}
+                    />
+                  ))}
+                  {methods.length === 0 && (
+                    <View style={styles.noContactCard}>
+                      <Ionicons
+                        name="alert-circle-outline"
+                        size={18}
+                        color={Colors.warning}
+                      />
+                      <Text style={styles.noContactText}>
+                        {"There's no phone number or email on your account. Add one in your profile to verify your identity."}
+                      </Text>
+                    </View>
+                  )}
+                  {error ? (
+                    <Animated.View
+                      entering={FadeIn.duration(Motion.duration.base)}
+                      style={styles.selectErrorRow}
+                      accessibilityLiveRegion="polite"
+                    >
+                      <Ionicons name="alert-circle" size={14} color={Colors.danger} />
+                      <Text style={styles.selectErrorText}>{error}</Text>
+                    </Animated.View>
+                  ) : null}
+                </Animated.View>
+              )}
+
+              {phase === 'enter' && (
+                <Animated.View key="enter" entering={stepAnim} style={styles.body}>
+                  <DestinationCard
+                    icon={method === 'email' ? 'mail' : 'chatbubble-ellipses'}
+                    label="Code sent to"
+                    destination={sentTo || currentMethod?.destination || ''}
+                    resentFlash={resentFlash}
+                  />
+
+                  <OtpCodeField
+                    value={code}
+                    onChange={handleCodeChange}
+                    length={OTP_LENGTH}
+                    error={error}
+                    status={status}
+                    onComplete={verify}
+                  />
+
+                  {status === 'success' ? (
+                    <Animated.View
+                      entering={FadeIn.duration(Motion.duration.base)}
+                      style={styles.verifiedRow}
+                    >
+                      <Ionicons name="shield-checkmark" size={14} color={Colors.success} />
+                      <Text style={styles.verifiedText} maxFontSizeMultiplier={1.6}>
+                        {`Verified — payment settings unlock for ${SESSION_MINUTES} minutes.`}
+                      </Text>
+                    </Animated.View>
+                  ) : (
+                    <View style={styles.ctaBlock}>
+                      <ResendSection
+                        key={cooldownKey}
+                        cooldownSeconds={RESEND_COOLDOWN}
+                        sending={sendingMethod !== null}
+                        disabled={status !== 'idle'}
+                        onResend={() => send(method, { isResend: true })}
+                      />
+                    </View>
+                  )}
+
+                  {methods.length > 1 && (
+                    <Pressable
+                      style={styles.changeMethodBtn}
+                      onPress={handleChangeMethod}
+                      disabled={status !== 'idle'}
+                      accessibilityRole="button"
+                      accessibilityLabel="Use a different verification method"
+                    >
+                      <Ionicons
+                        name="swap-horizontal-outline"
+                        size={14}
+                        color={Colors.primary}
+                      />
+                      <Text style={styles.changeMethodText} maxFontSizeMultiplier={1.6}>
+                        Verify another way
+                      </Text>
+                    </Pressable>
+                  )}
+                </Animated.View>
+              )}
+
+              <View style={styles.trustRow}>
+                <Ionicons name="lock-closed" size={12} color={Colors.textSecondary} />
+                <Text style={styles.trustText} maxFontSizeMultiplier={1.6}>
+                  Codes are single-use and expire after 5 minutes
+                </Text>
+              </View>
             </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>
@@ -507,13 +506,13 @@ VerificationSheet.displayName = 'VerificationSheet';
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
-const HERO_SUB: Record<Exclude<Phase, 'success'>, string> = {
+const HERO_SUB: Record<Phase, string> = {
   boot: 'This extra step keeps your M-Pesa payment settings secure.',
   select: 'Choose where to receive your one-time security code.',
   enter: 'Enter the 6-digit code we sent you. This extra step keeps your M-Pesa payment settings secure.',
 };
 
-const Hero: React.FC<{ phase: Exclude<Phase, 'success'>; reducedMotion: boolean }> = ({
+const Hero: React.FC<{ phase: Phase; reducedMotion: boolean }> = ({
   phase,
   reducedMotion,
 }) => {
@@ -602,35 +601,6 @@ const DestinationCard: React.FC<{
         </View>
       )}
     </View>
-  </View>
-);
-
-// ─── Success ──────────────────────────────────────────────────────────────────
-
-const SuccessBlock: React.FC<{ reducedMotion: boolean }> = ({ reducedMotion }) => (
-  <View style={styles.successWrap}>
-    <Animated.View
-      entering={
-        reducedMotion
-          ? FadeIn.duration(Motion.duration.base)
-          : ZoomIn.springify().damping(14).stiffness(180)
-      }
-    >
-      <View style={styles.successRing}>
-        <LinearGradient
-          colors={[Colors.success, Colors.successLight]}
-          style={styles.successCircle}
-        >
-          <Ionicons name="checkmark" size={30} color={Colors.white} />
-        </LinearGradient>
-      </View>
-    </Animated.View>
-    <Text style={styles.successTitle} maxFontSizeMultiplier={1.8} accessibilityRole="header">
-      Identity verified
-    </Text>
-    <Text style={styles.successSub} maxFontSizeMultiplier={1.8}>
-      Payment settings are unlocked for the next {SESSION_MINUTES} minutes.
-    </Text>
   </View>
 );
 
@@ -858,6 +828,21 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     marginTop: Spacing.xs,
   },
+  verifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs + 2,
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.sm,
+  },
+  verifiedText: {
+    flexShrink: 1,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.success,
+    textAlign: 'center',
+  },
   changeMethodBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -884,46 +869,6 @@ const styles = StyleSheet.create({
   trustText: {
     flexShrink: 1,
     fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamily,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-
-  // Success
-  successWrap: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-  },
-  successRing: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.successSubtle,
-    marginBottom: Spacing.md,
-    shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  successCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  successTitle: {
-    fontSize: Typography.size.h3,
-    lineHeight: Typography.lineHeight.h3,
-    fontFamily: Typography.fontFamilyBold,
-    color: Colors.textPrimary,
-    letterSpacing: Typography.letterSpacing.tight,
-    marginBottom: Spacing.xs + 2,
-  },
-  successSub: {
-    fontSize: Typography.size.small,
-    lineHeight: Typography.lineHeight.small,
     fontFamily: Typography.fontFamily,
     color: Colors.textSecondary,
     textAlign: 'center',

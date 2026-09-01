@@ -486,7 +486,7 @@ export default function OwnerSales() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         sale={selectedSale}
-        shopName={user?.shop?.name || 'Dukana'}
+        shopName={user?.shop?.name || 'DuQana'}
         shopPhone={user?.shop?.phone}
         currency={currency}
         thankYouNote={thankYouNote}

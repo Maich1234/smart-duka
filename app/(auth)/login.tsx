@@ -159,7 +159,7 @@ export default function LoginScreen() {
           onPress={() => router.push('/(auth)/register')}
           style={styles.createRow}
         >
-          <Text style={styles.createText}>New to Dukana?</Text>
+          <Text style={styles.createText}>New to DuQana?</Text>
           <Text style={styles.createLink}> Create your shop</Text>
           <Ionicons name="arrow-forward" size={14} color={Colors.primary} style={styles.createArrow} />
         </Pressable>

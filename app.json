@@ -1,24 +1,24 @@
 {
   "expo": {
-    "name": "Dukana",
+    "name": "DuQana",
     "slug": "smart-duka",
     "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "dukana",
+    "scheme": "duqana",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nifulabs.dukana",
+      "bundleIdentifier": "com.nifulabs.duqana",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSCameraUsageDescription": "Dukana uses the camera to capture your business logo and scan product barcodes.",
-        "NSPhotoLibraryUsageDescription": "Dukana accesses your photo library to set a business logo.",
-        "NSPhotoLibraryAddUsageDescription": "Dukana saves images to your photo library.",
-        "NSBluetoothAlwaysUsageDescription": "Dukana connects to your Bluetooth receipt printer to print sale receipts."
+        "NSCameraUsageDescription": "DuQana uses the camera to capture your business logo and scan product barcodes.",
+        "NSPhotoLibraryUsageDescription": "DuQana accesses your photo library to set a business logo.",
+        "NSPhotoLibraryAddUsageDescription": "DuQana saves images to your photo library.",
+        "NSBluetoothAlwaysUsageDescription": "DuQana connects to your Bluetooth receipt printer to print sale receipts."
       },
       "associatedDomains": [
-        "applinks:dukana.expo.app"
+        "applinks:duqana.expo.app"
       ]
     },
     "android": {
@@ -32,7 +32,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.nifulabs.dukana",
+      "package": "com.nifulabs.duqana",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
@@ -41,7 +41,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "dukana.expo.app"
+              "host": "duqana.expo.app"
             }
           ],
           "category": [
@@ -102,14 +102,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Dukana to access your photos to set a business logo.",
-          "cameraPermission": "Allow Dukana to use the camera to capture a business logo."
+          "photosPermission": "Allow DuQana to access your photos to set a business logo.",
+          "cameraPermission": "Allow DuQana to use the camera to capture a business logo."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Dukana uses your camera to scan product barcodes."
+          "cameraPermission": "DuQana uses your camera to scan product barcodes."
         }
       ],
       [
@@ -117,7 +117,7 @@
         {
           "isBackgroundEnabled": false,
           "neverForLocation": true,
-          "bluetoothAlwaysPermission": "Dukana connects to your Bluetooth receipt printer to print sale receipts."
+          "bluetoothAlwaysPermission": "DuQana connects to your Bluetooth receipt printer to print sale receipts."
         }
       ],
       "expo-audio"

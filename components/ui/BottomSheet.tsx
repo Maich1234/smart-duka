@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Pressable, StyleSheet, Platform } from 'react-native';
+import { Modal, View, Pressable, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,21 +33,33 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent accessibilityViewIsModal>
       {/* RNGH pressables inside a RN Modal need their own gesture root on Android */}
       <GestureHandlerRootView style={styles.gestureRoot}>
-        <KeyboardAvoidingView
-          style={styles.overlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        {/* A plain View here (not KeyboardAvoidingView) so the sheet is
+            bottom-anchored on the very first frame — Modal centers its
+            content by default until a child claims full height, and
+            KeyboardAvoidingView doesn't get real layout/keyboard data until
+            its first keyboard event, so wrapping the whole overlay in it
+            used to show the sheet centered for a frame (fixed the instant a
+            field was focused and the keyboard fired). Keyboard avoidance now
+            only wraps the sheet itself, which needs it. */}
+        <View style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-          <View
-            style={[
-              styles.sheet,
-              { maxHeight: `${maxHeightPercent}%`, paddingBottom: Spacing.xl + insets.bottom },
-            ]}
-          >
-            <View style={styles.handle} />
-            {children}
-          </View>
-        </KeyboardAvoidingView>
+          {/* Always 'padding', not the usual iOS-padding/Android-height split:
+              'height' shrinks whatever it wraps by the keyboard's height, which
+              only makes sense wrapping a full screen — wrapping just this sheet,
+              a short sheet's own height can be smaller than the keyboard's,
+              going negative and silently skipping the adjustment entirely. */}
+          <KeyboardAvoidingView behavior="padding">
+            <View
+              style={[
+                styles.sheet,
+                { maxHeight: `${maxHeightPercent}%`, paddingBottom: Spacing.xl + insets.bottom },
+              ]}
+            >
+              <View style={styles.handle} />
+              {children}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </GestureHandlerRootView>
     </Modal>
   );

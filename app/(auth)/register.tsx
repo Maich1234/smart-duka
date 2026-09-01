@@ -4,7 +4,7 @@ import { useAlert } from '@/context/AlertContext';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { register as registerApi } from '@/services/auth';
 import { Input } from '@/components/ui/Input';
@@ -29,6 +29,7 @@ const registerSchema = z
     confirmPassword: z.string().min(8),
     shopName: z.string().min(2, 'Shop name is required'),
     phone: z.string().optional(),
+    referralCode: z.string().max(40, 'Referral code is too long').optional(),
     acceptedTerms: z.literal(true, {
       message: 'Please accept the Terms and Privacy Policy to continue',
     }),
@@ -56,6 +57,9 @@ export default function RegisterScreen() {
   const { toast } = useAlert();
   // Anything already told to the onboarding journey shouldn't be asked twice.
   const draft = useOnboardingStore((s) => s.draft);
+  // A referral deep link (e.g. duqana://register?ref=CODE) pre-fills the
+  // field but never locks it — still editable before submitting.
+  const { ref: referralParam } = useLocalSearchParams<{ ref?: string }>();
   const {
     control,
     handleSubmit,
@@ -71,6 +75,7 @@ export default function RegisterScreen() {
       confirmPassword: '',
       shopName: draft.shopName || '',
       phone: draft.phone || '',
+      referralCode: (referralParam || '').slice(0, 40),
     },
   });
 
@@ -87,6 +92,7 @@ export default function RegisterScreen() {
         password: data.password,
         shopName: data.shopName,
         phone: data.phone,
+        referralCode: data.referralCode || undefined,
         // Re-checked server-side, which refuses to create the account without
         // it and records the version accepted against the user.
         acceptedTerms: data.acceptedTerms,
@@ -240,6 +246,21 @@ export default function RegisterScreen() {
             keyboardType="phone-pad"
             returnKeyType="done"
             hint="Used for M-Pesa payment notifications"
+          />
+        )}
+      />
+      <Controller
+        control={control}
+        name="referralCode"
+        render={({ field }) => (
+          <Input
+            label="Referral code (optional)"
+            placeholder="e.g. AGENT2024"
+            value={field.value}
+            onChangeText={(text) => field.onChange(text.toUpperCase())}
+            error={errors.referralCode?.message}
+            autoCapitalize="characters"
+            returnKeyType="done"
           />
         )}
       />

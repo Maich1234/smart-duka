@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '@/components/ui/Screen';
-import { Button } from '@/components/ui/Button';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { OtpCodeField } from '@/components/ui/OtpCodeField';
+import { OtpCodeField, type OtpStatus } from '@/components/ui/OtpCodeField';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -22,10 +21,12 @@ export default function VerifyEmailScreen() {
   const [codeError, setCodeError] = useState('');
   const [formError, setFormError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verified, setVerified] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_SECONDS);
   const [verifyAttempts, setVerifyAttempts] = useState(0);
   const [verifyCooldown, setVerifyCooldown] = useState(0);
+  const clearCodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -40,6 +41,10 @@ export default function VerifyEmailScreen() {
     const timer = setInterval(() => setVerifyCooldown((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
   }, [verifyCooldown]);
+
+  useEffect(() => () => {
+    if (clearCodeTimer.current) clearTimeout(clearCodeTimer.current);
+  }, []);
 
   const startCountdown = useCallback(() => {
     setCountdown(RESEND_SECONDS);
@@ -56,18 +61,27 @@ export default function VerifyEmailScreen() {
     try {
       await verifyEmail(email, code);
       haptics.success();
-      router.replace({ pathname: '/(auth)/login', params: { email, verified: '1' } });
+      setLoading(false);
+      setVerified(true);
+      setTimeout(() => {
+        router.replace({ pathname: '/(auth)/login', params: { email, verified: '1' } });
+      }, 900);
     } catch (error: any) {
       haptics.error();
+      setLoading(false);
       const attempts = verifyAttempts + 1;
       setVerifyAttempts(attempts);
       if (attempts >= 5) setVerifyCooldown(30);
       else if (attempts >= 3) setVerifyCooldown(10);
       setCodeError(error.response?.data?.message || 'Invalid or expired code. Try again.');
-    } finally {
-      setLoading(false);
+      // Leave the wrong code visible through the shake, then clear it so a
+      // retap of the same digits doesn't silently no-op — cancelled if the
+      // user starts editing first.
+      clearCodeTimer.current = setTimeout(() => setCode(''), 650);
     }
   };
+
+  const otpStatus: OtpStatus = verified ? 'success' : loading ? 'loading' : 'idle';
 
   const handleResend = async () => {
     setResending(true);
@@ -116,10 +130,17 @@ export default function VerifyEmailScreen() {
         <OtpCodeField
           value={code}
           onChange={(v) => {
+            if (clearCodeTimer.current) {
+              clearTimeout(clearCodeTimer.current);
+              clearCodeTimer.current = null;
+            }
             setCode(v);
             if (codeError) setCodeError('');
           }}
           error={codeError}
+          status={otpStatus}
+          disabled={verifyCooldown > 0}
+          onComplete={onSubmit}
           style={{ marginBottom: Spacing.md }}
         />
 
@@ -135,14 +156,6 @@ export default function VerifyEmailScreen() {
             Too many attempts — try again in {verifyCooldown}s
           </Text>
         )}
-        <Button
-          title="Verify Email"
-          onPress={onSubmit}
-          loading={loading}
-          style={styles.button}
-          size="lg"
-          disabled={code.length < 6 || verifyCooldown > 0}
-        />
 
         {/* Resend row */}
         <View style={styles.resendRow}>
@@ -217,10 +230,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,
     color: Colors.danger,
-  },
-  button: {
-    marginTop: Spacing.sm,
-    borderRadius: BorderRadius.lg,
   },
   resendRow: {
     flexDirection: 'row',

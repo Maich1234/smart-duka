@@ -12,7 +12,7 @@ import { BorderRadius } from '@/constants/BorderRadius';
  * Openers for a blank thread.
  *
  * A chat box with a blinking cursor is the hardest possible first step for
- * someone who has never used an assistant — these show what Dukana can
+ * someone who has never used an assistant — these show what DuQana can
  * actually answer, in the shopkeeper's own words. Tapping one fills the
  * composer rather than sending it, so the question can be edited (a name, a
  * month) before it goes.
