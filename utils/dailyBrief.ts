@@ -26,7 +26,7 @@ export const buildDailyBrief = (data: OwnerDashboardData | undefined): BriefBull
       {
         id: 'offline',
         icon: 'cloud-offline-outline',
-        text: 'Showing your last synced figures — new sales are saved and will sync when you reconnect.',
+        text: 'Showing your last synced figures. New sales are saved and will sync when you reconnect.',
         tone: 'neutral',
       },
     ];
@@ -65,7 +65,7 @@ export const buildDailyBrief = (data: OwnerDashboardData | undefined): BriefBull
       id: 'trend',
       icon: 'sunny-outline',
       tone: 'neutral',
-      text: 'No sales yet today — your counter is ready.',
+      text: 'No sales yet today. Your counter is ready.',
     });
   }
 
@@ -88,7 +88,7 @@ export const buildDailyBrief = (data: OwnerDashboardData | undefined): BriefBull
       tone: heavy ? 'warning' : 'neutral',
       text: heavy
         ? `Expenses (${formatCurrency(todayExpensesTotal)}) are over half of today's sales.`
-        : `Expenses remain low — ${formatCurrency(todayExpensesTotal)} today.`,
+        : `Expenses remain low: ${formatCurrency(todayExpensesTotal)} today.`,
     });
   } else if (todayProfit != null && todayProfit > 0) {
     bullets.push({
@@ -110,7 +110,7 @@ export const buildDailyBrief = (data: OwnerDashboardData | undefined): BriefBull
       text:
         lowCount === 1
           ? `${worst.name} needs restocking (${worst.quantity} left).`
-          : `${lowCount} products need restocking — ${worst.name} is lowest.`,
+          : `${lowCount} products need restocking. ${worst.name} is lowest.`,
     });
   } else {
     bullets.push({

@@ -89,7 +89,7 @@ export default function LoginScreen() {
           <View style={styles.verifiedBanner}>
             <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
             <Text style={styles.verifiedText}>
-              Email verified — sign in to continue
+              Email verified. Sign in to continue
             </Text>
           </View>
         ) : null}

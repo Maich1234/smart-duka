@@ -182,7 +182,7 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
                 <Ionicons name="cloud-offline-outline" size={18} color={Colors.textSecondary} />
                 <Text style={styles.offlineText}>
                   Your sales totals are on the server and can&apos;t be shown right now. Count the
-                  drawer anyway — the figures are reconciled the moment this syncs.
+                  drawer anyway: the figures are reconciled the moment this syncs.
                 </Text>
               </View>
             ) : (
@@ -209,7 +209,7 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
 
             <Input
               label="Cash counted in drawer"
-              placeholder="Count it now — every note and coin"
+              placeholder="Count it now, every note and coin"
               value={countedText}
               onChangeText={setCountedText}
               keyboardType="numeric"

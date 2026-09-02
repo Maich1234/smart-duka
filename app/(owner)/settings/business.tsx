@@ -88,7 +88,7 @@ export default function BusinessSettingsScreen() {
       type: granted ? 'success' : 'warning',
       message: granted
         ? 'Camera and photo access granted'
-        : "Some access wasn't granted — you can allow it from your device Settings.",
+        : "Some access wasn't granted. You can allow it from your device Settings.",
     });
   };
 

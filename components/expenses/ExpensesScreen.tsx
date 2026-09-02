@@ -100,7 +100,7 @@ export const ExpensesScreen: React.FC = () => {
       if (isOfflineQueued(error)) {
         setFormVisible(false);
         setEditingExpense(null);
-        toast({ type: 'info', message: 'Expense saved offline — will sync when connected.' });
+        toast({ type: 'info', message: 'Expense saved offline. Will sync when connected.' });
         return;
       }
       toast({ type: 'error', message: mutationErrorMessage(error, 'Could not save expense') });

@@ -70,12 +70,14 @@ export default function Personalize() {
       subtitle: 'We’ll shape your shop around it.',
       multi: false,
       body: (
-        <View style={styles.listWrap}>
+        <View style={styles.tileGrid}>
           {BUSINESS_TYPES.map((t) => (
             <ChoiceCard
               key={t.value}
+              variant="tile"
+              style={styles.tile}
               label={t.label}
-              emoji={t.emoji}
+              icon={t.icon}
               selected={answers.businessType === t.value}
               onPress={() => {
                 setAnswer('businessType', t.value);
@@ -113,12 +115,14 @@ export default function Personalize() {
       multi: true,
       selectedCount: answers.paymentMethods.length,
       body: (
-        <View style={styles.listWrap}>
+        <View style={styles.tileGrid}>
           {PAYMENT_METHODS.map((m) => (
             <ChoiceCard
               key={m.value}
+              variant="tile"
+              style={styles.tile}
               label={m.label}
-              emoji={m.emoji}
+              icon={m.icon}
               multi
               selected={answers.paymentMethods.includes(m.value)}
               onPress={() => toggleMulti('paymentMethods', m.value)}
@@ -129,16 +133,18 @@ export default function Personalize() {
     },
     {
       title: 'What eats your time today?',
-      subtitle: 'Pick as many as you like — we’ll fix them together.',
+      subtitle: 'Pick as many as you like. We’ll fix them together.',
       multi: true,
       selectedCount: answers.struggles.length,
       body: (
-        <View style={styles.listWrap}>
+        <View style={styles.tileGrid}>
           {STRUGGLES.map((s) => (
             <ChoiceCard
               key={s.value}
+              variant="tile"
+              style={styles.tile}
               label={s.label}
-              emoji={s.emoji}
+              icon={s.icon}
               multi
               selected={answers.struggles.includes(s.value)}
               onPress={() => toggleMulti('struggles', s.value)}
@@ -217,6 +223,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   listWrap: { gap: Spacing.sm },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  tile: { width: '47%' },
   footer: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,

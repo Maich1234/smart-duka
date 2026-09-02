@@ -7,6 +7,16 @@ export { Colors, Spacing, Typography, Shadows };
 
 export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
 
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
+
+// Hermes has no built-in `URL` global, so this checks the hostname with a
+// regex rather than parsing — good enough for the http(s) values this ever
+// sees, without pulling in a polyfill for one guard.
+const isLocalUrl = (value: string): boolean => {
+  const match = /^https?:\/\/([^/:?#]+)/i.exec(value.trim());
+  return !match || LOCAL_HOSTNAMES.has(match[1].toLowerCase());
+};
+
 /**
  * The DuQana web front end (the `smart-duka-web` Next.js app on Vercel).
  *
@@ -16,10 +26,16 @@ export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
  * or a future custom domain doesn't need a code change — set
  * EXPO_PUBLIC_WEB_URL in the EAS build profile.
  *
+ * EXPO_PUBLIC_* is inlined at build time, so a localhost value baked into a
+ * build (e.g. a development-profile setting bleeding into preview/production
+ * on EAS) is rejected here rather than shipping to real devices.
+ *
  * No trailing slash: every consumer appends a path beginning with "/".
  */
-export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? 'https://duqana.app')
-  .replace(/\/+$/, '');
+const configuredWebUrl = process.env.EXPO_PUBLIC_WEB_URL;
+export const WEB_URL = (
+  configuredWebUrl && !isLocalUrl(configuredWebUrl) ? configuredWebUrl : 'https://duqana.app'
+).replace(/\/+$/, '');
 
 // Used to build the QR code link on receipts. Points at the Next.js app's
 // /r/[token] route — previously the Expo web export, which is no longer where

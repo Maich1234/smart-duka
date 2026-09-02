@@ -69,7 +69,7 @@ export function NewProductScreen() {
       if (isOfflineQueued(error)) {
         resetForm();
         leaveAfterSave();
-        toast({ type: 'info', message: 'Product saved offline — will sync when connected.' });
+        toast({ type: 'info', message: 'Product saved offline. Will sync when connected.' });
         return;
       }
       toast({ type: 'error', message: mutationErrorMessage(error, 'Creation failed') });

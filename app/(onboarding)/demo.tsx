@@ -19,6 +19,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Confetti } from '@/components/onboarding/Confetti';
+import { DEMO_PRODUCTS as PRODUCTS } from '@/components/onboarding/content';
 import { useCountUp } from '@/components/onboarding/useCountUp';
 import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
@@ -26,13 +27,6 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { Shadows } from '@/constants/Shadows';
-
-const PRODUCTS = [
-  { id: 'milk', emoji: '🥛', name: 'Milk 500ml', price: 65 },
-  { id: 'bread', emoji: '🍞', name: 'Bread', price: 60 },
-  { id: 'sugar', emoji: '🍚', name: 'Sugar 1kg', price: 210 },
-  { id: 'soap', emoji: '🧼', name: 'Soap', price: 120 },
-] as const;
 
 const INITIAL_STOCK = 36;
 
@@ -155,7 +149,7 @@ export default function DemoSale() {
           Make your first sale.
         </Animated.Text>
         <Animated.Text entering={FadeInDown.duration(450).delay(90)} style={styles.subtitle}>
-          No account needed — this shop is yours to play with.
+          No account needed. This shop is yours to play with.
         </Animated.Text>
 
         {/* Live stats strip */}
@@ -182,7 +176,9 @@ export default function DemoSale() {
                   accessibilityRole="button"
                   accessibilityLabel={`Add ${p.name} to sale, KSh ${p.price}`}
                 >
-                  <Text style={styles.productEmoji}>{p.emoji}</Text>
+                  <View style={styles.productIconWrap}>
+                    <Ionicons name={p.icon} size={22} color={Colors.primary} />
+                  </View>
                   <Text style={styles.productName}>{p.name}</Text>
                   <Text style={styles.productPrice}>KSh {p.price}</Text>
                   {qty > 0 ? (
@@ -229,7 +225,7 @@ export default function DemoSale() {
         {phase === 'receipt' ? (
           <Animated.View entering={FadeInUp.duration(450).delay(350)}>
             <Text style={styles.ahaText}>
-              That took seconds — and your sales, stock and profit updated themselves.
+              That took seconds, and your sales, stock and profit updated themselves.
             </Text>
             <AnimatedPressable
               onPress={() => {
@@ -381,7 +377,14 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   productCardActive: { borderColor: Colors.primary },
-  productEmoji: { fontSize: 34 },
+  productIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   productName: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamilySemiBold,

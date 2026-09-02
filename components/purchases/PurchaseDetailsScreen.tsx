@@ -108,7 +108,7 @@ export function PurchaseDetailsScreen() {
     mutationFn: () => approvePurchase(id),
     onSuccess: (res) => {
       invalidate();
-      toast({ type: 'success', message: res.message || 'Purchase approved — stock updated.' });
+      toast({ type: 'success', message: res.message || 'Purchase approved. Stock updated.' });
     },
     onError: (error: any) => {
       if (isOfflineQueued(error)) {
@@ -236,7 +236,7 @@ export function PurchaseDetailsScreen() {
             <Text style={styles.noticeText}>
               {isOwner
                 ? 'Stock has not been added yet. Approve this purchase to release it into your inventory.'
-                : 'Stock has not been added yet — your shop owner needs to approve this purchase first.'}
+                : 'Stock has not been added yet. Your shop owner needs to approve this purchase first.'}
             </Text>
           </View>
         </View>
@@ -332,7 +332,7 @@ export function PurchaseDetailsScreen() {
           <View style={styles.noticeCardMuted}>
             <Ionicons name="eye-off-outline" size={16} color={Colors.textTertiary} />
             <Text style={styles.noticeMutedText}>
-              Costs are hidden — you don&apos;t have permission to see purchase prices.
+              Costs are hidden. You don&apos;t have permission to see purchase prices.
             </Text>
           </View>
         </View>
@@ -349,7 +349,7 @@ export function PurchaseDetailsScreen() {
             icon="wallet-outline"
           />
           <View style={styles.rowBorder} />
-          <DetailRow label="Recorded by" value={purchase.staff?.name ?? '—'} icon="person-outline" />
+          <DetailRow label="Recorded by" value={purchase.staff?.name ?? '-'} icon="person-outline" />
           <View style={styles.rowBorder} />
           <DetailRow label="Recorded on" value={formatDate(purchase.createdAt)} icon="calendar-outline" />
           {purchase.cancelledAt && (

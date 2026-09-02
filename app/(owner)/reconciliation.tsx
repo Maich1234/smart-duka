@@ -119,7 +119,7 @@ function CashiersSection() {
       ) : !enabled ? (
         <EmptyState
           title="Shift management is off"
-          subtitle="Turn it on in Profile → Shop Features to have staff clock in and count the drawer — that's what powers this reconciliation."
+          subtitle="Turn it on in Profile → Shop Features to have staff clock in and count the drawer: that's what powers this reconciliation."
         />
       ) : cashiers.length === 0 ? (
         <EmptyState title="No closed shifts yet" subtitle="Cashier reconciliation appears here once a shift is closed in this period." />

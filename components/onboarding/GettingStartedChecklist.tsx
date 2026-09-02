@@ -136,8 +136,8 @@ export const GettingStartedChecklist: React.FC = () => {
             <Ionicons name="checkmark" size={22} color="#FFFFFF" />
           </Animated.View>
           <View style={styles.doneTextWrap}>
-            <Text style={styles.title}>Your shop is fully set up 🎉</Text>
-            <Text style={styles.sub}>Products, sales, M-PESA and your team — all running.</Text>
+            <Text style={styles.title}>Your shop is fully set up</Text>
+            <Text style={styles.sub}>Products, sales, M-PESA and your team: all running.</Text>
           </View>
         </View>
         <AnimatedPressable
@@ -148,7 +148,7 @@ export const GettingStartedChecklist: React.FC = () => {
           style={styles.doneBtn}
           accessibilityRole="button"
         >
-          <Text style={styles.doneBtnText}>Nice — hide this</Text>
+          <Text style={styles.doneBtnText}>Nice, hide this</Text>
         </AnimatedPressable>
       </Animated.View>
     );

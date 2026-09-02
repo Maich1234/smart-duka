@@ -94,7 +94,7 @@ const queueAndReject = (
   }
   return Promise.reject({
     offlineQueued: true,
-    message: 'Saved offline — will sync when connected.',
+    message: 'Saved offline. Will sync when connected.',
   });
 };
 
@@ -155,7 +155,7 @@ api.interceptors.response.use(
     if (error.message === 'OFFLINE_QUEUED') {
       return Promise.reject({
         offlineQueued: true,
-        message: 'Saved offline — will sync when connected.',
+        message: 'Saved offline. Will sync when connected.',
       });
     }
     if (error.message === 'OFFLINE_REALTIME') {

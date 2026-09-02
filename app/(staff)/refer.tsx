@@ -42,7 +42,7 @@ export default function StaffReferScreen() {
     if (!data?.shareUrl) return;
     try {
       await Share.share({
-        message: `Join me on DuQana — sign up with my code ${data.code} at ${data.shareUrl}`,
+        message: `Join me on DuQana: sign up with my code ${data.code} at ${data.shareUrl}`,
       });
     } catch {
       // User dismissed the share sheet — nothing to do.
@@ -58,7 +58,7 @@ export default function StaffReferScreen() {
     return (
       <View style={styles.emptyWrap}>
         <Ionicons name="gift-outline" size={40} color={Colors.textSecondary} />
-        <Text style={styles.emptyText}>The referral program isn&apos;t live yet — check back soon.</Text>
+        <Text style={styles.emptyText}>The referral program isn&apos;t live yet. Check back soon.</Text>
       </View>
     );
   }
@@ -71,7 +71,7 @@ export default function StaffReferScreen() {
       <Animated.View entering={FadeInUp.duration(360)}>
         <Text style={styles.intro}>
           Invite a new shop to DuQana. When they sign up with your code and become a paying customer, you earn{' '}
-          KES {data.cashAmount.toLocaleString()} cash — paid out by DuQana, not deducted from your shop.
+          KES {data.cashAmount.toLocaleString()} cash: paid out by DuQana, not deducted from your shop.
         </Text>
       </Animated.View>
 
@@ -101,7 +101,7 @@ export default function StaffReferScreen() {
             <Text style={styles.label}>Shops you&apos;ve referred</Text>
           </View>
           {data.payouts.length === 0 ? (
-            <Text style={styles.emptyReferrals}>No referrals yet — share your code to get started.</Text>
+            <Text style={styles.emptyReferrals}>No referrals yet. Share your code to get started.</Text>
           ) : (
             data.payouts.map((p, i) => (
               <View key={i} style={styles.referralRow}>

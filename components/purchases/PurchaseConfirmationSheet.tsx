@@ -64,7 +64,7 @@ export const PurchaseConfirmationSheet: React.FC<PurchaseConfirmationSheetProps>
           icon={paymentMethod === 'credit' ? 'time-outline' : 'wallet-outline'}
           label="Paid with"
           value={paymentMethod === 'credit'
-            ? 'On credit — not paid yet'
+            ? 'On credit, not paid yet'
             : MONEY_OUT_METHOD_LABELS[paymentMethod]}
         />
         <SummaryRow icon="trending-up-outline" label="Inventory Impact" value={`+${totalQuantity} unit${totalQuantity === 1 ? '' : 's'}`} />

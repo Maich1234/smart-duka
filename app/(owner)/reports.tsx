@@ -214,7 +214,7 @@ export default function OwnerReports() {
         </View>
         <View style={s.booksText}>
           <Text style={s.booksTitle}>Financial Records</Text>
-          <Text style={s.booksSub}>Cashbook, profit &amp; loss and registers — download as PDF or Excel</Text>
+          <Text style={s.booksSub}>Cashbook, profit &amp; loss and registers: download as PDF or Excel</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
       </AnimatedPressable>

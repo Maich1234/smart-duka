@@ -170,7 +170,7 @@ export const FailedSyncSheet: React.FC<FailedSyncSheetProps> = ({ visible, onClo
           {ops.length} change{ops.length === 1 ? '' : 's'} couldn&apos;t sync
         </Text>
         <Text style={styles.subtitle}>
-          These were sent to the server and turned down — usually because something changed while
+          These were sent to the server and turned down: usually because something changed while
           you were offline. Nothing here has been recorded. Retry if the cause is fixed, or discard
           to remove them for good.
         </Text>

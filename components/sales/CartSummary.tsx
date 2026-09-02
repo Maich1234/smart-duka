@@ -212,7 +212,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
             value={manualReceiptCode}
             onChange={onManualReceiptCodeChange}
             optional
-            hint="Optional — helps you match this sale to your M-Pesa statement later."
+            hint="Optional: helps you match this sale to your M-Pesa statement later."
           />
         </Animated.View>
       )}

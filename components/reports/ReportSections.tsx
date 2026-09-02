@@ -1126,7 +1126,7 @@ export function StockIntelligence({ depletion }: StockIntelligenceProps) {
                         </Text>
                       </View>
                     ) : (
-                      <Text style={sv.dashText}>—</Text>
+                      <Text style={sv.dashText}>-</Text>
                     )}
                   </View>
                 );

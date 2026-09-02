@@ -86,7 +86,9 @@ export default function Activate() {
             <Animated.View entering={FadeInUp.duration(500).delay(150)}>
               {/* The earned launch offer */}
               <View style={styles.offerCard}>
-                <Text style={styles.offerEmoji}>🎉</Text>
+                <View style={styles.offerIconWrap}>
+                  <Ionicons name="gift-outline" size={20} color={Scene.gold} />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.offerTitle}>{plans.launchOffer.title}</Text>
                   <Text style={styles.offerHeadline}>{plans.launchOffer.headline}</Text>
@@ -120,7 +122,7 @@ export default function Activate() {
 
           {isError && (
             <Text style={styles.errorNote}>
-              We couldn’t load the plans right now — you can activate your free
+              We couldn’t load the plans right now. You can activate your free
               trial later from your dashboard.
             </Text>
           )}
@@ -181,7 +183,14 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginBottom: Spacing.md,
   },
-  offerEmoji: { fontSize: 26 },
+  offerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: 'rgba(224,172,76,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   offerTitle: {
     color: Scene.textDim,
     fontSize: Typography.size.caption,

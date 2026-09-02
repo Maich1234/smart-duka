@@ -55,7 +55,7 @@ export function describeSubscription(
         pill: daysLeft === 0 ? `${kind} · last day` : `${kind} · ${plural(daysLeft, 'day')}`,
         detail:
           daysLeft === 0
-            ? `${kind} ends today${access.cancelled ? '' : ' — subscribe to keep everything running'}`
+            ? `${kind} ends today${access.cancelled ? '' : '. Subscribe to keep everything running'}`
             : `${kind} · ${plural(daysLeft, 'day')} left${ends}`,
         tone: daysLeft <= 3 ? 'urgent' : daysLeft <= 7 ? 'warn' : 'info',
         daysLeft,
@@ -99,7 +99,7 @@ export function describeSubscription(
     default:
       return {
         pill: 'No plan',
-        detail: 'Your free trial is waiting — activate DuQana',
+        detail: 'Your free trial is waiting. Activate DuQana',
         tone: 'neutral',
         daysLeft: 0,
         isFree,

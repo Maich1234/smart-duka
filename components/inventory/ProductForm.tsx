@@ -626,7 +626,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           )}
           {form.productType === 'variable' && (
             <Text style={styles.hint}>
-              Leave Max Price blank if there's no upper limit — the till will accept any price at or above the minimum.
+              Leave Max Price blank if there's no upper limit: the till will accept any price at or above the minimum.
             </Text>
           )}
         </View>

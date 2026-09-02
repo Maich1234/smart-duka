@@ -362,7 +362,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         clearCart();
         setManualReceiptCode('');
         setMpesaMode('stk');
-        toast({ type: 'info', message: 'Sale saved offline — will sync when connected.' });
+        toast({ type: 'info', message: 'Sale saved offline. Will sync when connected.' });
         return;
       }
       if (isOfflineUnavailable(error)) {
@@ -394,12 +394,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       queryClient.invalidateQueries({ queryKey: ['myCommission'] }); // voided sales earn no commission
       resyncCatalogue();
       setDetailsModalVisible(false);
-      toast({ type: 'success', message: 'Sale voided — stock restored.' });
+      toast({ type: 'success', message: 'Sale voided. Stock restored.' });
     },
     onError: (error: any) => {
       if (isOfflineQueued(error)) {
         setDetailsModalVisible(false);
-        toast({ type: 'info', message: 'Void saved offline — will sync when connected.' });
+        toast({ type: 'info', message: 'Void saved offline. Will sync when connected.' });
         return;
       }
       toast({ type: 'error', message: mutationErrorMessage(error, 'Could not void this sale.') });

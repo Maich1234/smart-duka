@@ -12,32 +12,62 @@ import { BorderRadius } from '@/constants/BorderRadius';
 interface ChoiceCardProps {
   label: string;
   subtitle?: string;
-  /** Emoji leads the card — warmer than icon fonts at this size. */
-  emoji?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   selected: boolean;
   onPress: () => void;
-  /** Multi-select renders a square check; single renders a filled dot. */
+  /** Multi-select renders a square check; single renders a filled dot. Only
+   *  affects the 'row' variant's mark — 'tile' always shows the same badge. */
   multi?: boolean;
+  /** 'row' (default): full-width list row. 'tile': square product-card
+   *  layout matching the till grid in the first-sale demo, meant to sit in a
+   *  wrapping 2-column grid. */
+  variant?: 'row' | 'tile';
   style?: ViewStyle;
 }
 
-/** Tappable answer card for the personalization quiz — springs on press,
- *  pops a check when selected. */
+/** Tappable answer card for the personalization quiz and setup pickers —
+ *  springs on press, pops a check when selected. */
 export const ChoiceCard: React.FC<ChoiceCardProps> = ({
   label,
   subtitle,
-  emoji,
   icon,
   selected,
   onPress,
   multi = false,
+  variant = 'row',
   style,
 }) => {
   const handlePress = () => {
     haptics.selection();
     onPress();
   };
+
+  if (variant === 'tile') {
+    return (
+      <AnimatedPressable
+        onPress={handlePress}
+        pressScale={0.95}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={label}
+        style={[styles.tile, selected && styles.tileSelected, style]}
+      >
+        {icon ? (
+          <View style={[styles.tileIconWrap, selected && styles.tileIconWrapSelected]}>
+            <Ionicons name={icon} size={20} color={selected ? Colors.primary : Colors.textSecondary} />
+          </View>
+        ) : null}
+        <Text style={[styles.tileLabel, selected && styles.tileLabelSelected]} numberOfLines={2}>
+          {label}
+        </Text>
+        {selected ? (
+          <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.tileCheck}>
+            <Ionicons name="checkmark" size={12} color={Colors.white} />
+          </Animated.View>
+        ) : null}
+      </AnimatedPressable>
+    );
+  }
 
   return (
     <AnimatedPressable
@@ -48,9 +78,7 @@ export const ChoiceCard: React.FC<ChoiceCardProps> = ({
       accessibilityLabel={label}
       style={[styles.card, selected && styles.cardSelected, style]}
     >
-      {emoji ? (
-        <Text style={styles.emoji}>{emoji}</Text>
-      ) : icon ? (
+      {icon ? (
         <View style={[styles.iconWrap, selected && styles.iconWrapSelected]}>
           <Ionicons name={icon} size={18} color={selected ? Colors.primary : Colors.textSecondary} />
         </View>
@@ -88,7 +116,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
     backgroundColor: Colors.primarySubtle,
   },
-  emoji: { fontSize: 22 },
   iconWrap: {
     width: 34,
     height: 34,
@@ -124,5 +151,49 @@ const styles = StyleSheet.create({
   markSelected: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
+  },
+  tile: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    minHeight: 100,
+  },
+  tileSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primarySubtle,
+  },
+  tileIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileIconWrapSelected: { backgroundColor: Colors.surface },
+  tileLabel: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  tileLabelSelected: { color: Colors.primaryDark },
+  tileCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

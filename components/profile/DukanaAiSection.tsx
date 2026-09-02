@@ -41,7 +41,7 @@ export function DukanaAiSection({ state, aiEnabled, toggling, loadingShop, onTog
           </View>
           <View style={s.text}>
             <Text style={s.title}>DuQana AI</Text>
-            <Text style={s.sub}>Daily insights and a business chat assistant — included with any active subscription</Text>
+            <Text style={s.sub}>Daily insights and a business chat assistant, included with any active subscription</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
         </AnimatedPressable>

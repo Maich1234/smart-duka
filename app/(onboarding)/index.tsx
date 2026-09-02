@@ -17,7 +17,7 @@ import { Spacing } from '@/constants/Spacing';
 const PREVIEW_CAPTIONS = [
   'Never lose a sale again.',
   'Know your stock at a glance.',
-  'Get paid in seconds — M-PESA built in.',
+  'Get paid in seconds: M-PESA built in.',
   'Watch your profits grow.',
   'Run your shop from anywhere.',
 ];
@@ -93,7 +93,7 @@ export default function OnboardingWelcome() {
             <Text style={styles.headlineAccent}>Smarter.</Text>
           </Animated.Text>
           <Animated.Text entering={FadeInDown.duration(550).delay(380)} style={styles.sub}>
-            Manage stock, sell faster, accept payments and grow your business — all from one
+            Manage stock, sell faster, accept payments and grow your business: all from one
             place.
           </Animated.Text>
 

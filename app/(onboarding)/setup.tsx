@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, Image } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +26,7 @@ import { Shadows } from '@/constants/Shadows';
 import { CEO_SIGN_IMG_URL } from '@/constants/config';
 
 const setupSchema = z.object({
-  shopName: z.string().min(2, 'Give your shop a name — 2 characters or more'),
+  shopName: z.string().min(2, 'Give your shop a name, 2 characters or more'),
   ownerName: z.string().min(2, 'Your name helps your team know who’s boss'),
   phone: z.string(),
 });
@@ -43,62 +43,38 @@ const CURRENCIES = [
 // East African Community countries this app actively supports today —
 // matches constants/presets.js's COUNTRIES on the backend.
 const COUNTRIES = [
-  { code: 'KE', name: 'Kenya', flag: '🇰🇪' },
-  { code: 'UG', name: 'Uganda', flag: '🇺🇬' },
-  { code: 'TZ', name: 'Tanzania', flag: '🇹🇿' },
-  { code: 'RW', name: 'Rwanda', flag: '🇷🇼' },
-  { code: 'BI', name: 'Burundi', flag: '🇧🇮' },
-  { code: 'SS', name: 'South Sudan', flag: '🇸🇸' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'UG', name: 'Uganda' },
+  { code: 'TZ', name: 'Tanzania' },
+  { code: 'RW', name: 'Rwanda' },
+  { code: 'BI', name: 'Burundi' },
+  { code: 'SS', name: 'South Sudan' },
 ];
 
-type StepKind = 'field' | 'country' | 'county' | 'subCounty' | 'currency' | 'founder';
+// Pre-selects the currency step once a country is chosen — the owner can
+// still override it below. Countries without a listed currency default to
+// USD, same as CURRENCIES' fallback.
+const DEFAULT_CURRENCY: Record<string, string> = {
+  KE: 'KES',
+  UG: 'UGX',
+  TZ: 'TZS',
+  RW: 'USD',
+  BI: 'USD',
+  SS: 'USD',
+};
 
-/** One question per screenful. `field` only applies to `kind: 'field'` steps —
- *  everything else (country/county/sub-county/currency/founder) is plain
- *  local state, same pattern the currency step already used. */
-const STEPS: {
-  kind: StepKind;
-  field?: keyof SetupForm;
-  title: string;
-  subtitle: string;
-}[] = [
+type StepKind = 'basics' | 'location' | 'founder';
+
+const STEPS: { kind: StepKind; title: string; subtitle: string }[] = [
   {
-    kind: 'field',
-    field: 'shopName',
-    title: 'What’s your shop called?',
+    kind: 'basics',
+    title: 'Tell us about your shop',
     subtitle: 'This goes on your receipts and reports.',
   },
   {
-    kind: 'field',
-    field: 'ownerName',
-    title: 'And your name?',
-    subtitle: 'You’ll be the owner of this shop.',
-  },
-  {
-    kind: 'field',
-    field: 'phone',
-    title: 'Your business phone?',
-    subtitle: 'For M-PESA payment notifications. You can skip this.',
-  },
-  {
-    kind: 'country',
-    title: 'Which country do you operate in?',
-    subtitle: 'Sets your defaults — you can change this any time.',
-  },
-  {
-    kind: 'county',
-    title: 'Which county?',
-    subtitle: 'Helps us tailor tips and offers to your area. Optional.',
-  },
-  {
-    kind: 'subCounty',
-    title: 'Which sub-county?',
-    subtitle: 'Narrows it down even further. Optional.',
-  },
-  {
-    kind: 'currency',
-    title: 'Which currency do you sell in?',
-    subtitle: 'You can change this any time in settings.',
+    kind: 'location',
+    title: 'Where are you, and what currency do you sell in?',
+    subtitle: 'Sets your defaults. You can change any of this later in settings.',
   },
   {
     kind: 'founder',
@@ -111,6 +87,7 @@ export default function BusinessSetup() {
   const [step, setStep] = useState(0);
   const { draft, setDraft } = useOnboardingStore();
   const [currency, setCurrency] = useState(draft.currency || 'KES');
+  const [currencyTouched, setCurrencyTouched] = useState(false);
   const [country, setCountry] = useState(draft.country || 'KE');
   const [countyId, setCountyId] = useState<string | null>(null);
   const [countyName, setCountyName] = useState(draft.county || '');
@@ -141,19 +118,27 @@ export default function BusinessSetup() {
   });
   const subCountyOptions: PickerOption[] = (subcountiesData?.data ?? []).map((s) => ({ id: s._id, name: s.name }));
 
-  // The sub-county step only exists when the chosen county actually has data
-  // for it — every country but Kenya today. Recomputed as county changes.
-  const visibleSteps = useMemo(
-    () => STEPS.filter((s) => s.kind !== 'subCounty' || subCountyOptions.length > 0),
-    [subCountyOptions.length]
-  );
-
-  const current = visibleSteps[step];
+  const current = STEPS[step];
   const isFounderNote = current.kind === 'founder';
 
+  const selectCountry = (code: string) => {
+    haptics.selection();
+    setCountry(code);
+    setCountyId(null);
+    setCountyName('');
+    setSubCountyName('');
+    if (!currencyTouched) setCurrency(DEFAULT_CURRENCY[code] ?? currency);
+  };
+
+  const selectCurrency = (value: string) => {
+    haptics.selection();
+    setCurrency(value);
+    setCurrencyTouched(true);
+  };
+
   const goNext = async () => {
-    if (current.kind === 'field' && current.field) {
-      const valid = await trigger(current.field);
+    if (current.kind === 'basics') {
+      const valid = await trigger(['shopName', 'ownerName']);
       if (!valid) {
         haptics.error();
         return;
@@ -170,7 +155,7 @@ export default function BusinessSetup() {
       subCounty: subCountyName,
       currency,
     });
-    if (step < visibleSteps.length - 1) {
+    if (step < STEPS.length - 1) {
       setStep((s) => s + 1);
     } else {
       router.push('/(onboarding)/permissions');
@@ -182,11 +167,6 @@ export default function BusinessSetup() {
     else router.back();
   };
 
-  const optionalStep =
-    (current.kind === 'field' && current.field === 'phone') ||
-    current.kind === 'county' ||
-    current.kind === 'subCounty';
-
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="dark" />
@@ -194,23 +174,7 @@ export default function BusinessSetup() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <JourneyProgress
-          step={step + 1}
-          total={visibleSteps.length}
-          onBack={goBack}
-          right={
-            optionalStep ? (
-              <AnimatedPressable
-                onPress={goNext}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityRole="button"
-                accessibilityLabel="Skip this step"
-              >
-                <Text style={styles.skipText}>Skip</Text>
-              </AnimatedPressable>
-            ) : undefined
-          }
-        />
+        <JourneyProgress step={step + 1} total={STEPS.length} onBack={goBack} />
 
         {/* The keyed container itself stays unanimated: a Reanimated-animated
             ancestor above a ScrollView leaves RNGH pressables inside it
@@ -235,85 +199,79 @@ export default function BusinessSetup() {
               </>
             ) : null}
 
-            {current.kind === 'field' && current.field === 'shopName' ? (
-              <Controller
-                control={control}
-                name="shopName"
-                render={({ field, fieldState }) => (
-                  <Input
-                    placeholder="Duka la Amani"
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    error={fieldState.error?.message}
-                    autoCapitalize="words"
-                    autoFocus
-                    leftIcon="storefront-outline"
-                    returnKeyType="next"
-                    onSubmitEditing={goNext}
-                  />
-                )}
-              />
-            ) : null}
-
-            {current.kind === 'field' && current.field === 'ownerName' ? (
-              <Controller
-                control={control}
-                name="ownerName"
-                render={({ field, fieldState }) => (
-                  <Input
-                    placeholder="Jane Wanjiku"
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    error={fieldState.error?.message}
-                    autoCapitalize="words"
-                    autoFocus
-                    leftIcon="person-outline"
-                    returnKeyType="next"
-                    onSubmitEditing={goNext}
-                  />
-                )}
-              />
-            ) : null}
-
-            {current.kind === 'field' && current.field === 'phone' ? (
-              <Controller
-                control={control}
-                name="phone"
-                render={({ field }) => (
-                  <Input
-                    placeholder="+254 700 000 000"
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    keyboardType="phone-pad"
-                    autoFocus
-                    leftIcon="call-outline"
-                    returnKeyType="next"
-                    onSubmitEditing={goNext}
-                  />
-                )}
-              />
-            ) : null}
-
-            {current.kind === 'country' ? (
-              <Animated.View entering={FadeInRight.duration(320).delay(100)} style={styles.currencyList}>
-                {COUNTRIES.map((c) => (
-                  <ChoiceCard
-                    key={c.code}
-                    label={`${c.flag}  ${c.name}`}
-                    selected={country === c.code}
-                    onPress={() => {
-                      setCountry(c.code);
-                      setCountyId(null);
-                      setCountyName('');
-                      setSubCountyName('');
-                    }}
-                  />
-                ))}
+            {current.kind === 'basics' ? (
+              <Animated.View entering={FadeInRight.duration(320).delay(100)}>
+                <Controller
+                  control={control}
+                  name="shopName"
+                  render={({ field, fieldState }) => (
+                    <Input
+                      label="Shop name"
+                      placeholder="Duka la Amani"
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      error={fieldState.error?.message}
+                      autoCapitalize="words"
+                      autoFocus
+                      leftIcon="storefront-outline"
+                      returnKeyType="next"
+                    />
+                  )}
+                />
+                <Controller
+                  control={control}
+                  name="ownerName"
+                  render={({ field, fieldState }) => (
+                    <Input
+                      label="Your name"
+                      placeholder="Jane Wanjiku"
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      error={fieldState.error?.message}
+                      autoCapitalize="words"
+                      leftIcon="person-outline"
+                      returnKeyType="next"
+                    />
+                  )}
+                />
+                <Controller
+                  control={control}
+                  name="phone"
+                  render={({ field }) => (
+                    <Input
+                      label="Business phone"
+                      placeholder="+254 700 000 000"
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      keyboardType="phone-pad"
+                      leftIcon="call-outline"
+                      hint="For M-PESA payment notifications: optional, add it any time"
+                      returnKeyType="done"
+                      onSubmitEditing={goNext}
+                    />
+                  )}
+                />
               </Animated.View>
             ) : null}
 
-            {current.kind === 'county' ? (
+            {current.kind === 'location' ? (
               <Animated.View entering={FadeInRight.duration(320).delay(100)}>
+                <Text style={styles.sectionLabel}>Country</Text>
+                <View style={styles.tileGrid}>
+                  {COUNTRIES.map((c) => (
+                    <ChoiceCard
+                      key={c.code}
+                      variant="tile"
+                      style={styles.tile}
+                      icon="flag-outline"
+                      label={c.name}
+                      selected={country === c.code}
+                      onPress={() => selectCountry(c.code)}
+                    />
+                  ))}
+                </View>
+
+                <Text style={styles.sectionLabel}>County (optional)</Text>
                 <AnimatedPressable
                   style={styles.pickerField}
                   onPress={() => setShowCountyPicker(true)}
@@ -339,54 +297,55 @@ export default function BusinessSetup() {
                   }}
                   onClose={() => setShowCountyPicker(false)}
                 />
-              </Animated.View>
-            ) : null}
 
-            {current.kind === 'subCounty' ? (
-              <Animated.View entering={FadeInRight.duration(320).delay(100)}>
-                <AnimatedPressable
-                  style={styles.pickerField}
-                  onPress={() => setShowSubCountyPicker(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Choose sub-county"
-                >
-                  <Ionicons name="pin-outline" size={18} color={Colors.textTertiary} />
-                  <Text style={[styles.pickerFieldText, !subCountyName && styles.pickerFieldPlaceholder]}>
-                    {subCountyName || 'Select a sub-county'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
-                </AnimatedPressable>
-                <SearchablePicker
-                  visible={showSubCountyPicker}
-                  title="Select sub-county"
-                  options={subCountyOptions}
-                  loading={subcountiesLoading}
-                  onSelect={(o) => setSubCountyName(o.name)}
-                  onClose={() => setShowSubCountyPicker(false)}
-                />
-              </Animated.View>
-            ) : null}
+                {subCountyOptions.length > 0 ? (
+                  <>
+                    <Text style={styles.sectionLabel}>Sub-county (optional)</Text>
+                    <AnimatedPressable
+                      style={styles.pickerField}
+                      onPress={() => setShowSubCountyPicker(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Choose sub-county"
+                    >
+                      <Ionicons name="pin-outline" size={18} color={Colors.textTertiary} />
+                      <Text
+                        style={[styles.pickerFieldText, !subCountyName && styles.pickerFieldPlaceholder]}
+                      >
+                        {subCountyName || 'Select a sub-county'}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
+                    </AnimatedPressable>
+                    <SearchablePicker
+                      visible={showSubCountyPicker}
+                      title="Select sub-county"
+                      options={subCountyOptions}
+                      loading={subcountiesLoading}
+                      onSelect={(o) => setSubCountyName(o.name)}
+                      onClose={() => setShowSubCountyPicker(false)}
+                    />
+                  </>
+                ) : null}
 
-            {current.kind === 'currency' ? (
-              <Animated.View
-                entering={FadeInRight.duration(320).delay(100)}
-                style={styles.currencyList}
-              >
-                {CURRENCIES.map((c) => (
-                  <ChoiceCard
-                    key={c.value}
-                    label={c.label}
-                    subtitle={c.subtitle}
-                    selected={currency === c.value}
-                    onPress={() => setCurrency(c.value)}
-                  />
-                ))}
+                <Text style={styles.sectionLabel}>Currency</Text>
+                <View style={styles.currencyList}>
+                  {CURRENCIES.map((c) => (
+                    <ChoiceCard
+                      key={c.value}
+                      label={c.label}
+                      subtitle={c.subtitle}
+                      selected={currency === c.value}
+                      onPress={() => selectCurrency(c.value)}
+                    />
+                  ))}
+                </View>
               </Animated.View>
             ) : null}
 
             {isFounderNote ? (
               <Animated.View entering={FadeInDown.duration(450)} style={styles.founderCard}>
-                <Text style={styles.founderWave}>👋</Text>
+                <View style={styles.founderIconWrap}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={22} color={Colors.primary} />
+                </View>
                 <Text style={styles.founderText}>
                   Hi{draft.ownerName ? ` ${draft.ownerName.split(' ')[0]}` : ''},{'\n\n'}
                   We built DuQana because small businesses deserve software that works as hard
@@ -399,7 +358,7 @@ export default function BusinessSetup() {
                   resizeMode="contain"
                   accessibilityLabel="Michael Maina's signature"
                 />
-                <Text style={styles.founderSignature}>— Michael Maina</Text>
+                <Text style={styles.founderSignature}>- Michael Maina</Text>
                 <Text style={styles.founderRole}>Founder, DuQana</Text>
               </Animated.View>
             ) : null}
@@ -408,7 +367,7 @@ export default function BusinessSetup() {
           <View style={styles.footer}>
             <AnimatedPressable onPress={goNext} style={styles.nextBtn} accessibilityRole="button">
               <Text style={styles.nextBtnText}>
-                {isFounderNote ? 'Continue' : current.kind === 'currency' ? 'Looks right' : 'Next'}
+                {isFounderNote ? 'Continue' : current.kind === 'location' ? 'Looks right' : 'Next'}
               </Text>
               <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </AnimatedPressable>
@@ -428,11 +387,6 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl,
     flexGrow: 1,
   },
-  skipText: {
-    color: Colors.primary,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
   title: {
     fontSize: Typography.size.h1,
     lineHeight: Typography.lineHeight.h1,
@@ -447,6 +401,17 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: Spacing.lg,
   },
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textTertiary,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  tile: { width: '31%' },
   currencyList: { gap: Spacing.sm },
   pickerField: {
     flexDirection: 'row',
@@ -475,7 +440,15 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     ...Shadows.md,
   },
-  founderWave: { fontSize: 40, marginBottom: Spacing.md },
+  founderIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: Colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
   founderText: {
     fontSize: Typography.size.body,
     lineHeight: 26,

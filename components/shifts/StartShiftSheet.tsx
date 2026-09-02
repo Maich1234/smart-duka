@@ -49,7 +49,7 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
       await startShift({ openingFloat: parsedFloat, openingNote: note.trim() || undefined });
       haptics.success();
       invalidateShift();
-      toast({ type: 'success', message: 'Shift started — the till is yours!' });
+      toast({ type: 'success', message: 'Shift started. The till is yours!' });
       reset();
       onClose();
       onStarted?.();
@@ -70,7 +70,7 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
         invalidateShift();
         toast({
           type: 'success',
-          message: 'Shift started offline — it will sync when you\'re back online.',
+          message: 'Shift started offline. It will sync when you\'re back online.',
         });
         reset();
         onClose();
@@ -105,7 +105,7 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
         </View>
         <Text style={styles.title}>Start your shift</Text>
         <Text style={styles.subtitle}>
-          Count the cash in the drawer before you begin — it&apos;s your opening float and the
+          Count the cash in the drawer before you begin: it&apos;s your opening float and the
           baseline for reconciliation when you clock out.
         </Text>
 

@@ -158,12 +158,12 @@ export default function OwnerSales() {
       queryClient.invalidateQueries({ queryKey: ['salesStats'] });
       queryClient.invalidateQueries({ queryKey: ['products'] }); // stock restored
       setModalVisible(false);
-      toast({ type: 'success', message: 'Sale voided — stock restored.' });
+      toast({ type: 'success', message: 'Sale voided. Stock restored.' });
     },
     onError: (error: any) => {
       if (isOfflineQueued(error)) {
         setModalVisible(false);
-        toast({ type: 'info', message: 'Void saved offline — will sync when connected.' });
+        toast({ type: 'info', message: 'Void saved offline. Will sync when connected.' });
         return;
       }
       toast({ type: 'error', message: mutationErrorMessage(error, 'Could not void this sale.') });
@@ -520,7 +520,7 @@ const PaymentStatCard: React.FC<PaymentStatCardProps> = ({ icon, label, amount, 
     </View>
     <Text style={statStyles.label} numberOfLines={1}>{label}</Text>
     <Text style={statStyles.amount} numberOfLines={1}>{amount}</Text>
-    {pct ? <Text style={[statStyles.pct, { color: iconColor }]}>{pct}</Text> : <Text style={statStyles.dash}>—</Text>}
+    {pct ? <Text style={[statStyles.pct, { color: iconColor }]}>{pct}</Text> : <Text style={statStyles.dash}>-</Text>}
     {onPress && <Ionicons name="chevron-forward" size={10} color={Colors.textTertiary} style={{ marginTop: 2 }} />}
   </AnimatedPressable>
 );

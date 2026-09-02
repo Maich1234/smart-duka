@@ -123,13 +123,13 @@ export const MpesaConfigForm: React.FC<Props> = ({
         {environment === 'sandbox' && (
           <View style={styles.envNote}>
             <Ionicons name="information-circle-outline" size={13} color={Colors.info} />
-            <Text style={styles.envNoteText}>Sandbox mode — transactions are simulated and no real money moves</Text>
+            <Text style={styles.envNoteText}>Sandbox mode. Transactions are simulated and no real money moves</Text>
           </View>
         )}
         {environment === 'production' && (
           <View style={[styles.envNote, styles.envNoteWarning]}>
             <Ionicons name="warning-outline" size={13} color={Colors.accent} />
-            <Text style={[styles.envNoteText, { color: '#92400E' }]}>Production mode — real money transactions will occur</Text>
+            <Text style={[styles.envNoteText, { color: '#92400E' }]}>Production mode. Real money transactions will occur</Text>
           </View>
         )}
       </View>

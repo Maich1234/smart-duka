@@ -16,7 +16,7 @@ export default function InventorySettingsScreen() {
   const { toggling: togglingPurchasing, handleToggle: handleTogglePurchasing } = useShopConfigToggle(
     'purchasingEnabled',
     {
-      on: 'Purchasing is on — record stock purchases from the Purchases tab',
+      on: 'Purchasing is on: record stock purchases from the Purchases tab',
       off: 'Purchasing is off and hidden from navigation',
     },
   );

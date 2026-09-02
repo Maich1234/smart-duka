@@ -155,7 +155,7 @@ export function SuppliersScreen() {
     onError: (error: any) => {
       if (isOfflineQueued(error)) {
         closeForm();
-        toast({ type: 'info', message: 'Supplier saved offline — will sync when connected.' });
+        toast({ type: 'info', message: 'Supplier saved offline. Will sync when connected.' });
         return;
       }
       toast({ type: 'error', message: mutationErrorMessage(error, 'Could not save supplier') });

@@ -64,12 +64,12 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
   // Shown under the field as it's typed, not as a toast after tapping Add.
   const quantityError = (() => {
     if (!quantity.trim()) return undefined;
-    if (/[.,]/.test(quantity)) return 'Sold in whole units — enter a whole number.';
+    if (/[.,]/.test(quantity)) return 'Sold in whole units, enter a whole number.';
     if (isNaN(qty)) return 'Enter a number.';
     if (qty <= 0) return 'Quantity must be more than 0.';
     if (qty > available) {
       return inCart > 0
-        ? `Only ${available} left — ${inCart} already in this sale.`
+        ? `Only ${available} left, ${inCart} already in this sale.`
         : `Only ${available} in stock.`;
     }
     return undefined;

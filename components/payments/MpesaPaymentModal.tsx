@@ -485,7 +485,7 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
                   color={isOfflineEntry ? '#92400E' : Colors.success}
                 />
                 <Text style={[styles.statusBadgeText, { color: isOfflineEntry ? '#92400E' : Colors.success }]}>
-                  {isOfflineEntry ? 'Saved — will sync when online' : 'Payment Confirmed'}
+                  {isOfflineEntry ? 'Saved. Will sync when online' : 'Payment Confirmed'}
                 </Text>
               </View>
               <Text style={styles.statusTitle}>
@@ -493,7 +493,7 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
               </Text>
               <Text style={styles.statusSub}>
                 {isOfflineEntry
-                  ? `${formatCurrency(amount, currency)} from ${maskedPhone} — receipt code saved. Sale will sync automatically when connected.`
+                  ? `${formatCurrency(amount, currency)} from ${maskedPhone}. Receipt code saved. Sale will sync automatically when connected.`
                   : `${formatCurrency(amount, currency)} received from ${maskedPhone}`}
               </Text>
               {receiptNumber && (

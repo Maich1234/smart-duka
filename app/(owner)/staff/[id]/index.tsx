@@ -220,7 +220,7 @@ export default function StaffDetailsScreen() {
           <View style={styles.closureNote}>
             <Ionicons name="alert-circle-outline" size={18} color={Colors.danger} />
             <Text style={styles.closureNoteText}>
-              Closure approved — this account closes on {formatDate(staff.deletionScheduledAt)}.{' '}
+              Closure approved. This account closes on {formatDate(staff.deletionScheduledAt)}.{' '}
               {staff.name} can still cancel before then.
             </Text>
           </View>

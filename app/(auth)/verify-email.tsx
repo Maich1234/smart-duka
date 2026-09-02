@@ -153,7 +153,7 @@ export default function VerifyEmailScreen() {
 
         {verifyCooldown > 0 && (
           <Text style={styles.cooldownText}>
-            Too many attempts — try again in {verifyCooldown}s
+            Too many attempts. Try again in {verifyCooldown}s
           </Text>
         )}
 

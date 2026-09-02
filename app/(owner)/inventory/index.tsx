@@ -439,7 +439,7 @@ function IntelligenceBanner({
           >
             <Ionicons name="trending-up" size={13} color="#15803D" />
             <Text style={[bannerStyles.chipText, { color: '#15803D' }]}>
-              {fastCount} fast mover{fastCount !== 1 ? 's' : ''} — tap to view
+              {fastCount} fast mover{fastCount !== 1 ? 's' : ''}: tap to view
             </Text>
           </AnimatedPressable>
         )}

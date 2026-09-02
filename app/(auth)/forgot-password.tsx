@@ -240,7 +240,7 @@ export default function ForgotPasswordScreen() {
             {formError ? <InlineError message={formError} /> : null}
             {verifyCooldown > 0 && (
               <Text style={styles.cooldownText}>
-                Too many attempts — try again in {verifyCooldown}s
+                Too many attempts. Try again in {verifyCooldown}s
               </Text>
             )}
             <AnimatedPressable

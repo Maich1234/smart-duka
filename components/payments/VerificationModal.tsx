@@ -453,7 +453,7 @@ const VerificationSheet = forwardRef<VerificationSheetHandle, SheetProps>(
                     >
                       <Ionicons name="shield-checkmark" size={14} color={Colors.success} />
                       <Text style={styles.verifiedText} maxFontSizeMultiplier={1.6}>
-                        {`Verified — payment settings unlock for ${SESSION_MINUTES} minutes.`}
+                        {`Verified. Payment settings unlock for ${SESSION_MINUTES} minutes.`}
                       </Text>
                     </Animated.View>
                   ) : (

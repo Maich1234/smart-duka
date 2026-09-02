@@ -71,8 +71,8 @@ export default function NewStaffScreen() {
   const resolvedEmail = emailMode === 'system' ? systemEmail : form.email;
   const canCopyCredentials = !!resolvedEmail.trim() && !!form.password;
   const successMessage = emailMode === 'system'
-    ? 'Staff added — they can sign in right away.'
-    : 'Staff added — ask them to check their email to verify before signing in.';
+    ? 'Staff added. They can sign in right away.'
+    : 'Staff added. Ask them to check their email to verify before signing in.';
 
   const handleCopyCredentials = async () => {
     await Clipboard.setStringAsync(`Email: ${resolvedEmail}\nPassword: ${form.password}`);
@@ -143,7 +143,7 @@ export default function NewStaffScreen() {
       return toast({ type: 'error', message: 'Enter a username for the generated email' });
     }
     if (emailMode === 'system' && availability === 'taken') {
-      return toast({ type: 'error', message: 'That email is already taken — try another' });
+      return toast({ type: 'error', message: 'That email is already taken. Try another' });
     }
     if (!form.password || form.password.length < 6) {
       return toast({ type: 'error', message: 'Password must be at least 6 characters' });
@@ -229,11 +229,11 @@ export default function NewStaffScreen() {
               {availability === 'taken' && (
                 <View style={styles.availabilityRow}>
                   <Ionicons name="close-circle" size={14} color={Colors.danger} />
-                  <Text style={[styles.hint, { color: Colors.danger }]}>This email is taken — try another</Text>
+                  <Text style={[styles.hint, { color: Colors.danger }]}>This email is taken. Try another</Text>
                 </View>
               )}
               {availability === 'idle' && (
-                <Text style={styles.hint}>Auto-verified — ready to use immediately, no email needed.</Text>
+                <Text style={styles.hint}>Auto-verified: ready to use immediately, no email needed.</Text>
               )}
             </>
           )}

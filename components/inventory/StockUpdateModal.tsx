@@ -96,7 +96,7 @@ const StockUpdateModalBody: React.FC<Omit<StockUpdateModalProps, 'visible'>> = (
         {resultingStock !== null
           ? `New stock will be ${resultingStock}`
           : mode === 'add'
-            ? 'This adds to the current stock — the low stock alert works the same way.'
+            ? 'This adds to the current stock. The low stock alert works the same way.'
             : 'This sets the total, replacing the current stock.'}
       </Text>
 

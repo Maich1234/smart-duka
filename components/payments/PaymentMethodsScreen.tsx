@@ -266,7 +266,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                     {isMpesa && (
                       <Text style={styles.rowHint}>
                         {mpesaUsable
-                          ? 'Connected — sends an STK prompt to the customer'
+                          ? 'Connected. Sends an STK prompt to the customer'
                           : 'Records the sale and prints. Connect M-Pesa Business for STK prompts.'}
                       </Text>
                     )}
@@ -340,7 +340,7 @@ export const PaymentMethodsScreen: React.FC = () => {
         <View style={styles.note}>
           <Ionicons name="information-circle-outline" size={15} color={Colors.textSecondary} />
           <Text style={styles.noteText}>
-            Buttons other than M-Pesa don&apos;t talk to any payment provider yet — they record how
+            Buttons other than M-Pesa don&apos;t talk to any payment provider yet. They record how
             the customer paid so your reports and cashbook are right.
           </Text>
         </View>

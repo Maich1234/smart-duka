@@ -343,7 +343,7 @@ export default function OwnerProfile() {
           <StatCard
             icon="cube-outline"
             label="Total Products"
-            value={String(dashboard?.totalProducts ?? '—')}
+            value={String(dashboard?.totalProducts ?? '-')}
             iconColor={Colors.primary}
             iconBg={Colors.primarySubtle}
             delay={60}
@@ -351,7 +351,7 @@ export default function OwnerProfile() {
           <StatCard
             icon="trending-up-outline"
             label="Stock Value"
-            value={dashboard != null ? fmtCurrency(dashboard.currentStockValue, currency) : '—'}
+            value={dashboard != null ? fmtCurrency(dashboard.currentStockValue, currency) : '-'}
             iconColor={Colors.success}
             iconBg={Colors.successSubtle}
             delay={110}
@@ -362,7 +362,7 @@ export default function OwnerProfile() {
           <StatCard
             icon="cart-outline"
             label="Today's Sales"
-            value={dashboard != null ? fmtCurrency(dashboard.todaySalesTotal, currency) : '—'}
+            value={dashboard != null ? fmtCurrency(dashboard.todaySalesTotal, currency) : '-'}
             iconColor={Colors.accent}
             iconBg={Colors.accentSubtle}
             delay={160}

@@ -136,7 +136,7 @@ export function NewPurchaseScreen() {
       if (isOfflineQueued(error)) {
         clear();
         setConfirmVisible(false);
-        toast({ type: 'info', message: 'Purchase saved offline — will sync when connected.' });
+        toast({ type: 'info', message: 'Purchase saved offline. Will sync when connected.' });
         router.replace(base as never);
         return;
       }

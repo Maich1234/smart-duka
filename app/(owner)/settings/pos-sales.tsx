@@ -20,7 +20,7 @@ export default function PosSalesSettingsScreen() {
   const { toggling: togglingShifts, handleToggle: handleToggleShiftManagement } = useShopConfigToggle(
     'shiftManagementEnabled',
     {
-      on: 'Shift management is on — staff clock in before selling',
+      on: 'Shift management is on. Staff clock in before selling',
       off: 'Shift management is off',
     },
     [['activeShift']],

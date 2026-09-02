@@ -94,7 +94,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ name, email, role }) =
       <InfoRow
         icon="person-outline"
         label="Full Name"
-        value={name || '—'}
+        value={name || '-'}
         iconColor={Colors.primary}
         iconBg={Colors.primarySubtle}
         badge={statusBadge}
@@ -102,7 +102,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ name, email, role }) =
       <InfoRow
         icon="mail-outline"
         label="Email Address"
-        value={email || '—'}
+        value={email || '-'}
         iconColor={Colors.info}
         iconBg="#EFF6FF"
       />

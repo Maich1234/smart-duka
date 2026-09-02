@@ -130,7 +130,7 @@ export const downloadBook = async (
 
   await Sharing.shareAsync(saved.uri, {
     mimeType: MIME[format],
-    dialogTitle: `${title} — ${periodLabel}`,
+    dialogTitle: `${title}: ${periodLabel}`,
     // Only iOS uses this; harmless elsewhere.
     UTI: format === 'pdf' ? 'com.adobe.pdf' : undefined,
   });

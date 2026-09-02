@@ -43,7 +43,7 @@ export const useOwnerAttention = (data: OwnerDashboardData | undefined): Attenti
             : `${lowStock.length} products running low`,
         subtitle:
           critical.length > 0
-            ? `${critical.length} nearly out — restock to avoid lost sales`
+            ? `${critical.length} nearly out: restock to avoid lost sales`
             : 'Restock soon to stay ahead',
         severity: critical.length > 0 ? 'critical' : 'warning',
         // A single flagged product goes straight to that product; with

@@ -116,7 +116,7 @@ export default function SubscriptionScreen() {
 
         {state === 'trialing' && access?.expiresAt && status && (
           <Text style={styles.detail}>
-            Your {trialLabel} runs until {formatDate(access.expiresAt)} —{' '}
+            Your {trialLabel} runs until {formatDate(access.expiresAt)},{' '}
             {status.daysLeft === 0
               ? 'today is the last day'
               : `${status.daysLeft} day${status.daysLeft === 1 ? '' : 's'} left`}
@@ -135,7 +135,7 @@ export default function SubscriptionScreen() {
         {state === 'locked' && (
           <Text style={styles.detail}>
             Your subscription has ended and this shop is paused. Your data is safe and nothing has been
-            deleted — everything comes straight back when the subscription is renewed.
+            deleted. Everything comes straight back when the subscription is renewed.
           </Text>
         )}
         {state === 'none' && (
@@ -150,7 +150,7 @@ export default function SubscriptionScreen() {
             <Text style={styles.noteTitle}>Pay from your email or notifications</Text>
             <Text style={styles.noteBody}>
               We sent a secure payment link to your email and to your notifications. Open either one and
-              tap through to pay in your browser — it takes about a minute.
+              tap through to pay in your browser. It takes about a minute.
             </Text>
             <AnimatedPressable
               onPress={onResendLink}

@@ -66,7 +66,7 @@ const SECONDARY_FORMATS: { value: BookFormat; label: string; icon: keyof typeof 
 ];
 
 const formatCell = (value: string | number, column: BookColumn, currency: string): string => {
-  if (value === '' || value === null || value === undefined) return '—';
+  if (value === '' || value === null || value === undefined) return '-';
   if (column.type === 'money') {
     return `${currency} ${Number(value).toLocaleString('en-KE', {
       minimumFractionDigits: 2,
@@ -224,7 +224,7 @@ export default function BooksScreen() {
               <View style={s.warning}>
                 <Ionicons name="warning-outline" size={16} color={Colors.warning} />
                 <Text style={s.warningText}>
-                  Some figures here are estimated — see the notes at the end.
+                  Some figures here are estimated. See the notes at the end.
                 </Text>
               </View>
             )}

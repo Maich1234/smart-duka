@@ -50,7 +50,7 @@ function ErrorFallback({ error, onReset }: { error: Error | null; onReset: () =>
       </View>
       <Text style={s.title}>Something went wrong</Text>
       <Text style={s.subtitle}>
-        An unexpected error occurred. Your data is safe — tap below to reload this screen.
+        An unexpected error occurred. Your data is safe. Tap below to reload this screen.
       </Text>
       {__DEV__ && error && (
         <View style={s.devBox}>

@@ -165,7 +165,7 @@ export function BarcodeScannerScreen() {
       // variants') can't say which size/flavour was sold — same rule
       // PosScreen's addToCart applies when a configurable product is tapped.
       if (product.productType === 'configurable' && !variant) {
-        toast({ type: 'warning', message: `${product.name} has variants — use Search to pick one.` });
+        toast({ type: 'warning', message: `${product.name} has variants. Use Search to pick one.` });
         return;
       }
 
@@ -198,7 +198,7 @@ export function BarcodeScannerScreen() {
         playScanFeedback();
         toast({
           type: 'success',
-          message: `${product.name}${variant ? ` — ${variant.name}` : ''} · Qty ${inCart + 1}`,
+          message: `${product.name}${variant ? `, ${variant.name}` : ''} · Qty ${inCart + 1}`,
         });
         return;
       }
@@ -224,7 +224,7 @@ export function BarcodeScannerScreen() {
       // repeats here, on confirm, shared via playScanHaptic so it can't drift
       // from the setting the way a second inline check would.
       playScanHaptic();
-      toast({ type: 'success', message: `✓ ${product.name}${variant ? ` — ${variant.name}` : ''} added` });
+      toast({ type: 'success', message: `✓ ${product.name}${variant ? `, ${variant.name}` : ''} added` });
       setPendingScan(null);
       // Otherwise the P0-4 dwell guard would block an immediate intentional
       // rescan of the same barcode right after confirming this one.
@@ -395,7 +395,7 @@ export function BarcodeScannerScreen() {
         onConfirm={confirmPendingScan}
         productName={
           pendingScan
-            ? `${pendingScan.product.name}${pendingScan.variant ? ` — ${pendingScan.variant.name}` : ''}`
+            ? `${pendingScan.product.name}${pendingScan.variant ? `, ${pendingScan.variant.name}` : ''}`
             : ''
         }
         maxStock={pendingScan?.stockLimit ?? Infinity}

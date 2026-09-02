@@ -120,7 +120,7 @@ export const AdditionalCostsCard: React.FC<AdditionalCostsCardProps> = ({ costs,
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>Additional Purchase Costs</Text>
           <Text style={styles.headerSub}>
-            {costs.length > 0 ? `${costs.length} cost${costs.length === 1 ? '' : 's'} · ${formatCurrency(total)}` : 'Transport, packaging, loading — optional'}
+            {costs.length > 0 ? `${costs.length} cost${costs.length === 1 ? '' : 's'} · ${formatCurrency(total)}` : 'Transport, packaging, loading: optional'}
           </Text>
         </View>
         <Animated.View style={chevronStyle}>

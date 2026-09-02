@@ -144,7 +144,7 @@ export const PrinterSetupScreen: React.FC = () => {
     stopScanRef.current = null;
     setScanning(false);
     savePrinter(device, printer?.paperWidth ?? 58);
-    toast({ type: 'success', message: `${device.name} saved — receipts now print here` });
+    toast({ type: 'success', message: `${device.name} saved. Receipts now print here` });
   };
 
   const handleTestPrint = async () => {
@@ -190,7 +190,7 @@ export const PrinterSetupScreen: React.FC = () => {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + Spacing.lg }]} showsVerticalScrollIndicator={false}>
       <Text style={styles.intro}>
-        Connect the thermal printer on your counter and receipts print straight to it — no system print dialog.
+        Connect the thermal printer on your counter and receipts print straight to it: no system print dialog.
         Without one, printing keeps using your phone&apos;s built-in print sheet.
       </Text>
 

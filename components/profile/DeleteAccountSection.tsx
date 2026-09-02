@@ -181,7 +181,7 @@ export const DeleteAccountSection: React.FC = () => {
                 <View style={styles.infoBox}>
                   <Ionicons name="information-circle-outline" size={18} color={Colors.info} />
                   <Text style={styles.infoText}>
-                    Your sales and shift records stay with the shop either way — they&apos;re the
+                    Your sales and shift records stay with the shop either way. They&apos;re the
                     owner&apos;s books, not part of your personal profile.
                   </Text>
                 </View>

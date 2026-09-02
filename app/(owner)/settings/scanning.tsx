@@ -52,7 +52,7 @@ export default function ScanningSettingsScreen() {
           </SettingsCard>
         </Animated.View>
 
-        <SettingsSectionLabel label="Scan feedback — this device only." />
+        <SettingsSectionLabel label="Scan feedback: this device only." />
         <Animated.View entering={FadeInUp.duration(320).delay(60)}>
           <SettingsCard>
             <SettingsRow

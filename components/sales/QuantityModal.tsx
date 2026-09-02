@@ -78,13 +78,13 @@ const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
     if (!quantity.trim()) return undefined;
     // parseInt('1.5') silently becomes 1 — say so instead of quietly selling
     // a different quantity than the one on screen.
-    if (!isDecimal && /[.,]/.test(quantity)) return 'Sold in whole units — enter a whole number.';
+    if (!isDecimal && /[.,]/.test(quantity)) return 'Sold in whole units, enter a whole number.';
     if (isNaN(qty)) return 'Enter a number.';
     if (qty <= 0) return 'Quantity must be more than 0.';
     if (qty > available) {
       const left = `${fmtQty(available)}${isDecimal ? ` ${unitOfMeasure}` : ''}`;
       return inCart > 0
-        ? `Only ${left} left — ${fmtQty(inCart)} already in this sale.`
+        ? `Only ${left} left, ${fmtQty(inCart)} already in this sale.`
         : `Only ${left} in stock.`;
     }
     return undefined;

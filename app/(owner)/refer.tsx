@@ -44,7 +44,7 @@ export default function ReferScreen() {
     if (!data?.shareUrl) return;
     try {
       await Share.share({
-        message: `Join me on DuQana — sign up with my code ${data.code} at ${data.shareUrl}`,
+        message: `Join me on DuQana: sign up with my code ${data.code} at ${data.shareUrl}`,
       });
     } catch {
       // User dismissed the share sheet — nothing to do.
@@ -60,7 +60,7 @@ export default function ReferScreen() {
     return (
       <View style={styles.emptyWrap}>
         <Ionicons name="gift-outline" size={40} color={Colors.textSecondary} />
-        <Text style={styles.emptyText}>The referral program isn&apos;t live yet — check back soon.</Text>
+        <Text style={styles.emptyText}>The referral program isn&apos;t live yet. Check back soon.</Text>
       </View>
     );
   }
@@ -102,7 +102,7 @@ export default function ReferScreen() {
             <Text style={styles.label}>People you&apos;ve referred</Text>
           </View>
           {data.referrals.length === 0 ? (
-            <Text style={styles.emptyReferrals}>No referrals yet — share your code to get started.</Text>
+            <Text style={styles.emptyReferrals}>No referrals yet. Share your code to get started.</Text>
           ) : (
             data.referrals.map((r, i) => (
               <View key={i} style={styles.referralRow}>

@@ -10,52 +10,15 @@ import Animated, {
   withDelay,
   Easing,
   FadeInDown,
-  FadeOutUp,
+  ZoomIn,
 } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Typography } from '@/constants/Typography';
-import { Motion } from '@/constants/Motion';
 import { Scene } from './theme';
+import { DEMO_PRODUCTS } from './content';
 import { useCountUp } from './useCountUp';
 
-/** Scripted "day in the shop" — each tick lands one of these in the toast rail
- *  and moves the numbers, so the dashboard reads as genuinely alive. */
-const EVENTS = [
-  { icon: 'phone-portrait' as const, tint: '#34D399', title: 'M-PESA payment received', detail: '+KSh 250 · John K.', amount: 250, stock: 1 },
-  { icon: 'cart' as const, tint: Scene.glowSoft, title: 'New sale · 3 items', detail: 'Sarah · Counter 1', amount: 480, stock: 3 },
-  { icon: 'receipt' as const, tint: Scene.gold, title: 'Receipt #1042 printed', detail: 'Sent to customer', amount: 0, stock: 0 },
-  { icon: 'cash' as const, tint: '#34D399', title: 'Cash sale recorded', detail: '+KSh 120 · Milk 500ml', amount: 120, stock: 1 },
-  { icon: 'trending-up' as const, tint: Scene.glowSoft, title: 'Profit up 18% this week', detail: 'vs last week', amount: 0, stock: 0 },
-  { icon: 'cube' as const, tint: Scene.gold, title: 'Stock updated automatically', detail: 'Sugar 1kg · 32 left', amount: 0, stock: 0 },
-] as const;
-
-const BAR_TARGETS = [0.38, 0.52, 0.44, 0.66, 0.58, 0.78, 0.9];
-const BAR_MAX_H = 56;
-
-const Bar: React.FC<{ target: number; index: number; bump: number }> = ({ target, index, bump }) => {
-  const h = useSharedValue(0.06);
-
-  // Staggered entrance on mount; after that, the most recent day's bar nudges
-  // upward with every sale that lands.
-  useEffect(() => {
-    if (bump === 0) {
-      h.value = withDelay(300 + index * 90, withSpring(target, { damping: 16, stiffness: 140 }));
-    } else if (index === BAR_TARGETS.length - 1) {
-      h.value = withSpring(Math.min(1, target + bump * 0.035), { damping: 13, stiffness: 180 });
-    }
-    // Shared values and per-instance constants — stable for this
-    // element's lifetime, so declaring them keeps the animation mount-only.
-  }, [bump, h, index, target]);
-
-  const style = useAnimatedStyle(() => ({ height: h.value * BAR_MAX_H }));
-  const isToday = index === BAR_TARGETS.length - 1;
-
-  return (
-    <View style={styles.barSlot}>
-      <Animated.View style={[styles.bar, isToday && styles.barToday, style]} />
-    </View>
-  );
-};
+type Phase = 'adding' | 'charging' | 'paid';
 
 const LiveDot: React.FC = () => {
   const pulse = useSharedValue(1);
@@ -108,44 +71,93 @@ const FloatingChip: React.FC<{
   );
 };
 
+const ProductTile: React.FC<{
+  icon: keyof typeof Ionicons.glyphMap;
+  name: string;
+  price: number;
+  added: boolean;
+}> = ({ icon, name, price, added }) => {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (added) {
+      scale.value = withSequence(
+        withTiming(1.06, { duration: 140 }),
+        withSpring(1, { damping: 10, stiffness: 180 })
+      );
+    }
+    // Reanimated shared values: stable identities, declared for honesty.
+  }, [added, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View style={[styles.tile, added && styles.tileAdded, style]}>
+      <View style={[styles.tileIconWrap, added && styles.tileIconWrapAdded]}>
+        <Ionicons name={icon} size={15} color={added ? Scene.glowSoft : Scene.textDim} />
+      </View>
+      <View style={styles.tileTextWrap}>
+        <Text style={styles.tileName} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.tilePrice}>KSh {price}</Text>
+      </View>
+      {added ? (
+        <Animated.View entering={ZoomIn.springify().damping(12)} style={styles.tileCheck}>
+          <Ionicons name="checkmark" size={10} color={Scene.bgFrom} />
+        </Animated.View>
+      ) : null}
+    </Animated.View>
+  );
+};
+
 interface HeroDashboardProps {
-  /** 'live' (preview mode) runs the event loop ~2.5× faster. */
+  /** 'live' (preview mode) runs the ring-up loop ~1.7× faster. */
   tempo?: 'ambient' | 'live';
 }
 
 /**
- * The welcome screen's product-in-action hero: a glass dashboard card where
- * sales land, revenue counts up, stock ticks down and the week's chart grows —
- * demonstrating outcomes before a single word of copy is read.
+ * The welcome screen's product-in-action hero: a glass till where products
+ * get "tapped" onto a running cart total, charged over M-PESA and marked
+ * paid — the same rhythm as the interactive first-sale demo, so the promise
+ * on screen one is the exact thing screen two lets you touch.
  */
 export const HeroDashboard: React.FC<HeroDashboardProps> = ({ tempo = 'ambient' }) => {
-  const [revenue, setRevenue] = useState(12450);
-  const [stock, setStock] = useState(148);
-  const [eventIndex, setEventIndex] = useState(0);
-  const [salesLanded, setSalesLanded] = useState(0);
-  const tickRef = useRef(0);
+  // Cycle position lives in a ref, not state — nothing ever renders it
+  // directly, only the cart/total/phase it derives each tick.
+  const stepRef = useRef(0);
+  const [cart, setCart] = useState<number[]>([]);
+  const [total, setTotal] = useState(0);
+  const [phase, setPhase] = useState<Phase>('adding');
 
-  const displayRevenue = useCountUp(revenue, 800);
-  const displayStock = useCountUp(stock, 500);
+  const displayTotal = useCountUp(total, 500);
+  const stepMs = tempo === 'live' ? 750 : 1300;
+  const cycleLength = DEMO_PRODUCTS.length + 2; // one step per product, then charging, then paid
 
   useEffect(() => {
-    const interval = setInterval(
-      () => {
-        tickRef.current += 1;
-        const next = EVENTS[tickRef.current % EVENTS.length];
-        setEventIndex(tickRef.current % EVENTS.length);
-        if (next.amount > 0) {
-          setRevenue((r) => r + next.amount);
-          setSalesLanded((n) => n + 1);
-        }
-        if (next.stock > 0) setStock((s) => Math.max(90, s - next.stock));
-      },
-      tempo === 'live' ? 1400 : 3400
-    );
+    const interval = setInterval(() => {
+      const next = (stepRef.current + 1) % cycleLength;
+      stepRef.current = next;
+      if (next < DEMO_PRODUCTS.length) {
+        setPhase('adding');
+        setCart((c) => [...c, next]);
+        setTotal((t) => t + DEMO_PRODUCTS[next].price);
+      } else if (next === DEMO_PRODUCTS.length) {
+        setPhase('charging');
+      } else {
+        setPhase('paid');
+      }
+    }, stepMs);
     return () => clearInterval(interval);
-  }, [tempo]);
+  }, [stepMs, cycleLength]);
 
-  const event = EVENTS[eventIndex];
+  // The beat after "paid" clears the till for the next lap of the loop.
+  useEffect(() => {
+    if (phase !== 'paid') return;
+    const t = setTimeout(() => {
+      setCart([]);
+      setTotal(0);
+    }, stepMs - 150);
+    return () => clearTimeout(t);
+  }, [phase, stepMs]);
 
   return (
     <View style={styles.wrap}>
@@ -165,58 +177,48 @@ export const HeroDashboard: React.FC<HeroDashboardProps> = ({ tempo = 'ambient' 
           </View>
         </View>
 
-        {/* Revenue */}
-        <Text style={styles.revLabel}>Today&apos;s sales</Text>
-        <Text style={styles.revValue}>
-          KSh {Math.round(displayRevenue).toLocaleString('en-KE')}
-        </Text>
-
-        {/* Stat chips */}
-        <View style={styles.statRow}>
-          <View style={styles.statChip}>
-            <Ionicons name="trending-up" size={12} color="#34D399" />
-            <Text style={[styles.statText, { color: '#34D399' }]}>+18% profit</Text>
-          </View>
-          <View style={styles.statChip}>
-            <Ionicons name="cube-outline" size={12} color={Scene.textDim} />
-            <Text style={styles.statText}>{Math.round(displayStock)} items in stock</Text>
-          </View>
-        </View>
-
-        {/* Week chart */}
-        <View style={styles.chartRow}>
-          {BAR_TARGETS.map((t, i) => (
-            <Bar key={i} target={t} index={i} bump={salesLanded} />
+        {/* Till grid */}
+        <View style={styles.grid}>
+          {DEMO_PRODUCTS.map((p, i) => (
+            <ProductTile key={p.id} icon={p.icon} name={p.name} price={p.price} added={cart.includes(i)} />
           ))}
         </View>
 
-        {/* Event rail */}
-        <View style={styles.eventRail}>
-          <Animated.View
-            key={eventIndex}
-            entering={FadeInDown.duration(Motion.duration.slow)}
-            exiting={FadeOutUp.duration(Motion.duration.base)}
-            style={styles.eventRow}
+        {/* Cart total + charge state */}
+        <View style={styles.totalRow}>
+          <View>
+            <Text style={styles.totalLabel}>{phase === 'paid' ? 'Payment received' : 'Cart total'}</Text>
+            <Text style={styles.totalValue}>
+              KSh {Math.round(displayTotal).toLocaleString('en-KE')}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.chargePill,
+              phase === 'charging' && styles.chargePillCharging,
+              phase === 'paid' && styles.chargePillPaid,
+            ]}
           >
-            <View style={[styles.eventIcon, { backgroundColor: 'rgba(255,255,255,0.07)' }]}>
-              <Ionicons name={event.icon} size={14} color={event.tint} />
-            </View>
-            <View style={styles.eventTextWrap}>
-              <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
-              <Text style={styles.eventDetail} numberOfLines={1}>{event.detail}</Text>
-            </View>
-          </Animated.View>
+            <Ionicons
+              name={phase === 'paid' ? 'checkmark' : 'phone-portrait-outline'}
+              size={13}
+              color={phase === 'adding' ? Scene.glowSoft : Scene.bgFrom}
+            />
+            <Text style={[styles.chargeText, phase !== 'adding' && styles.chargeTextActive]}>
+              {phase === 'paid' ? 'Paid' : phase === 'charging' ? 'Charging…' : 'M-PESA'}
+            </Text>
+          </View>
         </View>
       </Animated.View>
 
       {/* Floating satellites */}
       <FloatingChip style={styles.chipTopRight} dy={6} duration={3200}>
-        <Ionicons name="add" size={12} color={Scene.gold} />
-        <Text style={[styles.floatChipText, { color: Scene.gold }]}>KSh 1,200</Text>
+        <Ionicons name="receipt-outline" size={12} color={Scene.gold} />
+        <Text style={[styles.floatChipText, { color: Scene.gold }]}>Receipt printed</Text>
       </FloatingChip>
       <FloatingChip style={styles.chipBottomLeft} dy={8} duration={4100} delay={400}>
-        <Ionicons name="checkmark-circle" size={12} color="#34D399" />
-        <Text style={[styles.floatChipText, { color: '#A7F3D0' }]}>Receipt sent</Text>
+        <Ionicons name="cube-outline" size={12} color="#A7F3D0" />
+        <Text style={[styles.floatChipText, { color: '#A7F3D0' }]}>Stock updated</Text>
       </FloatingChip>
     </View>
   );
@@ -268,69 +270,100 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     letterSpacing: 1,
   },
-  revLabel: {
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 18,
+  },
+  tile: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderWidth: 1,
+    borderColor: Scene.cardBorderSoft,
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 9,
+  },
+  tileAdded: {
+    borderColor: Scene.glow,
+    backgroundColor: 'rgba(45,212,191,0.10)',
+  },
+  tileIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileIconWrapAdded: { backgroundColor: 'rgba(45,212,191,0.16)' },
+  tileTextWrap: { flex: 1 },
+  tileName: {
+    color: Scene.text,
+    fontSize: 11,
+    fontFamily: Typography.fontFamilySemiBold,
+  },
+  tilePrice: {
+    color: Scene.textFaint,
+    fontSize: 10,
+    fontFamily: Typography.fontFamily,
+    marginTop: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  tileCheck: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Scene.glow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Scene.cardBorderSoft,
+  },
+  totalLabel: {
     color: Scene.textFaint,
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,
-    marginTop: 16,
   },
-  revValue: {
+  totalValue: {
     color: Scene.text,
-    fontSize: 32,
+    fontSize: 24,
     fontFamily: Typography.fontFamilyBold,
     letterSpacing: -0.5,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
-  statRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  statChip: {
+  chargePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    gap: 6,
+    backgroundColor: 'rgba(45,212,191,0.14)',
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
   },
-  statText: {
-    color: Scene.textDim,
+  chargePillCharging: { backgroundColor: Scene.glow },
+  chargePillPaid: { backgroundColor: '#34D399' },
+  chargeText: {
+    color: Scene.glowSoft,
     fontSize: 11,
     fontFamily: Typography.fontFamilySemiBold,
-    fontVariant: ['tabular-nums'],
   },
-  chartRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    height: BAR_MAX_H,
-    marginTop: 18,
-  },
-  barSlot: { flex: 1, height: BAR_MAX_H, justifyContent: 'flex-end' },
-  bar: {
-    borderRadius: 5,
-    backgroundColor: 'rgba(94,234,212,0.28)',
-  },
-  barToday: { backgroundColor: Scene.glow },
-  eventRail: { marginTop: 16, height: 44, justifyContent: 'center' },
-  eventRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  eventIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eventTextWrap: { flex: 1 },
-  eventTitle: {
-    color: Scene.text,
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
-  eventDetail: {
-    color: Scene.textFaint,
-    fontSize: 11,
-    fontFamily: Typography.fontFamily,
-  },
+  chargeTextActive: { color: Scene.bgFrom },
   floatChip: {
     position: 'absolute',
     flexDirection: 'row',

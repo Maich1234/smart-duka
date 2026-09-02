@@ -90,7 +90,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           <View style={styles.voidedBanner}>
             <Ionicons name="ban-outline" size={14} color="#B91C1C" />
             <Text style={styles.voidedBannerText}>
-              This sale was voided{sale.voidReason ? ` — ${sale.voidReason}` : ''}. Stock was restored and it is excluded from totals.
+              This sale was voided{sale.voidReason ? `: ${sale.voidReason}` : ''}. Stock was restored and it is excluded from totals.
             </Text>
           </View>
         )}
@@ -100,7 +100,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             <Ionicons name="checkmark-circle-outline" size={14} color="#15803D" />
             <Text style={styles.refundedBannerText}>
               Refunded {sale.refund?.method === 'mpesa' ? 'via M-Pesa' : 'in cash'}
-              {sale.refund?.reason ? ` — ${sale.refund.reason}` : ''}. Stock was restored and it is excluded from totals.
+              {sale.refund?.reason ? `: ${sale.refund.reason}` : ''}. Stock was restored and it is excluded from totals.
             </Text>
           </View>
         )}

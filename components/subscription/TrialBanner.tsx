@@ -27,7 +27,7 @@ export const TrialBanner: React.FC = () => {
 
   if (access.state === 'none') {
     icon = 'gift-outline';
-    text = 'Your free trial is waiting — activate DuQana.';
+    text = 'Your free trial is waiting. Activate DuQana.';
     tone = 'info';
   } else if (access.state === 'trialing' && status.daysLeft <= 7 && !access.cancelled) {
     icon = 'time-outline';
@@ -40,11 +40,11 @@ export const TrialBanner: React.FC = () => {
     tone = status.daysLeft <= 3 ? 'warn' : 'info';
   } else if (access.state === 'grace') {
     icon = 'alert-circle-outline';
-    text = `Subscription expired — ${access.graceDaysLeft} day${access.graceDaysLeft === 1 ? '' : 's'} left before your shop pauses.`;
+    text = `Subscription expired: ${access.graceDaysLeft} day${access.graceDaysLeft === 1 ? '' : 's'} left before your shop pauses.`;
     tone = 'urgent';
   } else if (access.state === 'locked') {
     icon = 'lock-closed-outline';
-    text = 'Subscription expired — this shop is paused.';
+    text = 'Subscription expired. This shop is paused.';
     tone = 'urgent';
   } else {
     return null;

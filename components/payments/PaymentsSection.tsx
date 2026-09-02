@@ -198,7 +198,7 @@ export const PaymentsSection: React.FC<Props> = ({ onChange }) => {
             </View>
           </View>
           <View style={styles.featureList}>
-            {['STK Push — customers pay with their M-Pesa PIN', 'Auto-confirmed receipts with M-Pesa reference', 'Full transaction history and reports'].map((f) => (
+            {['STK Push: customers pay with their M-Pesa PIN', 'Auto-confirmed receipts with M-Pesa reference', 'Full transaction history and reports'].map((f) => (
               <View key={f} style={styles.featureRow}>
                 <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
                 <Text style={styles.featureText}>{f}</Text>
@@ -253,8 +253,8 @@ export const PaymentsSection: React.FC<Props> = ({ onChange }) => {
       </View>
 
       {/* Business info */}
-      <InfoRow icon="business-outline" label="Business Name" value={config?.businessName ?? '—'} />
-      <InfoRow icon="keypad-outline" label="Shortcode" value={config?.shortcode ?? '—'} />
+      <InfoRow icon="business-outline" label="Business Name" value={config?.businessName ?? '-'} />
+      <InfoRow icon="keypad-outline" label="Shortcode" value={config?.shortcode ?? '-'} />
 
       {/* Masked credentials */}
       <View style={styles.credentialGroup}>
