@@ -4,7 +4,7 @@ import api from './api';
 // prices, trial length, marketing copy, promo discounts. Nothing is
 // hardcoded in the app, so plans can change without an app release.
 
-export type BillingCycle = 'monthly' | 'yearly';
+export type BillingCycle = 'monthly' | 'quarterly' | 'yearly';
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'cancelled';
 export type AccessState = 'none' | 'trialing' | 'active' | 'grace' | 'locked';
 export type PaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled' | 'timeout';

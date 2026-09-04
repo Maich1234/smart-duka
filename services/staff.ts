@@ -77,7 +77,7 @@ export interface SeatPreview {
   fullPeriodAmount: number;
   currency: string;
   nextInvoiceAt: string | null;
-  billingCycle: 'monthly' | 'yearly';
+  billingCycle: 'monthly' | 'quarterly' | 'yearly';
 }
 
 /** Returned alongside a created/updated staff member when the bill changed. */

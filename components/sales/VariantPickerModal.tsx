@@ -62,15 +62,24 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
   const qty = parseInt(quantity, 10);
 
   // Shown under the field as it's typed, not as a toast after tapping Add.
+  // Only genuinely invalid input blocks Add — exceeding stock is allowed
+  // (selling past what's on hand is allowed shop-wide; the shop owner is
+  // alerted at checkout), so it gets a heads-up rather than a block.
   const quantityError = (() => {
     if (!quantity.trim()) return undefined;
     if (/[.,]/.test(quantity)) return 'Sold in whole units, enter a whole number.';
     if (isNaN(qty)) return 'Enter a number.';
     if (qty <= 0) return 'Quantity must be more than 0.';
+    return undefined;
+  })();
+
+  const quantityWarning = (() => {
+    if (quantityError || !quantity.trim() || isNaN(qty) || qty <= 0) return undefined;
     if (qty > available) {
+      const shortfall = qty - available;
       return inCart > 0
-        ? `Only ${available} left, ${inCart} already in this sale.`
-        : `Only ${available} in stock.`;
+        ? `Only ${available} left, ${inCart} already in this sale — stock will go ${shortfall} negative.`
+        : `Only ${available} in stock — this will take stock ${shortfall} negative.`;
     }
     return undefined;
   })();
@@ -98,13 +107,14 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
       <View style={styles.chipRow}>
         {variants.map((v) => {
           const active = v._id === selectedId;
+          // Still shown as an FYI on the chip below, but no longer blocks
+          // selecting it — selling past what's on hand is allowed.
           const outOfStock = remaining(v) === 0;
           return (
             <AnimatedPressable
               key={v._id}
-              style={[styles.chip, active && styles.chipActive, outOfStock && styles.chipDisabled]}
-              onPress={() => !outOfStock && setSelectedId(v._id)}
-              disabled={outOfStock}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => setSelectedId(v._id)}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{v.name}</Text>
               <Text style={[styles.chipPrice, active && styles.chipTextActive]}>
@@ -131,7 +141,7 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
             value={quantity}
             onChangeText={setQuantity}
             keyboardType="numeric"
-            error={quantityError}
+            error={quantityError ?? quantityWarning}
           />
         </>
       )}
@@ -156,7 +166,6 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },
   chip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, minWidth: 100 },
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  chipDisabled: { opacity: 0.4 },
   chipText: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
   chipPrice: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
   chipCommission: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2, fontFamily: Typography.fontFamilySemiBold },

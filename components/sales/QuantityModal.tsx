@@ -73,7 +73,10 @@ const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
 
   // Live feedback under the field, rather than a toast the cashier only sees
   // after tapping Add: at a busy counter the correction should arrive while
-  // they're still looking at the number they typed.
+  // they're still looking at the number they typed. Only genuinely invalid
+  // input blocks Add — exceeding stock is allowed (selling past what's on
+  // hand is allowed shop-wide; the shop owner is alerted at checkout), so it
+  // gets a heads-up rather than a block.
   const quantityError = (() => {
     if (!quantity.trim()) return undefined;
     // parseInt('1.5') silently becomes 1 — say so instead of quietly selling
@@ -81,11 +84,17 @@ const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
     if (!isDecimal && /[.,]/.test(quantity)) return 'Sold in whole units, enter a whole number.';
     if (isNaN(qty)) return 'Enter a number.';
     if (qty <= 0) return 'Quantity must be more than 0.';
+    return undefined;
+  })();
+
+  const quantityWarning = (() => {
+    if (quantityError || !quantity.trim() || isNaN(qty) || qty <= 0) return undefined;
     if (qty > available) {
       const left = `${fmtQty(available)}${isDecimal ? ` ${unitOfMeasure}` : ''}`;
+      const shortfall = fmtQty(qty - available);
       return inCart > 0
-        ? `Only ${left} left, ${fmtQty(inCart)} already in this sale.`
-        : `Only ${left} in stock.`;
+        ? `Only ${left} left, ${fmtQty(inCart)} already in this sale — stock will go ${shortfall} negative.`
+        : `Only ${left} in stock — this will take stock ${shortfall} negative.`;
     }
     return undefined;
   })();
@@ -111,6 +120,8 @@ const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
     onConfirm(qty, unitPrice);
   };
 
+  const quantityHint = quantityError ?? quantityWarning;
+
   return (
     <>
       <Text style={styles.title}>Add to Cart</Text>
@@ -128,7 +139,7 @@ const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
         onChangeText={setQuantity}
         keyboardType={isDecimal ? 'decimal-pad' : 'numeric'}
         placeholder={isDecimal ? `e.g. 0.5` : undefined}
-        error={quantityError}
+        error={quantityHint}
       />
       {priceEditable && (
         <>

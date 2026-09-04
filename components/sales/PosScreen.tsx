@@ -27,7 +27,7 @@ import { MpesaPaymentModal } from '@/components/payments/MpesaPaymentModal';
 import { ShiftGate, ActiveShiftBar } from '@/components/shifts/ShiftGate';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { applyBestPromotion } from '@/utils/promotions';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatQuantity } from '@/utils/formatters';
 import { isOfflineQueued, isOfflineUnavailable, mutationErrorMessage } from '@/utils/errors';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -477,24 +477,9 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       setVariantModalVisible(true);
       return;
     }
-    // Bundles carry no stock of their own (their components do) — let the
-    // server be authoritative on whether there's enough component stock.
-    const tracksOwnStock = product.trackInventory && product.productType !== 'bundle';
-    if (tracksOwnStock) {
-      const inCart = cart.find((i) => i._id === product._id && !i.cartVariantId)?.cartQuantity ?? 0;
-      // Opening the sheet with nothing left to add would just show a disabled
-      // Add button, so say why here instead.
-      if (product.quantity - inCart <= 0) {
-        toast({
-          type: 'warning',
-          message:
-            inCart > 0
-              ? `All ${product.quantity} of ${product.name} are already in this sale`
-              : `${product.name} is out of stock`,
-        });
-        return;
-      }
-    }
+    // Selling past what's on hand is allowed (the shop owner is alerted at
+    // checkout) — the sheet below shows the available count either way, it
+    // just no longer blocks opening it.
     setSelectedProduct(product);
     setQuantityModalVisible(true);
   };
@@ -551,11 +536,33 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     ...(item.cartVariantId ? { variantId: item.cartVariantId } : {}),
   }));
 
-  const handleCheckout = () => {
-    if (cart.length === 0) {
-      toast({ type: 'warning', message: 'Add at least one product before checking out.' });
-      return;
-    }
+  // Cart lines that would take a product/variant below zero stock. Bundles
+  // are excluded — the server is authoritative on component stock, since a
+  // component can be shared across lines in ways the cart doesn't track.
+  const negativeStockLines = useMemo(
+    () =>
+      cart.filter((item) => {
+        if (item.productType === 'bundle') return false;
+        if (item.cartVariantId) {
+          const variant = item.variants?.find((v) => v._id === item.cartVariantId);
+          return variant != null && item.cartQuantity > variant.quantity;
+        }
+        return item.trackInventory && item.cartQuantity > item.quantity;
+      }),
+    [cart]
+  );
+
+  const negativeStockMessage = () =>
+    negativeStockLines
+      .map((item) => {
+        const variant = item.cartVariantId ? item.variants?.find((v) => v._id === item.cartVariantId) : undefined;
+        const name = variant ? `${item.name} (${variant.name})` : item.name;
+        const available = variant ? variant.quantity : item.quantity;
+        return `${name}: selling ${formatQuantity(item.cartQuantity)}, only ${formatQuantity(available)} in stock`;
+      })
+      .join('\n') + '\n\nContinue with this sale? The shop owner will be notified.';
+
+  const proceedToCheckout = () => {
     // STK Push is the one flow with a precondition, and only when the shop has
     // actually connected M-Pesa Business. Everything else — cash, an
     // unconfigured M-Pesa, Airtel, a bank transfer — records and prints.
@@ -583,6 +590,26 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         ? { mpesaReceiptNumber: code }
         : {}),
     });
+  };
+
+  const handleCheckout = () => {
+    if (cart.length === 0) {
+      toast({ type: 'warning', message: 'Add at least one product before checking out.' });
+      return;
+    }
+    if (negativeStockLines.length > 0) {
+      alert({
+        type: 'confirm',
+        title: 'Stock Will Go Negative',
+        message: negativeStockMessage(),
+        buttons: [
+          { label: 'Cancel', variant: 'ghost' },
+          { label: 'Continue Anyway', variant: 'danger', onPress: proceedToCheckout },
+        ],
+      });
+      return;
+    }
+    proceedToCheckout();
   };
 
   const handleMpesaSuccess = (transactionId: string | null, receiptNumber: string | null) => {
