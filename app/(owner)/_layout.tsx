@@ -20,6 +20,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAlert } from '@/context/AlertContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useCartStore } from '@/store/staffCartStore';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Typography } from '@/constants/Typography';
 import { TAB_BAR_BASE_HEIGHT } from '@/constants/Layout';
@@ -238,7 +239,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
 
 export default function OwnerLayout() {
   const { user, isLoading } = useAuth();
-  const { access } = useSubscription();
+  const { access, isLoading: subscriptionLoading } = useSubscription();
   const pathname = usePathname();
 
   // Subscription + grace period exhausted → every owner screen funnels to
@@ -269,6 +270,16 @@ export default function OwnerLayout() {
 
   if (!isLoading && (!user || user.role !== 'owner')) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  // Access is undefined until this resolves (from cache or network) — render
+  // real screen content before then and a locked shop flashes its dashboard
+  // for a frame before the effect above catches up and redirects. Doesn't
+  // apply once access is known (including from the offline-persisted cache),
+  // so a background refetch never blocks or re-flashes an already-rendered
+  // screen.
+  if (subscriptionLoading) {
+    return <LoadingState />;
   }
 
   return (
