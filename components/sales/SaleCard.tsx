@@ -22,7 +22,18 @@ interface SaleCardProps {
   currency?: string;
   showStaff?: boolean;
   onPress?: () => void;
+  /**
+   * Set only for a sale still living on this device, not yet confirmed by the
+   * server — 'syncing' is the queued write in flight or waiting for a
+   * connection, 'failed' is a sync the server permanently rejected.
+   */
+  syncStatus?: 'syncing' | 'failed';
 }
+
+const SYNC_STATUS_CONFIG: Record<NonNullable<SaleCardProps['syncStatus']>, { label: string; color: string }> = {
+  syncing: { label: 'Saved Offline · Syncing', color: '#B45309' },
+  failed: { label: 'Sync Failed', color: '#B91C1C' },
+};
 
 const AVATAR_COLORS = [
   ['#0F766E', '#CCFBF1'],
@@ -65,7 +76,7 @@ function formatSaleTime(dateString: string): string {
   return `${day} ${month} ${year} • ${time}`;
 }
 
-export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPress }) => {
+export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPress, syncStatus }) => {
   const staffName = sale.staff?.name ?? 'Unknown';
   const initials = getInitials(staffName);
   const [avatarText, avatarBg] = getAvatarColors(staffName);
@@ -86,7 +97,7 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
       };
 
   return (
-    <AnimatedPressable onPress={onPress} style={styles.row}>
+    <AnimatedPressable onPress={onPress} disabled={!onPress} style={styles.row}>
       <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
         <Text style={[styles.avatarText, { color: avatarText }]}>{initials}</Text>
       </View>
@@ -98,6 +109,11 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
           <Ionicons name="calendar-outline" size={11} color={Colors.textTertiary} />
           <Text style={styles.time}>{formatSaleTime(sale.createdAt)}</Text>
         </View>
+        {syncStatus && (
+          <Text style={[styles.syncStatus, { color: SYNC_STATUS_CONFIG[syncStatus].color }]} numberOfLines={1}>
+            {SYNC_STATUS_CONFIG[syncStatus].label}
+          </Text>
+        )}
       </View>
 
       <View style={styles.right}>
@@ -109,7 +125,9 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
         </Text>
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} style={styles.chevron} />
+      {/* Only a promise of "tap for more" when there's somewhere to go —
+          a still-syncing sale has no server record yet to open. */}
+      {onPress && <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} style={styles.chevron} />}
     </AnimatedPressable>
   );
 };
@@ -159,6 +177,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textTertiary,
     fontFamily: Typography.fontFamily,
+  },
+  syncStatus: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamilySemiBold,
+    marginTop: 2,
   },
   right: {
     alignItems: 'flex-end',

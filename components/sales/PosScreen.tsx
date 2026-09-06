@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
-import { createSale, getMySales, voidSale, refundSale, type Sale } from '@/services/sales';
+import { createSale, getMySales, voidSale, refundSale, type Sale, type SaleItem, type CreateSaleData } from '@/services/sales';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { getTransactionStatus } from '@/services/mpesa';
@@ -28,7 +28,7 @@ import { ShiftGate, ActiveShiftBar } from '@/components/shifts/ShiftGate';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { applyBestPromotion } from '@/utils/promotions';
 import { formatCurrency, formatQuantity } from '@/utils/formatters';
-import { isOfflineQueued, isOfflineUnavailable, mutationErrorMessage } from '@/utils/errors';
+import { isOfflineQueued, isOfflineUnavailable, isSubscriptionLocked, mutationErrorMessage } from '@/utils/errors';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -45,6 +45,12 @@ import { usePendingMpesaStore, type PendingMpesaPayment } from '@/store/pendingM
 import { isOfflineDbAvailable } from '@/utils/offlineDb';
 import { syncProductCache, searchCachedProducts, applyOfflineStockDelta, PRODUCT_CACHE_STALE_MS } from '@/utils/productCache';
 import { addOrIncrementCartItem } from '@/utils/cartOperations';
+import { randomUUID } from '@/utils/uuid';
+import { buildOptimisticSale } from '@/utils/saleBuilder';
+import { enqueueOperation, processQueue } from '@/utils/offlineQueue';
+import { saveLocalSale, onLocalSaleSynced } from '@/utils/localSales';
+import { useLocalSales } from '@/hooks/useLocalSales';
+import { useSubscription } from '@/hooks/useSubscription';
 
 // How long the background watcher (below) keeps quietly re-checking a
 // payment the cashier cancelled out of while it was still pending, and how
@@ -87,6 +93,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const canRefundSale = canRefundOwn || canRefundAll;
   const canCreateProduct = usePermission('create_product');
   const { toast, alert } = useAlert();
+  const { access } = useSubscription();
 
   const {
     value: search,
@@ -330,54 +337,116 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       ? chosenMethod
       : saleMethods[0].key;
 
+  // Local-first: "Sell" is a deterministic on-device write, never a network
+  // round trip. The sale is validated, committed to SQLite, reflected in the
+  // local stock mirror, and handed back to the UI as done — all synchronous —
+  // before the outbox even attempts to reach the server. Sync is kicked off
+  // in the background (processQueue, fire-and-forget) and reconciled later
+  // via onLocalSaleSynced below; it is never awaited here, on purpose,
+  // because completing the sale and syncing it are two different events.
+  //
+  // The one platform where this can't hold is SQLite-less web (no COOP/COEP,
+  // no OPFS — isOfflineDbAvailable() false): there's nowhere on-device to
+  // write, so that path falls back to the previous direct network call,
+  // which already degrades correctly offline (services/api.ts).
   const createSaleMutation = useMutation({
-    mutationFn: createSale,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['mySales'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['myCommission'] });
-      // Stock moved — refresh the local mirror so the till shows real levels.
-      resyncCatalogue();
+    mutationFn: async (data: CreateSaleData): Promise<{ data: Sale; local: boolean }> => {
+      // Local-first completes before any network check ever runs, so a
+      // locked shop that stays offline would otherwise never be told no —
+      // requirePaidShop's rejection only arrives once the queue reaches the
+      // server. `access` is the same persisted-cache value the owner paywall
+      // redirect trusts, and `canTransact` is already role-aware (staff keep
+      // their extra grace window) — undefined (still loading) never blocks.
+      if (access?.canTransact === false) {
+        throw {
+          subscriptionLocked: true,
+          message: user?.role === 'owner'
+            ? 'Your subscription has ended. Renew to start recording sales again.'
+            : 'This shop\'s subscription has ended. Ask the shop owner to renew.',
+        };
+      }
+      if (!isOfflineDbAvailable()) {
+        const res = await createSale(data);
+        return { data: res.data, local: false };
+      }
+
+      const localId = randomUUID();
+      const optimisticSale = buildOptimisticSale({
+        localId,
+        staff: { _id: user?._id ?? '', name: user?.name ?? '', email: user?.email ?? '' },
+        paymentMethod: data.paymentMethod,
+        paymentMethodLabel: saleMethods.find((m) => m.key === data.paymentMethod)?.label,
+        mpesaTransactionId: data.mpesaTransactionId,
+        mpesaReceiptNumber: data.mpesaReceiptNumber,
+        items: buildSaleItemSummaries(),
+      });
+
+      // Same idempotency key doubles as this row's local_sales id (see
+      // utils/localSales.ts) — one id ties the optimistic record, the queued
+      // write, and the server's own idempotency ledger together.
+      const queued = enqueueOperation(
+        { method: 'POST', url: '/sales', body: data as unknown as Record<string, unknown> },
+        localId,
+        localId,
+      );
+      if (!queued) {
+        // Nothing was saved anywhere — never claim otherwise.
+        throw {
+          offlineUnavailable: true,
+          message: 'No connection, and this device can\'t save changes offline. Please reconnect and try again.',
+        };
+      }
+
+      saveLocalSale(shopId, user?._id ?? null, optimisticSale);
+      // Take the stock down locally right away — the server hasn't
+      // necessarily seen this sale yet, so without this the mirror keeps
+      // offering units already in a customer's bag.
+      applyOfflineStockDelta(shopId, data.items.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId,
+        quantity: i.quantity,
+      })));
+
+      processQueue();
+
+      return { data: optimisticSale, local: true };
+    },
+    onSuccess: ({ data, local }) => {
       clearCart();
       setManualReceiptCode('');
       setMpesaMode('stk');
-      setCompletedSale(data.data);
+      setCompletedSale(data);
       setReceiptVisible(true);
-    },
-    onError: (error: any, variables) => {
-      if (isOfflineQueued(error)) {
-        // Take the stock down locally too. The server hasn't seen this sale
-        // yet, so without this the mirror keeps offering units that are
-        // already in a customer's bag — and every oversold line comes back
-        // as a permanent "Insufficient stock" rejection when the queue drains.
-        // Read from the mutation's own variables rather than the cart, which
-        // is cleared on the next line.
-        applyOfflineStockDelta(shopId, variables.items.map((i) => ({
-          productId: i.productId,
-          variantId: i.variantId,
-          quantity: i.quantity,
-        })));
+      if (local) {
         queryClient.invalidateQueries({ queryKey: ['productCache', shopId] });
-
-        clearCart();
-        setManualReceiptCode('');
-        setMpesaMode('stk');
-        toast({ type: 'info', message: 'Sale saved offline. Will sync when connected.' });
-        return;
+      } else {
+        // No-SQLite fallback: this was a real network round trip, so the
+        // server's own response is already authoritative.
+        queryClient.invalidateQueries({ queryKey: ['mySales'] });
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['myCommission'] });
+        resyncCatalogue();
       }
+    },
+    onError: (error: any) => {
       if (isOfflineUnavailable(error)) {
         // Nothing was saved anywhere — say so plainly instead of the
         // reassuring offline message, and keep the cart so it isn't retyped.
         toast({ type: 'error', message: error.message });
         return;
       }
+      if (isSubscriptionLocked(error)) {
+        // Refused before ever touching SQLite or the queue — keep the cart
+        // so it isn't retyped once the shop renews.
+        toast({ type: 'error', message: error.message });
+        return;
+      }
       if (error?.response?.data?.code === 'PAYMENT_METHOD_UNAVAILABLE') {
-        // The owner removed/disabled this method after it was selected but
-        // before the poll or a focus refetch caught up — the sale was
-        // correctly rejected server-side (it can never land in the DB with a
-        // method the shop doesn't currently accept). Refetch right away so
-        // the button is gone by the time the cashier looks back at the till,
-        // instead of leaving it tappable until the next poll.
+        // Only reachable via the no-SQLite fallback path (the local-first
+        // path never talks to the server synchronously): the owner
+        // removed/disabled this method after it was selected but before the
+        // poll or a focus refetch caught up. Refetch right away so the
+        // button is gone by the time the cashier looks back at the till.
         refetchShopConfig();
         toast({ type: 'error', message: 'That payment method was just removed. Pick another to complete the sale.' });
         return;
@@ -385,6 +454,42 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       toast({ type: 'error', message: mutationErrorMessage(error, 'Sale failed') });
     },
   });
+
+  // A synchronous lock, separate from createSaleMutation.isPending.
+  //
+  // isPending only becomes true once React commits the re-render after
+  // .mutate() runs — with the network round trip gone, mutationFn now
+  // resolves in well under a millisecond, so that render can lag behind a
+  // genuine double-tap (or a fast-fingered cashier hitting the button twice)
+  // for long enough to let both taps call .mutate() before the button's own
+  // `disabled={loading}` ever takes effect. Setting this ref the instant the
+  // first tap is handled — no render involved — closes that window: a
+  // second tap in the same frame is simply dropped rather than becoming a
+  // second sale.
+  const submittingRef = React.useRef(false);
+  const submitSale = (data: CreateSaleData) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    createSaleMutation.mutate(data, {
+      onSettled: () => { submittingRef.current = false; },
+    });
+  };
+
+  // The one place a queued sale's outcome comes back once the background
+  // sync (kicked off inside the mutation above) actually reaches the server —
+  // refetch the authoritative data so the provisional entry in "My Sales
+  // History" is replaced by the real one, and pull the real stock numbers in.
+  useEffect(() => onLocalSaleSynced(() => {
+    queryClient.invalidateQueries({ queryKey: ['mySales'] });
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['myCommission'] });
+    resyncCatalogue();
+  }), [queryClient, resyncCatalogue]);
+
+  // Sales made on this device the server hasn't confirmed yet — merged into
+  // "My Sales History" below so a cashier sees a sale the instant it's made,
+  // online or off, instead of it only appearing once synced.
+  const localSales = useLocalSales(shopId);
 
   const voidMutation = useMutation({
     mutationFn: (saleId: string) => voidSale(saleId),
@@ -462,6 +567,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   const products = usingCache ? cachedProducts ?? [] : productsData?.data || [];
   const mySales = mySalesData?.data || [];
+  // Sales this device has made but the server hasn't confirmed yet, newest
+  // first — shown ahead of the server page so a sale appears the instant
+  // it's made. Only prepended on page 1: they're always the most recent
+  // sales, so they'd be a duplicate/out-of-order mess on any later page.
+  const displayedSales = salesPage === 1 ? [...localSales, ...mySales] : mySales;
   // Local search returns the whole matching set at once — there is no "next
   // page" at a counter. Pagination only exists on the fallback path.
   const productsTotalPages = usingCache ? 1 : productsData?.pagination?.pages ?? 1;
@@ -536,6 +646,28 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     ...(item.cartVariantId ? { variantId: item.cartVariantId } : {}),
   }));
 
+  // Same cart, shaped for the optimistic receipt/sale-card display rather
+  // than the network payload above — everything here is already on-device
+  // (the cart line, its already-applied promotion, the shop's own commission
+  // rate), so it can be computed without waiting on the server's response.
+  const buildSaleItemSummaries = (): SaleItem[] => cart.map((item, i) => {
+    const promo = cartPromoResults[i];
+    const commission = (item.cartVariantCommission ?? 0) * item.cartQuantity;
+    return {
+      productId: item._id,
+      productName: item.name,
+      quantity: item.cartQuantity,
+      unitPrice: item.cartUnitPrice ?? item.sellingPrice,
+      subtotal: promo.subtotal,
+      ...(promo.discountAmount > 0 ? { discountAmount: promo.discountAmount } : {}),
+      ...(promo.appliedPromotionLabel ? { appliedPromotionLabel: promo.appliedPromotionLabel } : {}),
+      ...(commission > 0 ? { commissionAmount: commission } : {}),
+      ...(item.cartVariantId ? { variantId: item.cartVariantId, variantName: item.cartVariantName } : {}),
+      unitOfMeasure: item.unitOfMeasure,
+      productType: item.productType,
+    };
+  });
+
   // Cart lines that would take a product/variant below zero stock. Bundles
   // are excluded — the server is authoritative on component stock, since a
   // component can be shared across lines in ways the cart doesn't track.
@@ -583,7 +715,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       return;
     }
 
-    createSaleMutation.mutate({
+    submitSale({
       items: buildSaleItems(),
       paymentMethod,
       ...(paymentMethod === MPESA_METHOD_KEY && code.length >= 6
@@ -620,7 +752,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     const items = resumePayment?.saleItems ?? buildSaleItems();
     setResumePayment(null);
     usePendingMpesaStore.getState().clear();
-    createSaleMutation.mutate({
+    submitSale({
       items,
       paymentMethod: 'mpesa',
       // Normal flow: link confirmed STK push transaction
@@ -658,7 +790,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                 label: 'Record Sale',
                 onPress: () => {
                   usePendingMpesaStore.getState().clear();
-                  createSaleMutation.mutate({
+                  submitSale({
                     items: payment.saleItems,
                     paymentMethod: MPESA_METHOD_KEY,
                     mpesaTransactionId: payment.transactionId,
@@ -1009,17 +1141,23 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             {canViewSales && (
               <View style={styles.historySection}>
                 <Text style={styles.sectionTitle}>My Sales History</Text>
-                {mySales.length === 0 ? (
+                {displayedSales.length === 0 ? (
                   <EmptyState title="No sales yet" />
                 ) : (
-                  mySales.map((sale) => (
-                    <SaleCard
-                      key={sale._id}
-                      sale={sale}
-                      showStaff={false}
-                      onPress={() => { setSelectedSale(sale); setDetailsModalVisible(true); }}
-                    />
-                  ))
+                  displayedSales.map((sale) => {
+                    const localStatus = 'localStatus' in sale ? sale.localStatus : undefined;
+                    return (
+                      <SaleCard
+                        key={sale._id}
+                        sale={sale}
+                        showStaff={false}
+                        syncStatus={localStatus ? (localStatus === 'failed' ? 'failed' : 'syncing') : undefined}
+                        // A sale still syncing has no server record yet — its
+                        // details sheet (void/refund) needs one to act on.
+                        onPress={localStatus ? undefined : () => { setSelectedSale(sale); setDetailsModalVisible(true); }}
+                      />
+                    );
+                  })
                 )}
                 {salesTotalPages > 1 && (
                   <View style={styles.paginationRow}>

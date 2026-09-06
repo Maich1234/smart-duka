@@ -12,6 +12,9 @@ export const isOfflineQueued = (error: any): boolean => !!error?.offlineQueued;
  */
 export const isOfflineUnavailable = (error: any): boolean => !!error?.offlineUnavailable;
 
+/** True when a mutation was refused client-side because the shop's subscription lock forbids it. */
+export const isSubscriptionLocked = (error: any): boolean => !!error?.subscriptionLocked;
+
 /**
  * Message for a failed mutation: the server's own wording where there is one,
  * otherwise `fallback`.
@@ -22,6 +25,6 @@ export const isOfflineUnavailable = (error: any): boolean => !!error?.offlineUna
  * is the only way through.
  */
 export const mutationErrorMessage = (error: any, fallback: string): string => {
-  if (isOfflineUnavailable(error)) return error.message;
+  if (isOfflineUnavailable(error) || isSubscriptionLocked(error)) return error.message;
   return error?.response?.data?.message || fallback;
 };

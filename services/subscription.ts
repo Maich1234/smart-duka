@@ -80,6 +80,14 @@ export interface SubscriptionAccess {
   graceDaysLeft: number;
   expiresAt: string | null;
   cancelled: boolean;
+  /**
+   * Whether the signed-in user (role-aware — staff get `staffGraceExtraDays`
+   * beyond the owner's lock) may still record a transaction right now. Mirrors
+   * requirePaidShop's own check, so the till can enforce the same cutoff
+   * locally instead of relying on a network round trip that offline may
+   * never make.
+   */
+  canTransact: boolean;
 }
 
 export interface MySubscriptionResponse {
@@ -141,11 +149,6 @@ export async function activateTrial(): Promise<{
   message: string;
 }> {
   const res = await api.post('/subscriptions/trial', {});
-  return res.data;
-}
-
-export async function cancelSubscription(): Promise<{ success: boolean; data: { subscription: Subscription }; message: string }> {
-  const res = await api.post('/subscriptions/cancel');
   return res.data;
 }
 

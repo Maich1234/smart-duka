@@ -14,5 +14,13 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  // Test doubles export test-only helpers (__setState, __resetAllMockDatabases,
+  // …) the real modules don't have, and Jest type-checks nothing at run time
+  // (babel-jest strips types) — kept out of the app's own type-check surface.
+  "exclude": [
+    "node_modules",
+    "__tests__",
+    "__mocks__"
   ]
 }

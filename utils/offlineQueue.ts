@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/authStore';
 import { refreshAuthToken } from './tokenRefresh';
 import { getDb, isOfflineDbAvailable } from './offlineDb';
 import { randomUUID } from './uuid';
+import { resolveLocalSale, markLocalSaleFailed, retryLocalSale, discardLocalSale } from './localSales';
+import { applyOfflineStockDelta, restoreOfflineStockDelta, type OfflineStockDelta } from './productCache';
 
 // --- Exponential backoff (max 32 s) ---
 const MAX_BACKOFF_MS = 32_000;
@@ -64,6 +66,20 @@ function notifySync(syncing: boolean) {
  * commission. Scoping is what keeps the outbox honest about who sold what.
  */
 const currentUserId = (): string | null => useAuthStore.getState().user?._id ?? null;
+
+/** Shop the signed-in user belongs to — needed to reverse a sale's stock delta. */
+const currentShopId = (): string | null => useAuthStore.getState().user?.shop?._id ?? null;
+
+/** Extracts the per-line stock movement from a queued `/sales` write's body. */
+const stockDeltasFromSaleBody = (body: string | null): OfflineStockDelta[] => {
+  if (!body) return [];
+  try {
+    const parsed = JSON.parse(body) as { items?: { productId: string; variantId?: string; quantity: number }[] };
+    return (parsed.items ?? []).map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity }));
+  } catch {
+    return [];
+  }
+};
 
 // --- Public API ---
 
@@ -249,17 +265,23 @@ export const hasQueuedOperation = (urlFragment: string): boolean => {
  *
  * idempotencyKey: stable per-request key; the UNIQUE constraint prevents
  * double-insertion if the same logical operation is enqueued twice.
+ *
+ * localSaleId: for a `/sales` creation, the id of its matching row in
+ * `local_sales` (see utils/localSales.ts) — lets processQueue resolve or
+ * fail that specific optimistic record once the server answers. Omitted for
+ * every other kind of write.
  */
 export const enqueueOperation = (
   op: QueueOperation,
-  idempotencyKey: string
+  idempotencyKey: string,
+  localSaleId?: string,
 ): boolean => {
   if (!isOfflineDbAvailable()) return false;
   try {
     getDb().runSync(
       `INSERT OR IGNORE INTO offline_queue
-         (id, user_id, idempotency_key, method, url, body, next_attempt_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, user_id, idempotency_key, method, url, body, local_sale_id, next_attempt_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         randomUUID(),
         currentUserId(),
@@ -267,6 +289,7 @@ export const enqueueOperation = (
         op.method.toUpperCase(),
         op.url,
         op.body != null ? JSON.stringify(op.body) : null,
+        localSaleId ?? null,
         Date.now(),
         Date.now(),
       ]
@@ -310,8 +333,8 @@ export const retryAllFailed = (ids?: string[]): number => {
       ? { clause: ` AND id IN (${ids.map(() => '?').join(',')})`, params: ids }
       : { clause: '', params: [] as string[] };
 
-    const rows = db.getAllSync<{ id: string }>(
-      `SELECT id FROM offline_queue
+    const rows = db.getAllSync<{ id: string; local_sale_id: string | null; body: string | null }>(
+      `SELECT id, local_sale_id, body FROM offline_queue
        WHERE status = 'failed' AND (user_id = ? OR user_id IS NULL)${scope.clause}`,
       [userId, ...scope.params],
     );
@@ -326,6 +349,15 @@ export const retryAllFailed = (ids?: string[]): number => {
         [Date.now(), randomUUID(), row.id],
       );
       changed += 1;
+
+      // A retried sale is provisionally "selling" again — back to pending_sync,
+      // and its stock leaves the mirror again (recordFailure put it back when
+      // this row first failed; see the symmetric comment there).
+      if (row.local_sale_id) {
+        retryLocalSale(row.local_sale_id);
+        const shopId = currentShopId();
+        if (shopId) applyOfflineStockDelta(shopId, stockDeltasFromSaleBody(row.body));
+      }
     }
 
     notifyCount();
@@ -348,19 +380,29 @@ export const retryAllFailed = (ids?: string[]): number => {
 export const discardAllFailed = (ids?: string[]): number => {
   if (!isOfflineDbAvailable()) return 0;
   try {
+    const db = getDb();
     const userId = currentUserId();
-    const result = ids?.length
-      ? getDb().runSync(
-        `DELETE FROM offline_queue
-         WHERE (user_id = ? OR user_id IS NULL)
-           AND id IN (${ids.map(() => '?').join(',')})`,
-        [userId, ...ids],
-      )
-      : getDb().runSync(
-        `DELETE FROM offline_queue
-         WHERE status = 'failed' AND (user_id = ? OR user_id IS NULL)`,
-        [userId],
-      );
+    const scope = ids?.length
+      ? { clause: ` AND id IN (${ids.map(() => '?').join(',')})`, params: ids }
+      : { clause: " AND status = 'failed'", params: [] as string[] };
+
+    // Discarding a sale's queued write means the sale itself never happened —
+    // its local_sales row (and the "Sync Failed" card it drives) goes too.
+    // recordFailure already restored the stock this sale provisionally took
+    // when the row first failed, so there is nothing left to undo here.
+    const linked = db.getAllSync<{ local_sale_id: string }>(
+      `SELECT local_sale_id FROM offline_queue
+       WHERE (user_id = ? OR user_id IS NULL) AND local_sale_id IS NOT NULL${scope.clause}`,
+      [userId, ...scope.params],
+    );
+
+    const result = db.runSync(
+      `DELETE FROM offline_queue WHERE (user_id = ? OR user_id IS NULL)${scope.clause}`,
+      [userId, ...scope.params],
+    );
+
+    for (const row of linked) discardLocalSale(row.local_sale_id);
+
     notifyCount();
     return result.changes;
   } catch {
@@ -376,9 +418,22 @@ type QueueRow = {
   body: string | null;
   attempts: number;
   max_attempts: number;
+  local_sale_id: string | null;
 };
 
 let isProcessing = false;
+
+/**
+ * Set when something new is enqueued (or a retry requested) while a drain is
+ * already running. That row can't be in the current pass's `rows` — its
+ * SELECT already ran — so without this it would sit until whatever next
+ * touches the queue: the 30s periodic timer, the next reconnect, or a manual
+ * retry. For a sale made online moments after another sync started, that's a
+ * multi-second wait for something that should sync as fast as the first one
+ * did. Checked once in the current run's `finally`, so at most one extra
+ * pass runs back-to-back rather than one per row that arrived mid-drain.
+ */
+let rerunRequested = false;
 
 const sendRow = (row: QueueRow, token: string) => {
   const body = row.body ? JSON.parse(row.body) : undefined;
@@ -452,6 +507,14 @@ const recordFailure = (row: QueueRow, err: any) => {
        WHERE id = ?`,
       [newAttempts, httpStatus ?? null, serverMessage, row.id]
     );
+    if (row.local_sale_id) {
+      markLocalSaleFailed(row.local_sale_id, serverMessage);
+      // The sale never landed server-side — give back the stock it
+      // provisionally took so the till stops under-reporting it. Mirrored by
+      // applyOfflineStockDelta in retryAllFailed if the user retries.
+      const shopId = currentShopId();
+      if (shopId) restoreOfflineStockDelta(shopId, stockDeltasFromSaleBody(row.body));
+    }
   } else if (newAttempts >= row.max_attempts) {
     // Exhausted fast-backoff budget but not a permanent error.
     // Switch to a slow 5-minute cadence so the item keeps retrying
@@ -506,7 +569,13 @@ const purgeStaleFailures = (db: ReturnType<typeof getDb>) => {
  *   surface can offer the user a retry or a discard.
  */
 export const processQueue = async (): Promise<void> => {
-  if (isProcessing || !isOfflineDbAvailable()) return;
+  if (isProcessing) {
+    // A pass is already draining the queue — ask it to run once more right
+    // after it finishes instead of silently dropping this trigger.
+    rerunRequested = true;
+    return;
+  }
+  if (!isOfflineDbAvailable()) return;
 
   // Nothing can be attributed correctly without a signed-in user, and the
   // token below would be missing anyway.
@@ -534,17 +603,26 @@ export const processQueue = async (): Promise<void> => {
     purgeStaleFailures(db);
 
     const rows = db.getAllSync<QueueRow>(
-      `SELECT id, idempotency_key, method, url, body, attempts, max_attempts
+      `SELECT id, idempotency_key, method, url, body, attempts, max_attempts, local_sale_id
        FROM offline_queue
        WHERE status = 'pending' AND user_id = ? AND next_attempt_at <= ?
        ORDER BY created_at ASC`,
       [userId, Date.now()]
     );
 
+    // The check above already confirmed connectivity with nothing but
+    // synchronous SQLite calls since — re-checking again before the very
+    // first row is a redundant native round trip. Every row after that still
+    // gets its own fresh check, same as before, so a drop mid-drain is still
+    // caught between items.
+    let justCheckedConnectivity = true;
+
     for (const row of rows) {
-      // Re-check connectivity before each item
-      const check = await NetInfo.fetch();
-      if (check.isConnected === false) break;
+      if (!justCheckedConnectivity) {
+        const check = await NetInfo.fetch();
+        if (check.isConnected === false) break;
+      }
+      justCheckedConnectivity = false;
 
       // Re-read auth per item — if the user logs out or switches accounts
       // mid-sync we stop rather than replaying this user's rows under
@@ -556,6 +634,7 @@ export const processQueue = async (): Promise<void> => {
         await sendRow(row, token);
         // Success — remove from queue
         db.runSync(`DELETE FROM offline_queue WHERE id = ?`, [row.id]);
+        if (row.local_sale_id) resolveLocalSale(row.local_sale_id);
       } catch (err: any) {
         if (err?.response?.status !== 401) {
           if (isAlreadySatisfied(row, err)) {
@@ -584,6 +663,7 @@ export const processQueue = async (): Promise<void> => {
         try {
           await sendRow(row, freshToken);
           db.runSync(`DELETE FROM offline_queue WHERE id = ?`, [row.id]);
+          if (row.local_sale_id) resolveLocalSale(row.local_sale_id);
         } catch (retryErr: any) {
           if (retryErr?.response?.status === 401) break; // still unauthorized — pause
           if (isAlreadySatisfied(row, retryErr)) {
@@ -600,5 +680,9 @@ export const processQueue = async (): Promise<void> => {
     isProcessing = false;
     notifySync(false);
     notifyCount();
+    if (rerunRequested) {
+      rerunRequested = false;
+      void processQueue();
+    }
   }
 };

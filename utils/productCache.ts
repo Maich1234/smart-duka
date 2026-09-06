@@ -285,6 +285,48 @@ export function applyOfflineStockDelta(shopId: string, deltas: OfflineStockDelta
   }
 }
 
+/**
+ * Undoes a previously-applied {@link applyOfflineStockDelta} — the mirror
+ * image, used when a queued sale is permanently rejected by the server (or
+ * later discarded) so the stock it provisionally took never actually left.
+ * Without this, a sale that fails to sync leaves the till permanently
+ * under-reporting stock it never really sold.
+ */
+export function restoreOfflineStockDelta(shopId: string, deltas: OfflineStockDelta[]): void {
+  if (!isOfflineDbAvailable() || !shopId || !deltas.length) return;
+
+  try {
+    const db = getDb();
+    db.withTransactionSync(() => {
+      for (const delta of deltas) {
+        const row = db.getFirstSync<{ payload: string }>(
+          'SELECT payload FROM product_cache WHERE id = ? AND shop_id = ?',
+          [delta.productId, shopId],
+        );
+        if (!row) continue;
+
+        const product = JSON.parse(row.payload) as Product;
+        if (product.trackInventory === false) continue;
+
+        if (delta.variantId) {
+          const variant = product.variants?.find((v) => v._id === delta.variantId);
+          if (!variant) continue;
+          variant.quantity = (variant.quantity ?? 0) + delta.quantity;
+        } else {
+          product.quantity = (product.quantity ?? 0) + delta.quantity;
+        }
+
+        db.runSync(
+          'UPDATE product_cache SET payload = ? WHERE id = ? AND shop_id = ?',
+          [JSON.stringify(product), delta.productId, shopId],
+        );
+      }
+    });
+  } catch (err) {
+    console.warn('[productCache] stock restore failed:', (err as Error).message);
+  }
+}
+
 /** Drops a shop's cached catalogue — used on sign-out. */
 export function clearProductCache(shopId?: string): void {
   if (!isOfflineDbAvailable()) return;

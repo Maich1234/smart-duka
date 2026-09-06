@@ -60,6 +60,14 @@ const migrate = (db: SQLiteDatabase): void => {
     db.execSync(`ALTER TABLE product_cache ADD COLUMN barcode TEXT`);
   }
   db.execSync(`CREATE INDEX IF NOT EXISTS idx_product_cache_barcode ON product_cache(shop_id, barcode)`);
+
+  // Links a queued write back to the local-first sale it belongs to, so
+  // processQueue can resolve/fail that specific row in `local_sales` once the
+  // server answers (see utils/localSales.ts). NULL for every other kind of
+  // queued write.
+  if (!hasColumn('offline_queue', 'local_sale_id')) {
+    db.execSync(`ALTER TABLE offline_queue ADD COLUMN local_sale_id TEXT`);
+  }
 };
 
 export const initOfflineDb = (): void => {
@@ -125,6 +133,23 @@ export const initOfflineDb = (): void => {
         ON product_cache(shop_id, name);
       CREATE INDEX IF NOT EXISTS idx_product_cache_search
         ON product_cache(shop_id, search_blob);
+
+      -- A sale exactly as the till recorded it, written the instant "Sell" is
+      -- tapped — before, and independent of, whatever the network is doing.
+      -- id is the client-generated sale id, reused as the offline_queue row's
+      -- idempotency key, so this row and its queued write are two views of
+      -- the same intent. See utils/localSales.ts.
+      CREATE TABLE IF NOT EXISTS local_sales (
+        id TEXT PRIMARY KEY,
+        shop_id TEXT NOT NULL,
+        user_id TEXT,
+        payload TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending_sync',
+        last_error TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_local_sales_shop
+        ON local_sales(shop_id, created_at);
     `);
     migrate(db);
   } catch (err) {
