@@ -97,8 +97,3 @@ export async function getMpesaTransactions(params?: {
   const res = await api.get('/mpesa/transactions', { params });
   return res.data;
 }
-
-export async function getMpesaTransactionById(id: string): Promise<{ success: boolean; data: MpesaTransaction }> {
-  const res = await api.get(`/mpesa/transactions/${id}`);
-  return res.data;
-}

@@ -173,15 +173,3 @@ export const getDailySummary = async (
   const res = await api.get(`/summaries/daily/${date}`);
   return res.data;
 };
-
-export const listDailySummaries = async (params?: {
-  page?: number;
-  limit?: number;
-}): Promise<{
-  success: boolean;
-  data: DailySummaryData[];
-  pagination: { page: number; limit: number; total: number; pages: number };
-}> => {
-  const res = await api.get('/summaries/daily', { params });
-  return res.data;
-};

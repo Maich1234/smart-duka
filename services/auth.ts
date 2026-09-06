@@ -76,20 +76,6 @@ export interface ChangePasswordData {
   newPassword: string;
 }
 
-export interface ForgotPasswordData {
-  email: string;
-}
-
-export interface VerifyOtpData {
-  email: string;
-  otp: string;
-}
-
-export interface ResetPasswordData {
-  email: string;
-  newPassword: string;
-}
-
 export interface VerifyEmailData {
   email: string;
   code: string;
@@ -121,42 +107,10 @@ export const getProfile = async (): Promise<ProfileResponse> => {
 };
 
 /**
- * Update user profile
- */
-export const updateProfile = async (data: { name?: string; email?: string; phone?: string }) => {
-  const response = await api.put('/auth/profile', data);
-  return response.data;
-};
-
-/**
  * Change password (authenticated users)
  */
 export const changePassword = async (currentPassword: string, newPassword: string) => {
   const response = await api.post('/auth/change-password', { currentPassword, newPassword });
-  return response.data;
-};
-
-/**
- * Request OTP for password reset
- */
-export const forgotPassword = async (email: string) => {
-  const response = await api.post('/auth/forgot-password', { email });
-  return response.data;
-};
-
-/**
- * Verify OTP for password reset
- */
-export const verifyOtp = async (email: string, otp: string) => {
-  const response = await api.post('/auth/verify-otp', { email, otp });
-  return response.data;
-};
-
-/**
- * Reset password after OTP verification
- */
-export const resetPassword = async (email: string, otp: string, newPassword: string) => {
-  const response = await api.post('/auth/reset-password', { email, otp, newPassword });
   return response.data;
 };
 

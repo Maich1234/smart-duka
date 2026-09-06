@@ -193,14 +193,6 @@ export const refundSale = async (
 };
 
 /**
- * Get sale by ID
- */
-export const getSaleById = async (id: string): Promise<SaleResponse> => {
-  const response = await api.get(`/sales/${id}`);
-  return response.data;
-};
-
-/**
  * Get aggregated sales stats, optionally scoped to a date range.
  * When no dates are passed the backend returns the current-month totals.
  */

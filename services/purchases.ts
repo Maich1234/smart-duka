@@ -83,15 +83,6 @@ export interface CreatePurchaseData {
   purchaseDate?: string;
 }
 
-export interface UpdatePurchaseData {
-  supplierId?: string | null;
-  supplierName?: string;
-  items?: CreatePurchaseItemData[];
-  additionalCosts?: CreatePurchaseCostData[];
-  paymentMethod?: MoneyOutMethod;
-  purchaseDate?: string;
-}
-
 export interface PurchaseStats {
   purchaseCount: number;
   totalSpend: number;
@@ -174,17 +165,6 @@ export const getPurchases = async (params?: {
 
 export const getPurchaseById = async (id: string): Promise<PurchaseResponse> => {
   const response = await api.get(`/purchases/${id}`);
-  return response.data;
-};
-
-/**
- * Edits an existing purchase. Stock is corrected by delta (undo the old
- * quantities, apply the new ones) rather than a full retroactive recost —
- * see backend purchaseController.js for the rationale.
- * Owner, or staff with 'edit_purchases'.
- */
-export const updatePurchase = async (id: string, data: UpdatePurchaseData): Promise<PurchaseResponse> => {
-  const response = await api.put(`/purchases/${id}`, data);
   return response.data;
 };
 

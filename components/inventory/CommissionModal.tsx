@@ -124,9 +124,9 @@ const CommissionModalBody: React.FC<Omit<CommissionModalProps, 'visible'>> = ({
             />
           ) : (
             <View style={styles.derivedBaseRow}>
-              <Text style={styles.derivedBaseLabel}>Shop's base price</Text>
+              <Text style={styles.derivedBaseLabel}>Shop&apos;s base price</Text>
               <Text style={styles.derivedBaseValue}>{formatCurrency(parsedBase || 0)}</Text>
-              <Text style={styles.derivedBaseHint}>Matches this product's Min Price</Text>
+              <Text style={styles.derivedBaseHint}>Matches this product&apos;s Min Price</Text>
             </View>
           )}
           <Input

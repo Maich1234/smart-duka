@@ -96,23 +96,6 @@ export interface UpdateStaffData {
   commissionEligible?: boolean;
 }
 
-export interface StaffSalesResponse {
-  success: boolean;
-  data: {
-    _id: string;
-    invoiceNumber: string;
-    totalAmount: number;
-    paymentMethod: string;
-    createdAt: string;
-  }[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
 export interface Permission {
   value: string;
   label: string;
@@ -182,19 +165,6 @@ export const deleteStaff = async (id: string): Promise<{ success: boolean; messa
  */
 export const resetStaffPassword = async (id: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
   const response = await api.post(`/staff/${id}/reset-password`, { newPassword });
-  return response.data;
-};
-
-/**
- * Get sales made by a specific staff member (Owner only)
- */
-export const getStaffSales = async (id: string, params?: {
-  startDate?: string;
-  endDate?: string;
-  page?: number;
-  limit?: number;
-}): Promise<StaffSalesResponse> => {
-  const response = await api.get(`/staff/${id}/sales`, { params });
   return response.data;
 };
 

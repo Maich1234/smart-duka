@@ -16,9 +16,6 @@ export const MONEY_OUT_METHOD_LABELS: Record<MoneyOutMethod, string> = {
   credit: 'On credit',
 };
 
-/** Methods where money actually moved — the ones a Cashbook may include. */
-export const isCashMoving = (method?: MoneyOutMethod) => method !== 'credit';
-
 /* ── Money in: the till's buttons ─────────────────────────────────────────
  *
  * Shop-defined, not a fixed list. Mirrors the backend's

@@ -9,6 +9,7 @@ export const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   subscription_reminder: 'shield-checkmark-outline',
   shift_closed: 'time-outline',
   campaign: 'megaphone-outline',
+  security_alert: 'shield-outline',
   general: 'notifications-outline',
 };
 
@@ -24,6 +25,7 @@ export const TYPE_LABEL: Record<string, string> = {
   subscription_reminder: 'Subscription',
   shift_closed: 'Shift',
   campaign: 'Announcement',
+  security_alert: 'Security',
   general: 'Notification',
 };
 

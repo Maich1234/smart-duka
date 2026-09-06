@@ -59,13 +59,3 @@ export const CEO_SIGN_IMG_URL =
   'https://res.cloudinary.com/dwdhxgvsl/image/upload/w_280,q_auto/v1783716945/e-sign-removebg-preview_lvulz8.png';
 
 export const APP_NAME = 'DuQana';
-export const APP_VERSION = '1.0.0';
-
-export const PAYMENT_METHODS = [
-  { label: 'Cash', value: 'cash' },
-  { label: 'M-Pesa', value: 'mpesa' },
-] as const;
-
-export const DEFAULT_LOW_STOCK_ALERT = 5;
-export const DEFAULT_PAGE_SIZE = 20;
-export const MAX_PAGE_SIZE = 100;

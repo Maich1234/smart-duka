@@ -61,12 +61,3 @@ export function getCountryByCode(code: string): Country | undefined {
   return COUNTRIES.find((c) => c.code === code);
 }
 
-/** Returns the Currency symbol for a given currency code (e.g. 'KES' → 'KSh'). */
-export function getCurrencySymbol(currencyCode: string): string {
-  return CURRENCIES.find((c) => c.code === currencyCode)?.symbol ?? currencyCode;
-}
-
-/** Returns the UnitOfMeasure entry for a given value string. */
-export function getUnit(value: string): UnitOfMeasure | undefined {
-  return UNITS_OF_MEASURE.find((u) => u.value === value);
-}

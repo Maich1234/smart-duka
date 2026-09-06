@@ -16,6 +16,3 @@ export const TAB_BAR_BASE_HEIGHT = 58;
 
 /** Height of the content row in `ScreenHeader`, excluding the top inset. */
 export const HEADER_HEIGHT = 52;
-
-/** Minimum tap target, per the platform accessibility guidelines. */
-export const HIT_SLOP_SIZE = 44;

@@ -11,7 +11,6 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { getShopReferrals } from '@/services/shop';
-import { WEB_URL } from '@/constants/config';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
