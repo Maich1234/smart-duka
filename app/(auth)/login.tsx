@@ -69,7 +69,19 @@ export default function LoginScreen() {
       router.push({ pathname: '/(auth)/verify-email', params: { email: data.email } });
       return;
     }
-    setError('password', { message: result.message || 'Incorrect email or password' });
+    const knownFields = new Set<keyof LoginForm>(['email', 'password']);
+    let matchedAField = false;
+    (result.fieldErrors || []).forEach(({ field, message }) => {
+      if (knownFields.has(field as keyof LoginForm)) {
+        setError(field as keyof LoginForm, { type: 'server', message });
+        matchedAField = true;
+      }
+    });
+    // Account-level failures (deactivated, unhandled errors) have no field to
+    // pin to — fall back to the password field, same as before this existed.
+    if (!matchedAField) {
+      setError('password', { message: result.message || 'Incorrect email or password' });
+    }
   };
 
   return (

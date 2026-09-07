@@ -63,6 +63,7 @@ export default function RegisterScreen() {
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -113,11 +114,26 @@ export default function RegisterScreen() {
       }
     } catch (error: any) {
       if (__DEV__) console.error('[register] raw error:', error);
-      toast({
-        type: 'error',
-        message:
-          error.response?.data?.message || error.message || 'Something went wrong. Please try again.',
+      const fieldErrors: { field: string; message: string }[] = error.response?.data?.fieldErrors || [];
+      const formFields = new Set<keyof RegisterForm>([
+        'name', 'email', 'password', 'confirmPassword', 'shopName', 'phone', 'referralCode', 'acceptedTerms',
+      ]);
+      let matchedAField = false;
+      fieldErrors.forEach(({ field, message }) => {
+        if (formFields.has(field as keyof RegisterForm)) {
+          setError(field as keyof RegisterForm, { type: 'server', message });
+          matchedAField = true;
+        }
       });
+      // Only fall back to the generic toast when nothing could be pinned to a
+      // specific input — e.g. a rate limit or unexpected server error.
+      if (!matchedAField) {
+        toast({
+          type: 'error',
+          message:
+            error.response?.data?.message || error.message || 'Something went wrong. Please try again.',
+        });
+      }
     } finally {
       setLoading(false);
     }

@@ -113,7 +113,14 @@ export default function ForgotPasswordScreen() {
       setEmail(data.email);
       setStep('verify');
     } catch (error: any) {
-      setFormError(error.response?.data?.message || 'Could not send reset code. Try again.');
+      const emailFieldError = (error.response?.data?.fieldErrors || []).find(
+        (e: { field: string }) => e.field === 'email'
+      );
+      if (emailFieldError) {
+        emailForm.setError('email', { type: 'server', message: emailFieldError.message });
+      } else {
+        setFormError(error.response?.data?.message || 'Could not send reset code. Try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -157,7 +164,19 @@ export default function ForgotPasswordScreen() {
       await api.post('/auth/reset-password', { email, otp, newPassword: data.newPassword });
       setStep('success');
     } catch (error: any) {
-      setFormError(error.response?.data?.message || 'Could not reset password. Try again.');
+      // An expired/invalid OTP has no field to land on here — that input
+      // isn't shown at this step — so it stays on the banner.
+      const fieldErrors: { field: string; message: string }[] = error.response?.data?.fieldErrors || [];
+      let matchedAField = false;
+      fieldErrors.forEach(({ field, message }) => {
+        if (field === 'newPassword' || field === 'confirmPassword') {
+          resetForm.setError(field, { type: 'server', message });
+          matchedAField = true;
+        }
+      });
+      if (!matchedAField) {
+        setFormError(error.response?.data?.message || 'Could not reset password. Try again.');
+      }
     } finally {
       setLoading(false);
     }

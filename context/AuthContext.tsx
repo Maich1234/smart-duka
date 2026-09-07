@@ -24,6 +24,7 @@ interface AuthContextType {
     message?: string;
     role?: 'owner' | 'staff';
     needsVerification?: boolean;
+    fieldErrors?: { field: string; message: string }[];
   }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -105,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // every such failure masquerades as bad credentials.
       const message = error.response?.data?.message || error.message || 'Login failed';
       const needsVerification = error.response?.status === 401 && /verify your email/i.test(message);
-      return { success: false, message, needsVerification };
+      return { success: false, message, needsVerification, fieldErrors: error.response?.data?.fieldErrors };
     }
   };
 
