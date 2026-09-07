@@ -34,7 +34,7 @@ const isLocalUrl = (value: string): boolean => {
  */
 const configuredWebUrl = process.env.EXPO_PUBLIC_WEB_URL;
 export const WEB_URL = (
-  configuredWebUrl && !isLocalUrl(configuredWebUrl) ? configuredWebUrl : 'https://duqana.app'
+  configuredWebUrl && !isLocalUrl(configuredWebUrl) ? configuredWebUrl : 'https://duqana.co.ke'
 ).replace(/\/+$/, '');
 
 // Used to build the QR code link on receipts. Points at the Next.js app's

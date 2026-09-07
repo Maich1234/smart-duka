@@ -528,7 +528,7 @@ with no consent at all. Both paths now carry the checkbox.
 
 ### 3.20 — One front end, one URL · **P0** · mobile, web
 
-The DuQana front end is **`https://duqana.app`** (the
+The DuQana front end is **`https://duqana.co.ke`** (the
 `smart-duka-web` Next.js app on Vercel). Everything the mobile app links out to
 now resolves there, replacing two separate Expo web export hosts.
 
@@ -594,7 +594,7 @@ Recorded so future audits don't re-litigate these:
 ## 5 · Still needs a human decision
 
 1. ~~Confirm the production web domain.~~ **Resolved — the front end is
-   `https://duqana.app`.** See §3.20 for what that
+   `https://duqana.co.ke`.** See §3.20 for what that
    settled.
 2. **Submit the Play Data Safety form.** The pages exist (§3.6) but the form is
    a Play Console action nobody can do from the repo. It must declare: name,
