@@ -16,6 +16,7 @@ import {
   type AppNotification,
 } from '@/services/notificationInbox';
 import { haptics } from '@/utils/haptics';
+import { useAlert } from '@/context/AlertContext';
 import { formatRelativeTime } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -25,6 +26,7 @@ import { Spacing } from '@/constants/Spacing';
 export const NotificationsList: React.FC = () => {
   const tabBarHeight = useTabBarHeight();
   const queryClient = useQueryClient();
+  const { toast } = useAlert();
   // Kept separate from `detailVisible` so the sheet still has content to
   // render while it slides out (same pattern as SaleDetailsModal).
   const [selected, setSelected] = useState<AppNotification | null>(null);
@@ -43,6 +45,7 @@ export const NotificationsList: React.FC = () => {
   const markReadMutation = useMutation({
     mutationFn: markNotificationRead,
     onMutate: async (id: string) => {
+      const previous = queryClient.getQueryData(['notifications']);
       queryClient.setQueryData(['notifications'], (old: typeof data) =>
         old && {
           ...old,
@@ -52,6 +55,11 @@ export const NotificationsList: React.FC = () => {
           })),
         }
       );
+      return { previous };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(['notifications'], context.previous);
+      toast({ type: 'error', message: 'Could not mark notification as read' });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] }),
   });
@@ -59,6 +67,7 @@ export const NotificationsList: React.FC = () => {
   const markAllReadMutation = useMutation({
     mutationFn: markAllNotificationsRead,
     onMutate: async () => {
+      const previous = queryClient.getQueryData(['notifications']);
       queryClient.setQueryData(['notifications'], (old: typeof data) =>
         old && {
           ...old,
@@ -68,6 +77,11 @@ export const NotificationsList: React.FC = () => {
           })),
         }
       );
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['notifications'], context.previous);
+      toast({ type: 'error', message: 'Could not mark all notifications as read' });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] }),
   });
@@ -89,7 +103,8 @@ export const NotificationsList: React.FC = () => {
     <View style={styles.container}>
       {unreadCount > 0 && (
         <AnimatedPressable
-          style={styles.markAllRow}
+          style={[styles.markAllRow, markAllReadMutation.isPending && styles.markAllRowDisabled]}
+          disabled={markAllReadMutation.isPending}
           onPress={() => {
             haptics.medium();
             markAllReadMutation.mutate();
@@ -97,7 +112,9 @@ export const NotificationsList: React.FC = () => {
           accessibilityRole="button"
           accessibilityLabel="Mark all as read"
         >
-          <Text style={styles.markAllText}>Mark all as read</Text>
+          <Text style={styles.markAllText}>
+            {markAllReadMutation.isPending ? 'Marking...' : 'Mark all as read'}
+          </Text>
           <Text style={styles.unreadCountText}>{unreadCount} unread</Text>
         </AnimatedPressable>
       )}
@@ -157,6 +174,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
+  },
+  markAllRowDisabled: {
+    opacity: 0.5,
   },
   markAllText: {
     color: Colors.primary,

@@ -54,7 +54,7 @@ export const PaymentsSection: React.FC<Props> = ({ onChange }) => {
   const [verificationVisible, setVerificationVisible] = useState(false);
   const [config, setConfig] = useState<MpesaConfigDetails | null>(null);
   const [saving, setSaving] = useState(false);
-  const { alert, toast } = useAlert();
+  const { alert, toast, showLoading, hideLoading } = useAlert();
 
   const fetchConfig = async (token: string) => {
     try {
@@ -126,13 +126,17 @@ export const PaymentsSection: React.FC<Props> = ({ onChange }) => {
           onPress: async () => {
             const token = getStoredVerificationToken();
             if (!token) { setView('locked'); return; }
+            showLoading('Disconnecting...');
             try {
               await disconnectMpesa(token);
               setConfig(null);
               setView('no_config');
               onChange?.();
+              toast({ type: 'success', message: 'M-Pesa disconnected.' });
             } catch (err: any) {
               toast({ type: 'error', message: err.response?.data?.message || 'Failed to disconnect' });
+            } finally {
+              hideLoading();
             }
           },
         },

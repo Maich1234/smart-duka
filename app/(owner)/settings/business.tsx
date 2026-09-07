@@ -71,6 +71,7 @@ export default function BusinessSettingsScreen() {
       const { logoUrl } = await uploadShopLogo(asset.uri, asset.mimeType ?? 'image/jpeg');
       setShopEdits((prev) => ({ ...prev, logoUrl }));
       queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
+      toast({ type: 'success', message: 'Logo updated' });
     } catch (error: any) {
       toast({ type: 'error', message: error.response?.data?.message || 'Could not upload logo' });
     } finally {

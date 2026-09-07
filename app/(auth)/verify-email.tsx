@@ -12,10 +12,12 @@ import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import { verifyEmail, resendVerificationEmail } from '@/services/auth';
 import { haptics } from '@/utils/haptics';
+import { useAlert } from '@/context/AlertContext';
 
 const RESEND_SECONDS = 60;
 
 export default function VerifyEmailScreen() {
+  const { toast } = useAlert();
   const { email } = useLocalSearchParams<{ email: string }>();
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState('');
@@ -91,6 +93,7 @@ export default function VerifyEmailScreen() {
       startCountdown();
       setCode('');
       setCodeError('');
+      toast({ type: 'success', message: 'Code resent. Check your email.' });
     } catch (error: any) {
       setFormError(error.response?.data?.message || 'Could not resend code. Try again.');
     } finally {

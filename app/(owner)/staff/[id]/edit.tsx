@@ -77,6 +77,7 @@ export default function EditStaffScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
+      toast({ type: 'success', message: 'Staff details updated' });
       router.back();
     },
     onError: (error: any) => {

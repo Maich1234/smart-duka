@@ -62,7 +62,7 @@ export default function StaffDetailsScreen() {
   const tabBarHeight = useTabBarHeight();
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [commissionPeriod, setCommissionPeriod] = useState<CommissionPeriod>('today');
-  const { alert, toast } = useAlert();
+  const { alert, toast, showLoading, hideLoading } = useAlert();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['staff', id],
@@ -104,12 +104,14 @@ export default function StaffDetailsScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteStaff(id),
+    onMutate: () => showLoading('Removing...'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
       router.back();
     },
     onError: (error: any) =>
       toast({ type: 'error', message: error.response?.data?.message || 'Failed to delete staff' }),
+    onSettled: () => hideLoading(),
   });
 
   // Optimistic so the switch responds instantly on a slow Kenyan connection;

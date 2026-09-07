@@ -110,7 +110,10 @@ export default function OwnerInventory() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteProduct,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast({ type: 'success', message: 'Product deleted' });
+    },
     onError: (error: any) =>
       toast({ type: 'error', message: error.response?.data?.message || 'Deletion failed' }),
   });

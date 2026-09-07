@@ -113,6 +113,7 @@ export const ExpensesScreen: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expenseSummary'] });
       setPage(1);
+      toast({ type: 'success', message: 'Expense deleted' });
     },
     onError: (error: any) => {
       if (isOfflineQueued(error)) {
