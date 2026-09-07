@@ -9,7 +9,7 @@ import {
   onLocalSaleSynced,
 } from '@/utils/localSales';
 import type { Sale } from '@/services/sales';
-import { resetOfflineDb, SHOP_ID, USER_ID } from '../testUtils';
+import { resetOfflineDb, signIn, SHOP_ID, USER_ID, OTHER_USER_ID } from '../testUtils';
 
 function makeSale(id: string, overrides: Partial<Sale> = {}): Sale {
   return {
@@ -29,6 +29,10 @@ function makeSale(id: string, overrides: Partial<Sale> = {}): Sale {
 describe('localSales', () => {
   beforeEach(() => {
     resetOfflineDb();
+    // getLocalSalesSnapshot now scopes to the signed-in user (see the
+    // cross-staff-shared-till fix) — these tests need one signed in, same
+    // as offlineQueue.test.ts's resetAllTestState.
+    signIn();
   });
 
   it('a saved sale appears immediately, marked pending_sync', () => {
@@ -47,6 +51,17 @@ describe('localSales', () => {
 
     expect(getLocalSalesSnapshot(SHOP_ID).map((s) => s._id)).toEqual(['local-1']);
     expect(getLocalSalesSnapshot('shop-2').map((s) => s._id)).toEqual(['local-2']);
+  });
+
+  it('scopes sales by user, not just shop — a shared till never shows one cashier the other\'s pending sales', () => {
+    saveLocalSale(SHOP_ID, USER_ID, makeSale('local-1'));
+    signIn({ _id: OTHER_USER_ID });
+    saveLocalSale(SHOP_ID, OTHER_USER_ID, makeSale('local-2'));
+
+    expect(getLocalSalesSnapshot(SHOP_ID).map((s) => s._id)).toEqual(['local-2']);
+
+    signIn({ _id: USER_ID });
+    expect(getLocalSalesSnapshot(SHOP_ID).map((s) => s._id)).toEqual(['local-1']);
   });
 
   it('newest sale first', () => {

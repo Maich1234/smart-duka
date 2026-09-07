@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { refreshAuthToken } from './tokenRefresh';
 import { getDb, isOfflineDbAvailable } from './offlineDb';
 import { randomUUID } from './uuid';
-import { resolveLocalSale, markLocalSaleFailed, retryLocalSale, discardLocalSale } from './localSales';
+import { resolveLocalSale, markLocalSaleFailed, retryLocalSalesBatch, discardLocalSalesBatch } from './localSales';
 import { applyOfflineStockDelta, restoreOfflineStockDelta, type OfflineStockDelta } from './productCache';
 
 // --- Exponential backoff (max 32 s) ---
@@ -339,30 +339,36 @@ export const retryAllFailed = (ids?: string[]): number => {
       [userId, ...scope.params],
     );
 
-    let changed = 0;
-    for (const row of rows) {
-      db.runSync(
-        `UPDATE offline_queue
-           SET status = 'pending', attempts = 0, next_attempt_at = ?,
-               idempotency_key = ?, last_status = NULL, last_error = NULL
-         WHERE id = ?`,
-        [Date.now(), randomUUID(), row.id],
-      );
-      changed += 1;
-
-      // A retried sale is provisionally "selling" again — back to pending_sync,
-      // and its stock leaves the mirror again (recordFailure put it back when
-      // this row first failed; see the symmetric comment there).
-      if (row.local_sale_id) {
-        retryLocalSale(row.local_sale_id);
-        const shopId = currentShopId();
-        if (shopId) applyOfflineStockDelta(shopId, stockDeltasFromSaleBody(row.body));
+    // One transaction for every row's status flip — was previously N
+    // separate auto-committing writes for a bulk "Retry All".
+    db.withTransactionSync(() => {
+      for (const row of rows) {
+        db.runSync(
+          `UPDATE offline_queue
+             SET status = 'pending', attempts = 0, next_attempt_at = ?,
+                 idempotency_key = ?, last_status = NULL, last_error = NULL
+           WHERE id = ?`,
+          [Date.now(), randomUUID(), row.id],
+        );
       }
+    });
+
+    // A retried sale is provisionally "selling" again — back to pending_sync,
+    // and its stock leaves the mirror again (recordFailure put it back when
+    // this row first failed; see the symmetric comment there). Batched: one
+    // local_sales write + notification, and one stock-delta pass over every
+    // row's items, instead of one of each per row.
+    const localSaleIds = rows.map((r) => r.local_sale_id).filter((id): id is string => !!id);
+    if (localSaleIds.length) retryLocalSalesBatch(localSaleIds);
+    const shopId = currentShopId();
+    if (shopId) {
+      const allDeltas = rows.filter((r) => r.local_sale_id).flatMap((r) => stockDeltasFromSaleBody(r.body));
+      if (allDeltas.length) applyOfflineStockDelta(shopId, allDeltas);
     }
 
     notifyCount();
     void processQueue();
-    return changed;
+    return rows.length;
   } catch {
     return 0;
   }
@@ -401,7 +407,7 @@ export const discardAllFailed = (ids?: string[]): number => {
       [userId, ...scope.params],
     );
 
-    for (const row of linked) discardLocalSale(row.local_sale_id);
+    discardLocalSalesBatch(linked.map((row) => row.local_sale_id));
 
     notifyCount();
     return result.changes;

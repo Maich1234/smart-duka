@@ -1,4 +1,5 @@
 import { getDb, isOfflineDbAvailable } from './offlineDb';
+import { useAuthStore } from '@/store/authStore';
 import type { Sale } from '@/services/sales';
 
 /**
@@ -50,6 +51,7 @@ export const onLocalSaleSynced = (listener: Listener): (() => void) => {
 // run one every keystroke/re-render rather than only when something changed.
 let version = 0;
 let cachedShopId: string | null = null;
+let cachedUserId: string | null = null;
 let cachedVersion = -1;
 let cached: LocalSale[] = [];
 
@@ -58,16 +60,22 @@ function notify() {
   listeners.forEach((l) => l());
 }
 
+// Rows are scoped by shop AND by who made the sale — the same reason
+// offlineQueue.ts scopes its own outbox by user (see currentUserId there):
+// a shared till handed from staff A to staff B mid-shift must never show B
+// A's not-yet-synced sales as if they were B's own.
+const currentUserId = (): string | null => useAuthStore.getState().user?._id ?? null;
+
 type LocalSaleRow = { payload: string; status: LocalSaleStatus; last_error: string | null };
 
-function queryLocalSales(shopId: string): LocalSale[] {
-  if (!isOfflineDbAvailable() || !shopId) return [];
+function queryLocalSales(shopId: string, userId: string | null): LocalSale[] {
+  if (!isOfflineDbAvailable() || !shopId || !userId) return [];
   try {
     return getDb()
       .getAllSync<LocalSaleRow>(
         `SELECT payload, status, last_error FROM local_sales
-         WHERE shop_id = ? ORDER BY created_at DESC`,
-        [shopId],
+         WHERE shop_id = ? AND user_id = ? ORDER BY created_at DESC`,
+        [shopId, userId],
       )
       .map((row) => ({
         ...(JSON.parse(row.payload) as Sale),
@@ -80,11 +88,13 @@ function queryLocalSales(shopId: string): LocalSale[] {
   }
 }
 
-/** Sales made on this device the server hasn't confirmed yet, newest first. */
+/** Sales made on this device, by the signed-in user, the server hasn't confirmed yet — newest first. */
 export function getLocalSalesSnapshot(shopId: string): LocalSale[] {
-  if (cachedShopId !== shopId || cachedVersion !== version) {
-    cached = queryLocalSales(shopId);
+  const userId = currentUserId();
+  if (cachedShopId !== shopId || cachedUserId !== userId || cachedVersion !== version) {
+    cached = queryLocalSales(shopId, userId);
     cachedShopId = shopId;
+    cachedUserId = userId;
     cachedVersion = version;
   }
   return cached;
@@ -117,11 +127,11 @@ export function resolveLocalSale(localId: string): void {
   if (!isOfflineDbAvailable()) return;
   try {
     getDb().runSync(`DELETE FROM local_sales WHERE id = ?`, [localId]);
+    notify();
+    syncedListeners.forEach((l) => l());
   } catch (err) {
     console.warn('[localSales] resolve failed:', (err as Error).message);
   }
-  notify();
-  syncedListeners.forEach((l) => l());
 }
 
 /** The server has permanently rejected this sale — surface it, don't hide it. */
@@ -152,6 +162,24 @@ export function retryLocalSale(localId: string): void {
   }
 }
 
+/**
+ * Same as {@link retryLocalSale}, for every id in one write — used by
+ * retryAllFailed so a bulk "Retry All" on a backlog of failed sales is one
+ * statement and one notification, not one of each per sale.
+ */
+export function retryLocalSalesBatch(localIds: string[]): void {
+  if (!isOfflineDbAvailable() || !localIds.length) return;
+  try {
+    getDb().runSync(
+      `UPDATE local_sales SET status = 'pending_sync', last_error = NULL WHERE id IN (${localIds.map(() => '?').join(',')})`,
+      localIds,
+    );
+    notify();
+  } catch (err) {
+    console.warn('[localSales] batch retry failed:', (err as Error).message);
+  }
+}
+
 /** The queued write behind this sale was discarded for good — so is the sale. */
 export function discardLocalSale(localId: string): void {
   if (!isOfflineDbAvailable()) return;
@@ -160,5 +188,20 @@ export function discardLocalSale(localId: string): void {
     notify();
   } catch (err) {
     console.warn('[localSales] discard failed:', (err as Error).message);
+  }
+}
+
+/**
+ * Same as {@link discardLocalSale}, for every id in one write — used by
+ * discardAllFailed so a bulk "Discard All" is one statement and one
+ * notification, not one of each per sale.
+ */
+export function discardLocalSalesBatch(localIds: string[]): void {
+  if (!isOfflineDbAvailable() || !localIds.length) return;
+  try {
+    getDb().runSync(`DELETE FROM local_sales WHERE id IN (${localIds.map(() => '?').join(',')})`, localIds);
+    notify();
+  } catch (err) {
+    console.warn('[localSales] batch discard failed:', (err as Error).message);
   }
 }

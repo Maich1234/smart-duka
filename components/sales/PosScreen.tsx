@@ -378,7 +378,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         paymentMethodLabel: saleMethods.find((m) => m.key === data.paymentMethod)?.label,
         mpesaTransactionId: data.mpesaTransactionId,
         mpesaReceiptNumber: data.mpesaReceiptNumber,
-        items: buildSaleItemSummaries(),
+        items: buildSaleItemSummaries(data.items),
       });
 
       // Same idempotency key doubles as this row's local_sales id (see
@@ -646,25 +646,48 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     ...(item.cartVariantId ? { variantId: item.cartVariantId } : {}),
   }));
 
-  // Same cart, shaped for the optimistic receipt/sale-card display rather
-  // than the network payload above — everything here is already on-device
-  // (the cart line, its already-applied promotion, the shop's own commission
-  // rate), so it can be computed without waiting on the server's response.
-  const buildSaleItemSummaries = (): SaleItem[] => cart.map((item, i) => {
-    const promo = cartPromoResults[i];
-    const commission = (item.cartVariantCommission ?? 0) * item.cartQuantity;
+  // Shaped for the optimistic receipt/sale-card display rather than the
+  // network payload above. Takes the items actually being submitted — NOT
+  // read from the live `cart` closure — because they can genuinely differ:
+  // handleMpesaSuccess/checkPendingPayment resubmit a resumed payment's own
+  // frozen `saleItems` snapshot, which may no longer match whatever the
+  // cashier has since put in the cart for the next customer. Enriches from
+  // the matching cart line when there is one (the common case — same
+  // richness as before, including the already-applied promotion and
+  // commission); falls back to a plain catalog lookup, with no promo/
+  // commission reconstruction, for the rare frozen-snapshot case.
+  const buildSaleItemSummaries = (items: CreateSaleData['items']): SaleItem[] => items.map((item) => {
+    const cartIndex = cart.findIndex((c) => c._id === item.productId && (c.cartVariantId ?? undefined) === item.variantId);
+    if (cartIndex !== -1) {
+      const cartItem = cart[cartIndex];
+      const promo = cartPromoResults[cartIndex];
+      const commission = (cartItem.cartVariantCommission ?? 0) * cartItem.cartQuantity;
+      return {
+        productId: item.productId,
+        productName: cartItem.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice ?? cartItem.cartUnitPrice ?? cartItem.sellingPrice,
+        subtotal: promo.subtotal,
+        ...(promo.discountAmount > 0 ? { discountAmount: promo.discountAmount } : {}),
+        ...(promo.appliedPromotionLabel ? { appliedPromotionLabel: promo.appliedPromotionLabel } : {}),
+        ...(commission > 0 ? { commissionAmount: commission } : {}),
+        ...(item.variantId ? { variantId: item.variantId, variantName: cartItem.cartVariantName } : {}),
+        unitOfMeasure: cartItem.unitOfMeasure,
+        productType: cartItem.productType,
+      };
+    }
+
+    const product = products.find((p) => p._id === item.productId);
+    const unitPrice = item.unitPrice ?? product?.sellingPrice ?? 0;
     return {
-      productId: item._id,
-      productName: item.name,
-      quantity: item.cartQuantity,
-      unitPrice: item.cartUnitPrice ?? item.sellingPrice,
-      subtotal: promo.subtotal,
-      ...(promo.discountAmount > 0 ? { discountAmount: promo.discountAmount } : {}),
-      ...(promo.appliedPromotionLabel ? { appliedPromotionLabel: promo.appliedPromotionLabel } : {}),
-      ...(commission > 0 ? { commissionAmount: commission } : {}),
-      ...(item.cartVariantId ? { variantId: item.cartVariantId, variantName: item.cartVariantName } : {}),
-      unitOfMeasure: item.unitOfMeasure,
-      productType: item.productType,
+      productId: item.productId,
+      productName: product?.name ?? 'Item',
+      quantity: item.quantity,
+      unitPrice,
+      subtotal: unitPrice * item.quantity,
+      ...(item.variantId ? { variantId: item.variantId, variantName: product?.variants?.find((v) => v._id === item.variantId)?.name } : {}),
+      unitOfMeasure: product?.unitOfMeasure,
+      productType: product?.productType,
     };
   });
 

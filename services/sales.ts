@@ -31,7 +31,7 @@ export interface Sale {
   };
   createdAt: string;
   updatedAt: string;
-  /** Only present on createSale/getSaleById responses — used to build the receipt QR code */
+  /** Only present on createSale responses — used to build the receipt QR code */
   receiptToken?: string;
   // M-Pesa fields (populated for mpesa payment method)
   mpesaTransactionId?: string;

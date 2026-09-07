@@ -24,6 +24,7 @@ import { onForegroundMessage, onNotificationOpened, onTokenRefresh } from '@/ser
 import { initOfflineDb } from '@/utils/offlineDb';
 import { setupOfflineListener } from '@/utils/offlineManager';
 import { enqueueOperation, processQueue } from '@/utils/offlineQueue';
+import { onLocalSaleSynced } from '@/utils/localSales';
 import { randomUUID } from '@/utils/uuid';
 import { getDeviceId } from '@/utils/deviceId';
 import { getProducts } from '@/services/products';
@@ -61,7 +62,7 @@ async function migrateAsyncStorageQueue() {
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 300, fade: true });
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       // 6 hours in-memory GC — enough for an 8-hour shift without memory bloat.
@@ -73,6 +74,21 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
+});
+
+// A sale can sync from triggers PosScreen never sees — a NetInfo reconnect,
+// the periodic backoff retry, or an AppState foreground, all in
+// offlineManager.ts — not just from PosScreen's own mount-time subscription.
+// Without this, syncing while e.g. the owner dashboard is the only mounted
+// screen leaves mySales/products/myCommission stale until something else
+// happens to re-observe them. Registered once, here at module scope
+// (matches setupOfflineListener's own never-unsubscribed listeners below) —
+// this file is the one place that already owns both `queryClient` and the
+// app's lifetime.
+onLocalSaleSynced(() => {
+  queryClient.invalidateQueries({ queryKey: ['mySales'] });
+  queryClient.invalidateQueries({ queryKey: ['products'] });
+  queryClient.invalidateQueries({ queryKey: ['myCommission'] });
 });
 
 const asyncStoragePersister = createAsyncStoragePersister({

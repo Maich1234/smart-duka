@@ -21,13 +21,14 @@ import {
 } from '@/utils/offlineQueue';
 import { FailedSyncSheet } from '@/components/sync/FailedSyncSheet';
 import { Typography } from '@/constants/Typography';
+import { Colors } from '@/constants/Colors';
 
 // ─── Colour tokens ─────────────────────────────────────────────────────────────
 
 const OFFLINE_BG   = '#F97316'; // warm orange
 const SYNCING_BG   = '#0F766E'; // teal
 const DONE_BG      = '#15803D'; // green — brief "all synced" flash
-const FAILED_BG    = '#B91C1C'; // red — needs a decision from the user
+const FAILED_BG    = Colors.syncFailed; // red — needs a decision from the user, same token SaleCard uses
 const PILL_TEXT    = '#FFFFFF';
 
 // ─── Pulsing dot for "syncing" state ──────────────────────────────────────────

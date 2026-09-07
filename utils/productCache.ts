@@ -248,6 +248,13 @@ export type OfflineStockDelta = {
  * Best-effort and deliberately not transactional with the queue write: a
  * missed decrement is a stale number, while a missed queue row is a lost sale.
  * The real quantity is restored on the next successful `syncProductCache`.
+ *
+ * Deliberately not clamped at zero — the till allows selling past zero
+ * stock, and clamping here would make this irreversible: if the sale is
+ * later permanently rejected, {@link restoreOfflineStockDelta} adds the same
+ * delta back, so apply/restore only stay exact inverses (and the mirror only
+ * ever reflects reality) if neither side clamps. A resulting negative number
+ * is clamped for display only (see ProductCard), never stored as zero.
  */
 export function applyOfflineStockDelta(shopId: string, deltas: OfflineStockDelta[]): void {
   if (!isOfflineDbAvailable() || !shopId || !deltas.length) return;
@@ -269,9 +276,9 @@ export function applyOfflineStockDelta(shopId: string, deltas: OfflineStockDelta
         if (delta.variantId) {
           const variant = product.variants?.find((v) => v._id === delta.variantId);
           if (!variant) continue;
-          variant.quantity = Math.max(0, (variant.quantity ?? 0) - delta.quantity);
+          variant.quantity = (variant.quantity ?? 0) - delta.quantity;
         } else {
-          product.quantity = Math.max(0, (product.quantity ?? 0) - delta.quantity);
+          product.quantity = (product.quantity ?? 0) - delta.quantity;
         }
 
         db.runSync(

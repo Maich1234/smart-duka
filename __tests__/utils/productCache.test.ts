@@ -22,11 +22,20 @@ describe('productCache stock deltas', () => {
     expect(readProduct('p1').quantity).toBe(10);
   });
 
-  it('never takes a product below zero, even if oversold offline', () => {
+  it('goes negative rather than clamping at zero, so a failed oversold sale restores exactly', () => {
+    // Regression test: clamping the apply at zero here used to make restore
+    // (a plain add-back) over-restore — a product with 2 in stock, oversold
+    // by 5, clamped to 0, then "restored" by +5 would end up reading 5
+    // instead of the true 2. Letting apply go negative keeps apply/restore
+    // exact inverses; the till clamps for display only (ProductCard), never
+    // in the stored mirror.
     seedProduct(SHOP_ID, { _id: 'p1', name: 'Bread', quantity: 2, trackInventory: true });
 
     applyOfflineStockDelta(SHOP_ID, [{ productId: 'p1', quantity: 5 }]);
-    expect(readProduct('p1').quantity).toBe(0);
+    expect(readProduct('p1').quantity).toBe(-3);
+
+    restoreOfflineStockDelta(SHOP_ID, [{ productId: 'p1', quantity: 5 }]);
+    expect(readProduct('p1').quantity).toBe(2);
   });
 
   it('moves a specific variant, not the parent product', () => {

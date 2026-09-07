@@ -30,9 +30,12 @@ interface SaleCardProps {
   syncStatus?: 'syncing' | 'failed';
 }
 
+// 'syncing' fires for every local-first sale while its background write is
+// in flight, online or not — it usually resolves within a second even on a
+// good connection, so the label can't claim to know the device was offline.
 const SYNC_STATUS_CONFIG: Record<NonNullable<SaleCardProps['syncStatus']>, { label: string; color: string }> = {
-  syncing: { label: 'Saved Offline · Syncing', color: '#B45309' },
-  failed: { label: 'Sync Failed', color: '#B91C1C' },
+  syncing: { label: 'Saving…', color: '#B45309' },
+  failed: { label: 'Sync Failed', color: Colors.syncFailed },
 };
 
 const AVATAR_COLORS = [

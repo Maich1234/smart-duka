@@ -41,7 +41,9 @@ function getInitials(name: string): string {
 type StockStatus = 'in_stock' | 'low' | 'critical' | 'stockout';
 
 function getStockStatus(quantity: number, lowStockAlert: number): StockStatus {
-  if (quantity === 0) return 'stockout';
+  // <= 0, not === 0: the offline cache can go negative (selling past zero
+  // stock while offline) — still a stockout, not merely "critical".
+  if (quantity <= 0) return 'stockout';
   if (quantity <= Math.ceil(lowStockAlert * 0.5)) return 'critical';
   if (quantity <= lowStockAlert) return 'low';
   return 'in_stock';
@@ -198,7 +200,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <View style={styles.stockLabelRow}>
               <Text style={styles.stockLabel}>STOCK</Text>
               <Text style={[styles.stockCount, { color: statusConfig.text }]}>
-                {product.quantity} unit{product.quantity !== 1 ? 's' : ''}
+                {/* The offline-cached quantity can transiently go negative
+                    (selling past zero stock offline) — never shown as such. */}
+                {Math.max(0, product.quantity)} unit{product.quantity !== 1 ? 's' : ''}
               </Text>
             </View>
             <View style={styles.barTrack}>

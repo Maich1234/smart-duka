@@ -17,6 +17,8 @@ export const Colors = {
   danger: '#DC2626',
   dangerSubtle: '#FEE2E2',
   error: '#DC2626',
+  /** A sync the server permanently rejected, needing a user decision — SaleCard and OfflineIndicator agree on this one. */
+  syncFailed: '#B91C1C',
   background: '#F8FAFC',
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',

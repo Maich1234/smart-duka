@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { haptics } from '@/utils/haptics';
 import {
@@ -237,10 +237,31 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
   );
 };
 
+// A fresh install/first login with no persisted subscription cache, offline,
+// hangs on the GET (12s timeout + 1 retry — up to ~24s) before `isLoading`
+// resolves to false. Blocking the whole app behind a spinner for that long
+// contradicts the fail-open design everywhere else here (undefined access
+// is never locked) — past this bound, stop waiting and let the app through;
+// the redirect effect below still catches a genuinely locked shop the
+// moment `access` does resolve.
+const SUBSCRIPTION_LOADING_TIMEOUT_MS = 3000;
+
 export default function OwnerLayout() {
   const { user, isLoading } = useAuth();
   const { access, isLoading: subscriptionLoading } = useSubscription();
   const pathname = usePathname();
+  const [subscriptionLoadingTimedOut, setSubscriptionLoadingTimedOut] = useState(false);
+
+  // No reset-to-false branch needed: react-query v5's `isLoading` (isPending
+  // && isFetching) can only go true→false once data has ever landed, then
+  // stays false for the query's lifetime — a background refetch never flips
+  // it true again — so `subscriptionLoading` never becomes true a second
+  // time for this screen to time out again.
+  useEffect(() => {
+    if (!subscriptionLoading) return;
+    const timer = setTimeout(() => setSubscriptionLoadingTimedOut(true), SUBSCRIPTION_LOADING_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [subscriptionLoading]);
 
   // Subscription + grace period exhausted → every owner screen funnels to
   // the paywall until an M-PESA payment lands. Derived server-side; while
@@ -278,7 +299,7 @@ export default function OwnerLayout() {
   // apply once access is known (including from the offline-persisted cache),
   // so a background refetch never blocks or re-flashes an already-rendered
   // screen.
-  if (subscriptionLoading) {
+  if (subscriptionLoading && !subscriptionLoadingTimedOut) {
     return <LoadingState />;
   }
 
