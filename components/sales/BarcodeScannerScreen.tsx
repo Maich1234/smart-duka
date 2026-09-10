@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Linking } from 'react-native';
+import { Platform, View, Text, StyleSheet, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
@@ -318,7 +318,7 @@ export function BarcodeScannerScreen() {
 
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <AnimatedPressable onPress={close} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Back">
-          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+          <Ionicons name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} size={22} color="#FFFFFF" />
         </AnimatedPressable>
         <Text style={styles.headerTitle}>Scan barcode</Text>
         <View style={styles.headerRight}>

@@ -147,6 +147,10 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
+    // 44pt is iOS's touch-target floor (Android's is 48dp, but the app's
+    // controls are otherwise sized for iOS's 44pt minimum) — size="sm"'s
+    // own padding+line-height only reaches ~36px without this.
+    minHeight: 44,
     borderRadius: BorderRadius.xl || 14,
     alignItems: 'center',
     justifyContent: 'center',

@@ -79,7 +79,7 @@ function formatSaleTime(dateString: string): string {
   return `${day} ${month} ${year} • ${time}`;
 }
 
-export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPress, syncStatus }) => {
+const SaleCardComponent: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPress, syncStatus }) => {
   const staffName = sale.staff?.name ?? 'Unknown';
   const initials = getInitials(staffName);
   const [avatarText, avatarBg] = getAvatarColors(staffName);
@@ -134,6 +134,10 @@ export const SaleCard: React.FC<SaleCardProps> = ({ sale, currency = 'KES', onPr
     </AnimatedPressable>
   );
 };
+
+// Rendered inside a FlashList — memoized so re-rendering the sales list
+// doesn't re-run every row's avatar-color/payment-badge derivation.
+export const SaleCard = React.memo(SaleCardComponent);
 
 const styles = StyleSheet.create({
   row: {

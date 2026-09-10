@@ -12,6 +12,8 @@ export const Colors = {
   successLight: '#22C55E',
   successSubtle: '#E6F4EA',
   warning: '#F59E0B',
+  /** Warning-colored text/icons on a light surface — #F59E0B itself fails WCAG contrast as foreground content. */
+  warningDark: '#92400E',
   warningSubtle: '#FEF3C7',
   info: '#2563EB',
   danger: '#DC2626',

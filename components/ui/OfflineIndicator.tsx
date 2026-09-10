@@ -253,6 +253,13 @@ const styles = StyleSheet.create({
     elevation: 14,
     alignItems: 'center',
     pointerEvents: 'box-none',
+    // This pill floats at the top of every screen, in the same band as a
+    // screen's own header controls. Edge-to-edge, a long label (e.g. "1
+    // change needs review · Tap") grew to nearly the full width and covered
+    // the back button underneath it. Reserving a leading/trailing control
+    // zone on both sides keeps it clear of them; it stays centred because
+    // the inset is symmetric.
+    paddingHorizontal: 56,
   },
   pill: {
     flexDirection: 'row',

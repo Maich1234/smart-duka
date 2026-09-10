@@ -200,7 +200,9 @@ const styles = StyleSheet.create({
   hintText: {
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,
-    color: Colors.textTertiary,
+    // textSecondary, not textTertiary — this is real guidance text read
+    // under every field, and textTertiary fails WCAG contrast (~2.5:1).
+    color: Colors.textSecondary,
     marginTop: 5,
   },
 });

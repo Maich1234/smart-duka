@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useNavigation, type Href } from 'expo-router';
 import { AnimatedPressable } from './AnimatedPressable';
@@ -67,7 +67,7 @@ export const BackButton: React.FC<BackButtonProps> = ({
       accessibilityLabel={accessibilityLabel}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Ionicons name="chevron-back" size={24} color={color} />
+      <Ionicons name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} size={24} color={color} />
     </AnimatedPressable>
   );
 };

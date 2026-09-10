@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Modal, View, Pressable, StyleSheet } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
+
+const DISMISS_DISTANCE = 100;
+const DISMISS_VELOCITY = 800;
 
 interface BottomSheetProps {
   visible: boolean;
@@ -28,6 +32,51 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   maxHeightPercent = 90,
 }) => {
   const insets = useSafeAreaInsets();
+  const dragY = useSharedValue(0);
+
+  // The handle glyph has always visually promised a drag-to-dismiss gesture
+  // that was never wired up. Reset on every open, not just declared once —
+  // this component doesn't unmount between hide/show (Modal's `visible` is
+  // what toggles), so a leftover drag offset from the last close would
+  // otherwise show the sheet's content briefly displaced downward.
+  //
+  // dragY isn't declared as a dependency: Reanimated shared values have a
+  // stable identity across renders, and listing it here would make the
+  // compiler treat the gesture handlers' worklet mutations of dragY.value
+  // below as unsafe ("cannot be modified").
+  useEffect(() => {
+    if (visible) dragY.value = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  // Scoped to the handle only, not the whole sheet — the sheet's own content
+  // (forms, scrollable lists) must keep its normal touch/scroll behavior.
+  // On a successful dismiss this hands off to the same `onClose` the overlay
+  // tap already uses, so the Modal's own tested slide-out animation plays
+  // rather than a second, custom exit animation racing it.
+  //
+  // react-hooks/immutability treats dragY as frozen once the reset effect
+  // above touches it, but mutating `.value` is the whole point of a
+  // Reanimated shared value — same false positive, same fix, as
+  // VerificationModal's handleSheetLayout/closeWith.
+  const dragGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      if (event.translationY > 0) {
+        // eslint-disable-next-line react-hooks/immutability
+        dragY.value = event.translationY;
+      }
+    })
+    .onEnd((event) => {
+      const shouldDismiss =
+        event.translationY > DISMISS_DISTANCE || event.velocityY > DISMISS_VELOCITY;
+      if (shouldDismiss) runOnJS(onClose)();
+      // eslint-disable-next-line react-hooks/immutability
+      dragY.value = withSpring(0, { damping: 20, stiffness: 300 });
+    });
+
+  const dragAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: dragY.value }],
+  }));
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent accessibilityViewIsModal>
@@ -49,15 +98,20 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
               a short sheet's own height can be smaller than the keyboard's,
               going negative and silently skipping the adjustment entirely. */}
           <KeyboardAvoidingView behavior="padding">
-            <View
+            <Animated.View
               style={[
                 styles.sheet,
                 { maxHeight: `${maxHeightPercent}%`, paddingBottom: Spacing.xl + insets.bottom },
+                dragAnimStyle,
               ]}
             >
-              <View style={styles.handle} />
+              <GestureDetector gesture={dragGesture}>
+                <View style={styles.handleZone}>
+                  <View style={styles.handle} />
+                </View>
+              </GestureDetector>
               {children}
-            </View>
+            </Animated.View>
           </KeyboardAvoidingView>
         </View>
       </GestureHandlerRootView>
@@ -81,13 +135,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
     paddingTop: Spacing.sm,
+    // Without this a child that overruns the sheet's maxHeight paints outside
+    // the card — over the rounded corners, and over whatever sits below it.
+    overflow: 'hidden',
+  },
+  handleZone: {
+    // The visual handle is 4px tall — much smaller than a real touch/drag
+    // target. This widens the grabbable area without changing what's drawn;
+    // paddingBottom matches the handle's old marginBottom so the gap above
+    // the sheet's content is unchanged.
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    alignItems: 'center',
   },
   handle: {
     width: 40,
     height: 4,
     backgroundColor: Colors.border,
     borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: Spacing.md,
   },
 });

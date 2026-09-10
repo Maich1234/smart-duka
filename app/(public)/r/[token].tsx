@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, Platform, Linking } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { Screen } from '@/components/ui/Screen';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -55,7 +56,11 @@ export default function ReceiptVerificationScreen() {
   const finalStars = receipt.rating?.stars ?? stars;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    // Screen, not a raw ScrollView: this is an unauthenticated page with no
+    // app chrome to fall back on — it needs its own safe-area insets (no
+    // notch/cutout overlap) and keyboard avoidance for the comment field
+    // below, which the shared primitive gives every other screen for free.
+    <Screen backgroundColor={Colors.background} contentContainerStyle={styles.container}>
       <View style={styles.badge}>
         <Ionicons name="shield-checkmark" size={40} color={Colors.success} />
       </View>
@@ -151,7 +156,7 @@ export default function ReceiptVerificationScreen() {
           </>
         )}
       </Card>
-    </ScrollView>
+    </Screen>
   );
 }
 

@@ -14,31 +14,34 @@ type StrengthLevel = 0 | 1 | 2 | 3 | 4;
 interface StrengthInfo {
   level: StrengthLevel;
   label: string;
+  /** Progress-bar fill — a decorative meter, not held to text-contrast rules. */
   color: string;
+  /** Label text color — Colors.warning/accentLight fail WCAG contrast as foreground text, so this can diverge from `color`. */
+  textColor: string;
 }
 
 function getStrength(password: string): StrengthInfo {
-  if (!password) return { level: 0, label: '', color: Colors.border };
+  if (!password) return { level: 0, label: '', color: Colors.border, textColor: Colors.border };
   // Passwords under the minimum length are always Weak, regardless of complexity.
-  if (password.length < 8) return { level: 1, label: 'Weak', color: Colors.danger };
+  if (password.length < 8) return { level: 1, label: 'Weak', color: Colors.danger, textColor: Colors.danger };
   let score = 1; // length >= 8 already satisfies one criterion
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
 
   const map: Record<number, StrengthInfo> = {
-    1: { level: 1, label: 'Weak', color: Colors.danger },
-    2: { level: 2, label: 'Fair', color: Colors.warning },
-    3: { level: 3, label: 'Good', color: Colors.accentLight },
-    4: { level: 4, label: 'Strong', color: Colors.success },
+    1: { level: 1, label: 'Weak', color: Colors.danger, textColor: Colors.danger },
+    2: { level: 2, label: 'Fair', color: Colors.warning, textColor: Colors.warningDark },
+    3: { level: 3, label: 'Good', color: Colors.accentLight, textColor: Colors.accentDark },
+    4: { level: 4, label: 'Strong', color: Colors.success, textColor: Colors.success },
   };
-  return map[score] ?? { level: 1, label: 'Weak', color: Colors.danger };
+  return map[score] ?? { level: 1, label: 'Weak', color: Colors.danger, textColor: Colors.danger };
 }
 
 const SEGMENTS = 4;
 
 export const PasswordStrength: React.FC<PasswordStrengthProps> = ({ password }) => {
-  const { level, label, color } = getStrength(password);
+  const { level, label, color, textColor } = getStrength(password);
   // Lazy useState, not useRef: this value is interpolated during render,
   // and reading a ref there is what react-hooks/refs forbids. useState's
   // initialiser runs once and its identity is guaranteed stable, so the
@@ -72,7 +75,7 @@ export const PasswordStrength: React.FC<PasswordStrengthProps> = ({ password }) 
           ]}
         />
       </View>
-      <Text style={[styles.label, { color }]}>{label}</Text>
+      <Text style={[styles.label, { color: textColor }]}>{label}</Text>
     </View>
   );
 };

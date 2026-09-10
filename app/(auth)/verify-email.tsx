@@ -187,6 +187,20 @@ export default function VerifyEmailScreen() {
             Check your spam folder if you don&apos;t see the email.
           </Text>
         </View>
+
+        {/* This screen disables swipe-back (see (auth)/_layout.tsx) so a stray
+            gesture mid-verification doesn't lose the flow — but that means
+            there must be an explicit way out, or a user on the wrong email
+            (or who just doesn't have the code yet) is stuck with no exit. */}
+        <AnimatedPressable
+          onPress={() => router.replace('/(auth)/login')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.backToLoginLink}
+          accessibilityRole="button"
+          accessibilityLabel="Back to login"
+        >
+          <Text style={styles.backToLoginText}>Wrong email? Back to login</Text>
+        </AnimatedPressable>
       </View>
     </Screen>
   );
@@ -266,7 +280,9 @@ const styles = StyleSheet.create({
   hintText: {
     flex: 1,
     fontSize: Typography.size.caption,
-    color: Colors.textTertiary,
+    // textSecondary, not textTertiary — this is the real "check your spam
+    // folder" guidance, not decoration, and textTertiary fails contrast.
+    color: Colors.textSecondary,
     fontFamily: Typography.fontFamily,
     lineHeight: 18,
   },
@@ -276,5 +292,15 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     textAlign: 'center',
     marginBottom: Spacing.xs,
+  },
+  backToLoginLink: {
+    alignSelf: 'center',
+    marginTop: Spacing.lg,
+    paddingVertical: 4,
+  },
+  backToLoginText: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
   },
 });

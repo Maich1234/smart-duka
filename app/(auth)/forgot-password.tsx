@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -199,7 +199,7 @@ export default function ForgotPasswordScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
+            <Ionicons name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} size={20} color={Colors.textPrimary} />
           </AnimatedPressable>
         ) : null}
 

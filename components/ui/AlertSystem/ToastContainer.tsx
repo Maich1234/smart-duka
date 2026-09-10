@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Dimensions, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -138,6 +138,10 @@ function ToastItem({ toast, onRemove, index }: ToastItemProps) {
     if (toast.type === 'success') haptics.success();
     else if (toast.type === 'error') haptics.error();
     else if (toast.type === 'warning') haptics.warning();
+
+    // A screen-reader user gets no other signal that a save/payment/delete
+    // succeeded or failed — the toast is a visual-only channel otherwise.
+    AccessibilityInfo.announceForAccessibility(toast.message);
 
     scheduleAutoDismiss();
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
@@ -95,6 +96,7 @@ export default function BusinessSettingsScreen() {
 
   return (
     <View style={styles.flex}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl, paddingTop: Spacing.lg }}>
         <SettingsSectionLabel label="Your shop's profile, tax setup, and receipt branding." />
 
@@ -127,6 +129,7 @@ export default function BusinessSettingsScreen() {
           </SettingsCard>
         </Animated.View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

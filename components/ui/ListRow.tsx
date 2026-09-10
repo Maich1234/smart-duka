@@ -58,7 +58,15 @@ export const ListRow: React.FC<ListRowProps> = ({
   );
 
   if (onPress) {
-    return <AnimatedPressable onPress={onPress}>{content}</AnimatedPressable>;
+    return (
+      <AnimatedPressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+      >
+        {content}
+      </AnimatedPressable>
+    );
   }
 
   return content;

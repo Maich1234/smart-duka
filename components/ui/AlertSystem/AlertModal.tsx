@@ -179,6 +179,8 @@ function DialogButton({
         { backgroundColor: bgColor },
         variant === 'ghost' && styles.btnGhost,
       ]}
+      accessibilityRole="button"
+      accessibilityLabel={button.label}
     >
       <Text style={[styles.btnText, { color: textColor }]}>{button.label}</Text>
     </AnimatedPressable>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -41,6 +42,7 @@ export default function StaffSecuritySettingsScreen() {
 
   return (
     <View style={styles.flex}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl, paddingTop: Spacing.lg }}>
         <SettingsSectionLabel label="Staff access, pay visibility, and your own login." />
 
@@ -74,6 +76,7 @@ export default function StaffSecuritySettingsScreen() {
           <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
         </Animated.View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -21,6 +21,48 @@ import { formatRelativeTime } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+
+interface NotificationRowProps {
+  item: AppNotification;
+  onPress: (item: AppNotification) => void;
+}
+
+// Extracted and memoized so re-rendering the list (a mark-all-read mutation,
+// a page loading in) doesn't re-run every row's icon lookup and layout — the
+// inline renderItem this replaced also handed FlashList a fresh onPress
+// closure per item per render, defeating memoization before it could help.
+const NotificationRowComponent: React.FC<NotificationRowProps> = ({ item, onPress }) => {
+  const handlePress = useCallback(() => onPress(item), [item, onPress]);
+
+  return (
+    <AnimatedPressable
+      style={[styles.row, !item.read && styles.rowUnread]}
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={item.title}
+    >
+      <View style={[styles.iconWrap, !item.read && styles.iconWrapUnread]}>
+        <Ionicons
+          name={iconForType(item.type)}
+          size={18}
+          color={item.read ? Colors.textTertiary : Colors.primary}
+        />
+      </View>
+      <View style={styles.body}>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, !item.read && styles.titleUnread]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {!item.read && <View style={styles.dot} />}
+        </View>
+        <Text style={styles.text} numberOfLines={2}>{item.body}</Text>
+        <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
+      </View>
+    </AnimatedPressable>
+  );
+};
+
+const NotificationRow = React.memo(NotificationRowComponent);
 
 /** Shared inbox UI rendered by both the owner and staff Notifications screens. */
 export const NotificationsList: React.FC = () => {
@@ -90,12 +132,20 @@ export const NotificationsList: React.FC = () => {
   // side-effect of having read it. Doing only the latter (the old behaviour)
   // made a tap look like it destroyed the thing the user wanted to read,
   // since list rows clamp the title to one line and the body to two.
-  const onPressItem = (item: AppNotification) => {
-    haptics.light();
-    setSelected(item);
-    setDetailVisible(true);
-    if (!item.read) markReadMutation.mutate(item._id);
-  };
+  // Stable identity so NotificationRow's own memoization isn't defeated by a
+  // fresh function every render — TanStack Query's `mutate` is itself stable
+  // across renders, so depending on the whole mutation object (which isn't)
+  // would recreate this every render for no reason.
+  const onPressItem = useCallback(
+    (item: AppNotification) => {
+      haptics.light();
+      setSelected(item);
+      setDetailVisible(true);
+      if (!item.read) markReadMutation.mutate(item._id);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [markReadMutation.mutate]
+  );
 
   if (isLoading) return <ListSkeleton rows={7} />;
 
@@ -127,32 +177,7 @@ export const NotificationsList: React.FC = () => {
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.xl, paddingHorizontal: Spacing.md, paddingTop: Spacing.sm }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
         ListEmptyComponent={<EmptyState title="No notifications yet" subtitle="Alerts and updates will show up here." />}
-        renderItem={({ item }) => (
-          <AnimatedPressable
-            style={[styles.row, !item.read && styles.rowUnread]}
-            onPress={() => onPressItem(item)}
-            accessibilityRole="button"
-            accessibilityLabel={item.title}
-          >
-            <View style={[styles.iconWrap, !item.read && styles.iconWrapUnread]}>
-              <Ionicons
-                name={iconForType(item.type)}
-                size={18}
-                color={item.read ? Colors.textTertiary : Colors.primary}
-              />
-            </View>
-            <View style={styles.body}>
-              <View style={styles.titleRow}>
-                <Text style={[styles.title, !item.read && styles.titleUnread]} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                {!item.read && <View style={styles.dot} />}
-              </View>
-              <Text style={styles.text} numberOfLines={2}>{item.body}</Text>
-              <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
-            </View>
-          </AnimatedPressable>
-        )}
+        renderItem={({ item }) => <NotificationRow item={item} onPress={onPressItem} />}
       />
       <NotificationDetailSheet
         visible={detailVisible}

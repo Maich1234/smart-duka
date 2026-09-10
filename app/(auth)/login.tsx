@@ -207,7 +207,9 @@ const styles = StyleSheet.create({
   legalText: {
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamily,
-    color: Colors.textTertiary,
+    // textSecondary, not textTertiary — a Play Store–required legal link
+    // shouldn't render at ~2.5:1 contrast.
+    color: Colors.textSecondary,
     textDecorationLine: 'underline',
     paddingVertical: 6,
   },

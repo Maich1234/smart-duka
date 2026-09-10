@@ -171,7 +171,7 @@ export const SelectPicker: React.FC<SelectPickerProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel="Back to list"
                 >
-                  <Ionicons name="arrow-back" size={20} color={Colors.textPrimary} />
+                  <Ionicons name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} size={20} color={Colors.textPrimary} />
                   <Text style={styles.sheetTitle}>{label}</Text>
                 </AnimatedPressable>
               ) : (

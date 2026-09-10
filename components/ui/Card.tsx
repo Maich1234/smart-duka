@@ -14,6 +14,8 @@ interface CardProps extends ViewProps {
   bordered?: boolean;
   padding?: keyof typeof Spacing;
   onPress?: () => void;
+  /** Read by screen readers in place of the card's raw child text when it's tappable. */
+  accessibilityLabel?: string;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -23,6 +25,7 @@ export const Card: React.FC<CardProps> = ({
   padding = 'md',
   onPress,
   style,
+  accessibilityLabel,
   ...props
 }) => {
   const paddingValue = Spacing[padding as keyof typeof Spacing] as number;
@@ -48,7 +51,11 @@ export const Card: React.FC<CardProps> = ({
   );
 
   if (onPress) {
-    return <AnimatedPressable onPress={onPress}>{content}</AnimatedPressable>;
+    return (
+      <AnimatedPressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel}>
+        {content}
+      </AnimatedPressable>
+    );
   }
 
   return content;

@@ -238,7 +238,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: Spacing.md,
   },
-  list: { flexGrow: 0, maxHeight: 260 },
+  // flexShrink: 1 so the action buttons below always win the space fight and
+  // can never be pushed off the sheet — the list scrolls instead. Without it
+  // the list kept its full intrinsic height and the buttons overlapped it,
+  // cutting a row off mid-content (only its label visible, reason and
+  // timestamp hidden under "Retry all").
+  list: { flexGrow: 0, flexShrink: 1, maxHeight: 260 },
   listContent: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
   row: {
     flexDirection: 'row',

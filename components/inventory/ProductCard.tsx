@@ -50,8 +50,10 @@ function getStockStatus(quantity: number, lowStockAlert: number): StockStatus {
 }
 
 const STATUS_CONFIG: Record<StockStatus, { label: string; bg: string; text: string; bar: string }> = {
-  in_stock: { label: 'In Stock', bg: '#DCFCE7', text: '#15803D', bar: '#22C55E' },
-  low: { label: 'Low Stock', bg: '#FEF3C7', text: '#D97706', bar: '#F59E0B' },
+  in_stock: { label: 'In Stock', bg: Colors.successSubtle, text: '#15803D', bar: '#22C55E' },
+  // text is Colors.warningDark, not Colors.warning (#F59E0B) — the latter is
+  // only 2.86:1 against this badge's own background, well under WCAG's 4.5:1.
+  low: { label: 'Low Stock', bg: '#FEF3C7', text: Colors.warningDark, bar: '#F59E0B' },
   critical: { label: 'Critical', bg: '#FEE2E2', text: '#DC2626', bar: '#EF4444' },
   stockout: { label: 'Stockout', bg: '#FEE2E2', text: '#DC2626', bar: '#EF4444' },
 };
@@ -92,7 +94,7 @@ interface ProductCardProps {
   index?: number;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({
+const ProductCardComponent: React.FC<ProductCardProps> = ({
   product,
   showCostPrice = false,
   onPress,
@@ -131,7 +133,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <Animated.View entering={FadeInDown.duration(280).delay(Math.min(index * 55, 480))}>
-      <AnimatedPressable onPress={onPress} style={styles.card}>
+      <AnimatedPressable
+        onPress={onPress}
+        style={styles.card}
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name}, ${statusConfig.label}, ${formatCurrency(product.sellingPrice)}`}
+      >
         {/* ── Top row: avatar + name/meta + status badge ── */}
         <View style={styles.topRow}>
           <View style={[styles.avatar, { backgroundColor: categoryColor.bg }]}>
@@ -232,8 +239,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   accessibilityLabel="Adjust stock"
                   accessibilityRole="button"
                 >
-                  <Ionicons name="archive-outline" size={15} color={Colors.warning} />
-                  <Text style={[styles.actionLabel, { color: Colors.warning }]}>Adjust</Text>
+                  <Ionicons name="archive-outline" size={15} color={Colors.warningDark} />
+                  <Text style={[styles.actionLabel, { color: Colors.warningDark }]}>Adjust</Text>
                 </AnimatedPressable>
               )}
               {onEdit && (
@@ -270,6 +277,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     </Animated.View>
   );
 };
+
+// Rendered inside a FlashList — memoized so a re-render of the list (e.g.
+// another row's stock changing) doesn't re-run this card's own category-hash
+// and margin/stock-bar math for every unrelated row.
+export const ProductCard = React.memo(ProductCardComponent);
 
 const styles = StyleSheet.create({
   card: {

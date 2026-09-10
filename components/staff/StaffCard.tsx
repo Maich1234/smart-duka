@@ -46,12 +46,17 @@ interface StaffCardProps {
   isLast?: boolean;
 }
 
-export const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
+const StaffCardComponent: React.FC<StaffCardProps> = ({ staff, onPress }) => {
   const colors = avatarColors(staff.name);
   const role = deriveRole(staff.permissions);
 
   return (
-    <AnimatedPressable style={styles.card} onPress={onPress}>
+    <AnimatedPressable
+      style={styles.card}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${staff.name}, ${role}, ${staff.isActive ? 'Active' : 'Inactive'}`}
+    >
       <View style={[styles.avatar, { backgroundColor: colors.bg }]}>
         <Text style={[styles.avatarText, { color: colors.text }]}>{initials(staff.name)}</Text>
       </View>
@@ -75,6 +80,10 @@ export const StaffCard: React.FC<StaffCardProps> = ({ staff, onPress }) => {
     </AnimatedPressable>
   );
 };
+
+// Rendered inside a FlashList — memoized so re-rendering the staff list
+// doesn't re-run every row's role/initials/avatar-color derivation.
+export const StaffCard = React.memo(StaffCardComponent);
 
 const styles = StyleSheet.create({
   card: {
