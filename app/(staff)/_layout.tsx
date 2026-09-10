@@ -81,7 +81,7 @@ const AnimatedTabIcon: React.FC<AnimatedTabIconProps> = ({ config, isFocused, ca
       <Ionicons
         name={isFocused ? config.activeIcon : config.icon}
         size={22}
-        color={isFocused ? Colors.primary : '#94A3B8'}
+        color={isFocused ? Colors.primary : Colors.textTertiary}
       />
       {showBadge && (
         <View style={badgeStyles.dot}>
@@ -235,7 +235,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isFocused ? Colors.primary : '#94A3B8' },
+                  { color: isFocused ? Colors.primary : Colors.textTertiary },
                   isFocused && styles.tabLabelActive,
                 ]}
               >
@@ -264,6 +264,8 @@ export default function StaffLayout() {
       backBehavior="history"
       screenOptions={{
         headerShown: true,
+        // See the owner layout: keeps blurred tabs from refetching on resume.
+        freezeOnBlur: true,
         header: ({ route, options }) => (
           <ScreenHeader
             title={options.title ?? route.name}

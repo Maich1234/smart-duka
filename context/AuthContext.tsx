@@ -37,28 +37,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // call logout() in the same tick.
 let logoutInProgress = false;
 
+// How long startup will wait for the server to confirm or reject a hydrated
+// session before routing on it anyway. Sized against a measured warm API
+// round trip (~550-870ms from Kenya), so a live connection almost always
+// answers inside it. app/splash.tsx then runs its brand animation before
+// choosing a route, and validation continues during that too — so the real
+// window is this plus the animation, and only a backend cold start is likely
+// to outrun both.
+const SESSION_VALIDATION_DEADLINE = 900;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, setAuth, logout: storeLogout, isLoading, setLoading } = useAuthStore();
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const initAuth = async () => {
+    // Revalidates the hydrated session against the server. Resolves as soon as
+    // the answer is known; a rejected session is torn down *before* this
+    // settles, so whoever is waiting on it routes to login rather than
+    // flashing a dashboard belonging to an account that is no longer valid.
+    const validateSession = async (storedUser: NonNullable<typeof user>) => {
       try {
-        // SecureStore hydration is async — reading the store before it lands
-        // sees a null user, skips the profile/FCM refresh, and flips
-        // isLoading off while a real session is still on its way in.
-        await waitForHydration(useAuthStore);
-        const storedUser = useAuthStore.getState().user;
-        if (storedUser) {
-          await getProfile();
-          // Re-registers this device's FCM token on every app start (not
-          // just at login) — otherwise a token that rotated or never made
-          // it to the backend (e.g. permission granted after first login)
-          // stays out of sync until the user manually logs out/in again.
-          if (storedUser.role === 'owner' && (await getNotificationsPreference())) {
-            registerDeviceForNotifications();
-          }
-        }
+        await getProfile();
       } catch (error: any) {
         // Only clear the session when the server explicitly rejected it.
         // A network failure here just means the app started offline — the
@@ -73,9 +72,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await clearAll();
           storeLogout();
         }
-      } finally {
-        setLoading(false);
+        return;
       }
+      // Re-registers this device's FCM token on every app start (not just at
+      // login) — otherwise a token that rotated or never made it to the
+      // backend (e.g. permission granted after first login) stays out of sync
+      // until the user manually logs out/in again. Deliberately not awaited:
+      // a confirmed-good session shouldn't wait on a notifications lookup.
+      void (async () => {
+        if (storedUser.role === 'owner' && (await getNotificationsPreference())) {
+          registerDeviceForNotifications();
+        }
+      })().catch(() => {});
+    };
+
+    const initAuth = async () => {
+      try {
+        // SecureStore hydration is async — reading the store before it lands
+        // sees a null user, skips the profile/FCM refresh, and flips
+        // isLoading off while a real session is still on its way in.
+        await waitForHydration(useAuthStore);
+      } catch {
+        // Hydration itself failed (corrupt store, SecureStore unavailable).
+        // Fall through on whatever the store holds rather than stranding the
+        // app on the splash screen forever.
+      }
+
+      const storedUser = useAuthStore.getState().user;
+      if (storedUser) {
+        // Bounded wait, not an open one. getProfile() carries a 12s timeout,
+        // and holding the splash for that long on a stalled connection would
+        // punish every cashier to spare the rare one with a dead token. So:
+        // give the server a short window to reject the session, and if it
+        // hasn't answered by then, route on the cached session and let
+        // validation land in the background. Validation keeps running either
+        // way, and the splash animation that follows this adds its own window
+        // on top before any route is actually chosen.
+        await Promise.race([
+          // .catch is load-bearing: clearAll() can reject, and an unhandled
+          // rejection here would skip setLoading(false) below and leave the
+          // app on the splash screen permanently.
+          validateSession(storedUser).catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, SESSION_VALIDATION_DEADLINE)),
+        ]);
+      }
+
+      setLoading(false);
     };
     initAuth();
     // setLoading/storeLogout are zustand actions (stable); queryClient is the

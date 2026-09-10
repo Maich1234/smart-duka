@@ -7,6 +7,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import Constants from 'expo-constants';
 // Subpath imports so Metro bundles only these three weights, not all 18 Inter fonts.
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
@@ -91,10 +92,27 @@ onLocalSaleSynced(() => {
   queryClient.invalidateQueries({ queryKey: ['myCommission'] });
 });
 
+// Only what a cashier needs to keep *transacting* through a connection drop.
+// Everything else (sales history, reports, analytics, staff, purchases,
+// expenses, notifications, AI threads) is server-side history that refetches
+// on reconnect — persisting it meant JSON.stringify-ing an ever-growing cache
+// on the JS thread every few seconds, which is what made the app degrade the
+// longer a shift ran.
+const PERSISTED_QUERY_KEYS = new Set([
+  'products',
+  'productCategories',
+  'shopConfig',
+  'paymentStatus',
+  'subscription',
+]);
+
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
   key: 'dukana.cache',
-  throttleTime: 3000,
+  // 10s, not 3s: this serialises on the JS thread, competing with the till for
+  // frames. The dehydrate filter above keeps the payload small enough that a
+  // longer window risks very little.
+  throttleTime: 10_000,
   // Hard cap: ~4 MB of JSON. Keeps the serialised cache manageable on
   // low-storage Android devices (2 GB RAM, 16 GB ROM tier).
   // If the cap is hit, React Query drops the least-recently-used queries first.
@@ -376,6 +394,15 @@ export default function RootLayout() {
         // Persist for 8 hours — one business shift. Expired cache is
         // dropped on startup so stale data never surfaces after overnight.
         maxAge: 1000 * 60 * 60 * 8,
+        // Discards the whole persisted cache when the app updates. Without a
+        // buster, a release that changes a response shape rehydrates the old
+        // shape into the new screens and renders undefined fields.
+        buster: Constants.expoConfig?.version ?? 'dev',
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) =>
+            query.state.status === 'success' &&
+            PERSISTED_QUERY_KEYS.has(query.queryKey[0] as string),
+        },
       }}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>

@@ -287,8 +287,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     // poll, a payment method removed mid-shift would sit on the till until
     // the cashier happened to navigate away and back. Only polls while this
     // screen is actually the one on-screen, so it doesn't burn battery/data
-    // in the background.
-    refetchInterval: isFocused ? 30_000 : false,
+    // in the background. Five minutes rather than thirty seconds: the
+    // focus refetch below already covers navigating back to the till, so the
+    // poll only has to catch an edit made while the till sits open — and at
+    // 30s it was spending 120 requests an hour of a cashier's mobile data to
+    // watch a value the owner changes a few times a month.
+    refetchInterval: isFocused ? 5 * 60_000 : false,
   });
   const thankYouNote = shopConfigData?.data.receiptThankYouNote;
   const shopLogoUrl = shopConfigData?.data.logoUrl;
@@ -930,6 +934,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                   onPress={() => setSalesPage((p) => Math.max(1, p - 1))}
                   disabled={salesPage <= 1}
                   style={[pageBtn, salesPage <= 1 && pageBtnDisabled]}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                   accessibilityRole="button"
                   accessibilityLabel={`Previous page, page ${salesPage - 1}`}
                   accessibilityState={{ disabled: salesPage <= 1 }}
@@ -941,6 +946,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                   onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
                   disabled={salesPage >= salesTotalPages}
                   style={[pageBtn, salesPage >= salesTotalPages && pageBtnDisabled]}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                   accessibilityRole="button"
                   accessibilityLabel={`Next page, page ${salesPage + 1}`}
                   accessibilityState={{ disabled: salesPage >= salesTotalPages }}
@@ -1135,6 +1141,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                   onPress={() => setProductsPage((p) => Math.max(1, p - 1))}
                   disabled={productsPage <= 1}
                   style={[styles.paginationBtn, productsPage <= 1 && styles.paginationBtnDisabled]}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                   accessibilityRole="button"
                   accessibilityLabel={`Previous page, page ${productsPage - 1}`}
                   accessibilityState={{ disabled: productsPage <= 1 }}
@@ -1146,6 +1153,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                   onPress={() => setProductsPage((p) => Math.min(productsTotalPages, p + 1))}
                   disabled={productsPage >= productsTotalPages}
                   style={[styles.paginationBtn, productsPage >= productsTotalPages && styles.paginationBtnDisabled]}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                   accessibilityRole="button"
                   accessibilityLabel={`Next page, page ${productsPage + 1}`}
                   accessibilityState={{ disabled: productsPage >= productsTotalPages }}
@@ -1188,6 +1196,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                       onPress={() => setSalesPage((p) => Math.max(1, p - 1))}
                       disabled={salesPage <= 1}
                       style={[styles.paginationBtn, salesPage <= 1 && styles.paginationBtnDisabled]}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                       accessibilityRole="button"
                       accessibilityLabel={`Previous page, page ${salesPage - 1}`}
                       accessibilityState={{ disabled: salesPage <= 1 }}
@@ -1199,6 +1208,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                       onPress={() => setSalesPage((p) => Math.min(salesTotalPages, p + 1))}
                       disabled={salesPage >= salesTotalPages}
                       style={[styles.paginationBtn, salesPage >= salesTotalPages && styles.paginationBtnDisabled]}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                       accessibilityRole="button"
                       accessibilityLabel={`Next page, page ${salesPage + 1}`}
                       accessibilityState={{ disabled: salesPage >= salesTotalPages }}

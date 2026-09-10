@@ -28,13 +28,17 @@ const WORD_H = Math.round(WORD_W * (166 / 814));
 
 // Beat sheet, mirroring the brand animation: the bag settles first, then the
 // word wipes in beneath it, then the footer.
-const MARK_DURATION = 620;
-const WORD_DELAY = 430;
-const WORD_DURATION = 560;
-const FOOTER_DELAY = WORD_DELAY + WORD_DURATION - 120;
-const FOOTER_DURATION = 420;
-const HOLD = 420;
-const NAVIGATE_AT = FOOTER_DELAY + FOOTER_DURATION + HOLD;
+//
+// Every millisecond here is spent by a cashier with a customer waiting at the
+// counter, so the beat is kept tight and there is no hold on the finished
+// frame — navigation fires the moment the footer lands. Tune the whole
+// sequence from these five constants; NAVIGATE_AT follows automatically.
+const MARK_DURATION = 420;
+const WORD_DELAY = 260;
+const WORD_DURATION = 380;
+const FOOTER_DELAY = WORD_DELAY + WORD_DURATION - 90;
+const FOOTER_DURATION = 300;
+const NAVIGATE_AT = FOOTER_DELAY + FOOTER_DURATION;
 
 // Longest we will wait on the reduce-motion query before animating anyway.
 const ACCESSIBILITY_DEADLINE = 120;
@@ -102,18 +106,29 @@ export default function SplashScreen() {
     // Shared values have stable identities; listed for honesty.
   }, [reduceMotion, footerOpacity, footerTranslateY, markOpacity, markScale, wordWidth]);
 
-  // Navigation is deliberately independent of the animation: it runs on the
-  // same schedule whether or not motion is reduced, and is never chained off an
-  // animation callback (which would strand the user if a frame were dropped).
+  // Navigation is never chained off an animation callback, which would strand
+  // the user on this screen if a frame were dropped — it runs off its own
+  // timer, and off hydration, both of which always settle.
   const navigated = useRef(false);
+
+  // Started during the first render, not inside the timeout below, so a slow
+  // SecureStore/AsyncStorage read overlaps the brand animation instead of
+  // being added on top of it. Routing must read the stores after hydration —
+  // the initial defaults (no user, onboarding not completed) would otherwise
+  // send an already-signed-in device back to the welcome journey.
+  const hydration = useRef<Promise<unknown> | null>(null);
+  if (!hydration.current) {
+    hydration.current = waitForHydration(useAuthStore, useOnboardingStore).catch(() => {});
+  }
+
   useEffect(() => {
+    // Settles within ACCESSIBILITY_DEADLINE; scheduling before it resolves
+    // would pick the wrong delay for a reduced-motion user.
+    if (reduceMotion === null) return;
+
     let cancelled = false;
-    const timeout = setTimeout(async () => {
-      // Routing must read the stores at fire time AND after hydration — the
-      // initial defaults (no user, onboarding not completed) would otherwise
-      // send an already-signed-in device back to the welcome journey whenever
-      // SecureStore/AsyncStorage is slow to hydrate.
-      await waitForHydration(useAuthStore, useOnboardingStore);
+    const go = async () => {
+      await hydration.current;
       if (cancelled || navigated.current) return;
       navigated.current = true;
       const { user } = useAuthStore.getState();
@@ -124,13 +139,17 @@ export default function SplashScreen() {
         const { completed } = useOnboardingStore.getState();
         router.replace(completed ? '/(auth)/login' : '/(onboarding)');
       }
-    }, NAVIGATE_AT);
+    };
+
+    // A reduced-motion user is shown no animation, so there is no beat to sit
+    // through — send them straight on as soon as the stores are readable.
+    const timeout = setTimeout(go, reduceMotion ? 0 : NAVIGATE_AT);
 
     return () => {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, []);
+  }, [reduceMotion]);
 
   const markStyle = useAnimatedStyle(() => ({
     opacity: markOpacity.value,

@@ -22,6 +22,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useCartStore } from '@/store/staffCartStore';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { TAB_BAR_BASE_HEIGHT } from '@/constants/Layout';
 
@@ -85,7 +86,7 @@ const AnimatedTabIcon: React.FC<AnimatedTabIconProps> = ({ config, isFocused }) 
       <Ionicons
         name={isFocused ? config.activeIcon : config.icon}
         size={22}
-        color={isFocused ? '#0F766E' : '#94A3B8'}
+        color={isFocused ? Colors.primary : Colors.textTertiary}
       />
     </Animated.View>
   );
@@ -223,7 +224,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
               <Animated.Text
                 style={[
                   styles.tabLabel,
-                  { color: isFocused ? '#0F766E' : '#94A3B8' },
+                  { color: isFocused ? Colors.primary : Colors.textTertiary },
                   isFocused && styles.tabLabelActive,
                 ]}
               >
@@ -312,6 +313,11 @@ export default function OwnerLayout() {
       backBehavior="history"
       screenOptions={{
         headerShown: true,
+        // Tab screens stay mounted once visited. Without this, all of them keep
+        // live query observers, so the resume-invalidation in app/_layout.tsx
+        // (refetchType 'active') refires every query from every screen the
+        // owner has ever opened — a thundering herd on a 3G connection.
+        freezeOnBlur: true,
         // One header for every screen in the app — see components/ui/ScreenHeader.
         // Tab roots are the only screens without a back button; everything else
         // here is pushed on top of one. The paywall is the other exception:
@@ -566,7 +572,7 @@ const styles = StyleSheet.create({
     width: TAB_WIDTH * 0.55,
     height: 3,
     borderRadius: 2,
-    backgroundColor: '#0F766E',
+    backgroundColor: Colors.primary,
   },
   tabsRow: {
     flexDirection: 'row',
