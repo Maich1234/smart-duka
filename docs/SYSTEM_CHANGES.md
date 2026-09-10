@@ -114,6 +114,7 @@ native. Mitigated by §3.11 (a small offline "first aid" set stays in-app).
 | 3.19 | Barcode scanning | mobile | v2 | deferred |
 | 3.20 | One front end, one URL | mobile, web | **P0** | ✅ done |
 | 3.21 | Terms consent, recorded server-side | all three | **P0** | ✅ done |
+| 3.22 | Marketing site split from the dashboard app | mobile, web | **P0** | code ready, domain cutover pending |
 
 ### Deploy order — this matters
 
@@ -125,6 +126,13 @@ native. Mitigated by §3.11 (a small offline "first aid" set stays in-app).
    Ship it before the app build that removes checkout, or existing shops have
    no way to renew.
 3. **Mobile last**, and only once 1 and 2 are live.
+
+**§3.22 has its own ordering, independent of the above:** `smart-duka-marketing`
+must be deployed, verified, and attached to `duqana.co.ke` *before*
+`smart-duka-web`'s marketing-page-deletion commit is pushed — that push also
+detaches `smart-duka-web` from `duqana.co.ke` in favor of `app.duqana.co.ke`.
+Pushing it first leaves `duqana.co.ke` serving a dashboard redirect with no
+marketing site behind it.
 
 Set the Vercel cron secret for the new job before step 1 completes, or
 `/cron/account-deletions` 401s and scheduled closures never complete.
@@ -576,6 +584,40 @@ FMCG. Revisit when moving upmarket.
 
 ---
 
+### 3.22 — Marketing site split from the dashboard app · **P0** · mobile, web
+
+§3.20's one-host consolidation lasted until the marketing pages (`/`, `/about`,
+`/contact`, `/help`, `/privacy`, `/terms`, `/delete-account`) needed to ship,
+scale, and cache independently of the authenticated dashboard — a
+persuade-mode public site and an operate-mode logged-in app have different
+concerns (SEO/crawlability, edge caching, release cadence) that a single
+Next.js app couldn't cleanly serve. They're now `smart-duka-marketing`, a
+separate Next.js project holding everything that was public in
+`smart-duka-web`.
+
+**Domain split:** `smart-duka-marketing` takes over `https://duqana.co.ke`
+(the root domain visitors expect for a marketing site); `smart-duka-web`
+moves to `https://app.duqana.co.ke`. `smart-duka-web`'s root route (`/`) is
+now just a redirect to `/owner/dashboard`, which already sends logged-out
+visitors to `/login` and staff to `/staff/dashboard`.
+
+**Mobile** (`constants/config.ts`): `WEB_URL`/`HELP_CENTER_URL` now point at
+the marketing site (unchanged value, since it kept the original domain);
+`PUBLIC_WEB_URL` is a new, separately-overridable constant (`EXPO_PUBLIC_APP_URL`)
+pointing at the app's new subdomain, since receipts (`/r/<token>`) and the
+setup-guide embed (`/embed/setup-guide`, an authenticated webview) are
+dashboard-app routes, not marketing pages. `openLegal.ts` and `openHelp.ts`
+needed no changes — terms/privacy/delete-account/help all moved to the host
+`WEB_URL` already pointed at.
+
+**Known gap this split introduced and fixed before shipping:** every
+Sign In/Get Started link in the marketing site was a relative Next.js
+`<Link href="/login">`, which 404s once `/login` lives in a different
+deployment. Replaced with an `APP_URL`-qualified absolute link in the new
+project's `src/lib/site.ts`.
+
+---
+
 ## 4 · Verified as healthy
 
 Recorded so future audits don't re-litigate these:
@@ -593,9 +635,10 @@ Recorded so future audits don't re-litigate these:
 
 ## 5 · Still needs a human decision
 
-1. ~~Confirm the production web domain.~~ **Resolved — the front end is
-   `https://duqana.co.ke`.** See §3.20 for what that
-   settled.
+1. ~~Confirm the production web domain.~~ **Resolved, then split in two** — see
+   §3.20 for the original single-host decision and §3.22 for why it became
+   `https://duqana.co.ke` (marketing, `smart-duka-marketing`) and
+   `https://app.duqana.co.ke` (the dashboard app, `smart-duka-web`).
 2. **Submit the Play Data Safety form.** The pages exist (§3.6) but the form is
    a Play Console action nobody can do from the repo. It must declare: name,
    email, phone, financial transaction data, device IDs, county/sub-county —

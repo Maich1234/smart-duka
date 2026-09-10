@@ -18,13 +18,11 @@ const isLocalUrl = (value: string): boolean => {
 };
 
 /**
- * The DuQana web front end (the `smart-duka-web` Next.js app on Vercel).
- *
- * One host serves everything the app links out to: the Help & Learning
- * Center (/help), public receipts (/r/<token>), the privacy policy, terms,
- * and the public account-deletion page. Overridable so a preview deployment
- * or a future custom domain doesn't need a code change — set
- * EXPO_PUBLIC_WEB_URL in the EAS build profile.
+ * The DuQana marketing site (`smart-duka-marketing` on Vercel) — the Help &
+ * Learning Center (/help), the privacy policy, terms, the public
+ * account-deletion page, and Contact all live here, not in the app.
+ * Overridable so a preview deployment or a future custom domain doesn't need
+ * a code change — set EXPO_PUBLIC_WEB_URL in the EAS build profile.
  *
  * EXPO_PUBLIC_* is inlined at build time, so a localhost value baked into a
  * build (e.g. a development-profile setting bleeding into preview/production
@@ -37,14 +35,21 @@ export const WEB_URL = (
   configuredWebUrl && !isLocalUrl(configuredWebUrl) ? configuredWebUrl : 'https://duqana.co.ke'
 ).replace(/\/+$/, '');
 
-// Used to build the QR code link on receipts. Points at the Next.js app's
-// /r/[token] route — previously the Expo web export, which is no longer where
-// public pages live.
-export const PUBLIC_WEB_URL = WEB_URL;
-
 // Base URL of the Help & Learning Center. No help content ships in this app on
 // any platform — openHelp() always opens the browser (see utils/openHelp.ts).
 export const HELP_CENTER_URL = WEB_URL;
+
+/**
+ * The dashboard app's own web deployment (`smart-duka-web` on Vercel) — a
+ * separate host from the marketing site above. Used for the things that need
+ * an authenticated app context rather than a public marketing page: the
+ * receipt QR code (/r/<token>) and the setup-guide embed's scoped webview
+ * token. Set EXPO_PUBLIC_APP_URL in the EAS build profile to override.
+ */
+const configuredAppUrl = process.env.EXPO_PUBLIC_APP_URL;
+export const PUBLIC_WEB_URL = (
+  configuredAppUrl && !isLocalUrl(configuredAppUrl) ? configuredAppUrl : 'https://app.duqana.co.ke'
+).replace(/\/+$/, '');
 
 // Matches app.json's "scheme" — used to deep-link from the web verification
 // page into the native app when it's installed (falls back to the web page

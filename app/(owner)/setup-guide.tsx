@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { getWebviewToken } from '@/services/auth';
-import { WEB_URL } from '@/constants/config';
+import { PUBLIC_WEB_URL } from '@/constants/config';
 import { Colors } from '@/constants/Colors';
 
 /**
@@ -27,7 +27,7 @@ export default function SetupGuideScreen() {
     let cancelled = false;
     getWebviewToken()
       .then(({ token }) => {
-        if (!cancelled) setUri(`${WEB_URL}/embed/setup-guide?token=${encodeURIComponent(token)}`);
+        if (!cancelled) setUri(`${PUBLIC_WEB_URL}/embed/setup-guide?token=${encodeURIComponent(token)}`);
       })
       .catch(() => {
         if (!cancelled) router.back();
@@ -65,7 +65,7 @@ export default function SetupGuideScreen() {
           // scoped auth token in its URL, so an off-domain redirect (a stray
           // link on the guide page, a compromised ad, etc.) must not be able
           // to load third-party content inside this authenticated WebView.
-          originWhitelist={[`${WEB_URL}/*`]}
+          originWhitelist={[`${PUBLIC_WEB_URL}/*`]}
           onNavigationStateChange={(nav: WebViewNavigation) => setCanGoBack(nav.canGoBack)}
           onMessage={handleMessage}
           startInLoadingState
