@@ -5,6 +5,7 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListRow } from '@/components/ui/ListRow';
 import { MONEY_OUT_METHOD_LABELS } from '@/constants/paymentMethods';
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   getExpenses,
@@ -55,7 +56,6 @@ export const ExpensesScreen: React.FC = () => {
   const canManageExpenses = usePermission('manage_expenses');
   const [formVisible, setFormVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { alert, toast } = useAlert();
 
@@ -71,13 +71,16 @@ export const ExpensesScreen: React.FC = () => {
     isSearching,
   } = useSearch('expenses');
 
-  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['expenses', page],
-    queryFn: () => getExpenses({ page, limit: 10 }),
+  const {
+    data, isLoading, isError, refetch, isRefetching,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['expenses'],
+    queryFn: ({ pageParam }) => getExpenses({ page: pageParam, limit: 10 }),
     enabled: canManageExpenses,
-    // Keep the current page's expenses mounted while the next page loads,
-    // instead of the whole screen dropping to a full-screen loading state.
-    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
 
   const { data: summaryData } = useQuery({
@@ -92,7 +95,6 @@ export const ExpensesScreen: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expenseSummary'] });
-      setPage(1);
       setFormVisible(false);
       setEditingExpense(null);
     },
@@ -112,7 +114,6 @@ export const ExpensesScreen: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expenseSummary'] });
-      setPage(1);
       toast({ type: 'success', message: 'Expense deleted' });
     },
     onError: (error: any) => {
@@ -146,8 +147,7 @@ export const ExpensesScreen: React.FC = () => {
     setFormVisible(true);
   };
 
-  const allExpenses = useMemo(() => data?.data || [], [data]);
-  const totalPages = data?.pagination?.pages ?? 1;
+  const allExpenses = useMemo<Expense[]>(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
 
   const expenses = useMemo(() => {
     if (!searchQuery) return allExpenses;
@@ -267,33 +267,10 @@ export const ExpensesScreen: React.FC = () => {
             <EmptyState title="No expenses recorded" subtitle="Add your first expense to start tracking spending." />
           )
         }
-        ListFooterComponent={
-          totalPages > 1 ? (
-            <View style={styles.paginationBar}>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel={`Previous page, page ${page - 1}`}
-                accessibilityState={{ disabled: page <= 1 }}
-              >
-                <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
-              </AnimatedPressable>
-              <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel={`Next page, page ${page + 1}`}
-                accessibilityState={{ disabled: page >= totalPages }}
-              >
-                <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
-              </AnimatedPressable>
-            </View>
-          ) : null
-        }
+        // Pages load as the owner scrolls rather than from Prev/Next buttons.
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<ListFooterLoader loading={isFetchingNextPage} />}
       />
 
       <ExpenseFormSheet
@@ -346,28 +323,6 @@ const styles = StyleSheet.create({
   },
 
   // Pagination
-  paginationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-    paddingVertical: Spacing.lg,
-  },
-  pageBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageBtnDisabled: { borderColor: Colors.border },
-  pageLabel: {
-    fontSize: 13,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textSecondary,
-  },
 
   // Search empty state
   emptySearch: {

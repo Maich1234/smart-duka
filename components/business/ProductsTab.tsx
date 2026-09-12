@@ -1,11 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useImperativeHandle, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Shimmer } from '@/components/ui/Shimmer';
-import { Button } from '@/components/ui/Button';
+import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
 import { QueryError } from '@/components/ui/QueryError';
 import { haptics } from '@/utils/haptics';
 import { formatQuantity } from '@/utils/formatters';
@@ -45,7 +45,17 @@ const PAGE_SIZE = 20;
  * revenue/cost/profit/margin breakdown, because five figures per row is how
  * a useful list becomes an unreadable spreadsheet on a 360dp screen.
  */
-export const ProductsTab: React.FC<BusinessTabProps> = ({ currency, period, onPeriodChange }) => {
+export interface ProductsTabHandle {
+  /** Fetch the next page, if there is one and none is already in flight. */
+  loadMore: () => void;
+}
+
+export const ProductsTab = ({
+  currency,
+  period,
+  onPeriodChange,
+  ref,
+}: BusinessTabProps & { ref?: React.Ref<ProductsTabHandle> }) => {
   const [sort, setSort] = useState<ProductSort>('most_sold');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -61,6 +71,12 @@ export const ProductsTab: React.FC<BusinessTabProps> = ({ currency, period, onPe
 
   const first = data?.pages[0]?.data;
   const rows = data?.pages.flatMap((p) => p.data.rows) ?? [];
+
+  // The shell owns the scroll view, so paging is driven from its
+  // onEndReached rather than a button in the list.
+  useImperativeHandle(ref, () => ({
+    loadMore: () => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); },
+  }), [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const toggle = useCallback((id: string) => {
     haptics.light();
@@ -136,15 +152,7 @@ export const ProductsTab: React.FC<BusinessTabProps> = ({ currency, period, onPe
             </View>
           )}
 
-          {hasNextPage && (
-            <Button
-              title={isFetchingNextPage ? 'Loading…' : 'Show more'}
-              variant="outline"
-              onPress={() => fetchNextPage()}
-              loading={isFetchingNextPage}
-              style={s.more}
-            />
-          )}
+          <ListFooterLoader loading={isFetchingNextPage} />
         </>
       )}
     </View>
@@ -262,5 +270,4 @@ const s = StyleSheet.create({
     color: Colors.textPrimary,
   },
   rowDetail: { marginTop: 2 },
-  more: { marginTop: Spacing.lg },
 });

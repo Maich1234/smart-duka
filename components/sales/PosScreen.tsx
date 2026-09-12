@@ -5,7 +5,7 @@ import { useFocusEffect } from "expo-router/react-navigation";
 import { router, useIsFocused } from 'expo-router';
 import { useAlert } from '@/context/AlertContext';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
@@ -148,15 +148,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   const queryClient = useQueryClient();
 
-  const [productsPage, setProductsPage] = useState(1);
 
-  // Reset to page 1 alongside the keystroke rather than in an effect watching
-  // the debounced query — an effect here fires a second render pass on every
-  // search, and a stale page number produces an empty grid when the new query
-  // has fewer pages. Only the server-search fallback paginates at all.
+  // The debounced search term is part of the products query key, so a new
+  // search starts its own paging — there is no page number left to reset, and
+  // none of the stale-page empty grids that reset existed to prevent.
   const setSearch = (value: string) => {
     setSearchValue(value);
-    setProductsPage(1);
   };
   const [salesPage, setSalesPage] = useState(1);
 
@@ -247,13 +244,21 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   // isn't staring at an empty till while the mirror fills.
   const usingCache = cacheEnabled && syncSettled;
 
-  const { data: productsData, refetch: refetchProducts } = useQuery({
-    queryKey: ['products', searchQuery, productsPage],
-    queryFn: () => getProducts({ search: searchQuery, page: productsPage, limit: 10 }),
+  const {
+    data: productsData,
+    refetch: refetchProducts,
+    fetchNextPage: fetchMoreProducts,
+    hasNextPage: hasMoreProducts,
+    isFetchingNextPage: loadingMoreProducts,
+  } = useInfiniteQuery({
+    // The search term is the key, so typing restarts paging by itself and the
+    // grid no longer blanks between keystrokes.
+    queryKey: ['products', searchQuery],
+    queryFn: ({ pageParam }) => getProducts({ search: searchQuery, page: pageParam, limit: 10 }),
     enabled: canRecordSale && !usingCache,
-    // Stops the grid blanking on every keystroke, which it used to do (the
-    // owner sales screen already got this right).
-    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
 
   // Manual pull state (not isLoading/isRefetching) so the spinner never
@@ -569,7 +574,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     });
   };
 
-  const products = usingCache ? cachedProducts ?? [] : productsData?.data || [];
+  const serverProducts = useMemo<Product[]>(
+    () => productsData?.pages.flatMap((page) => page.data) ?? [],
+    [productsData],
+  );
+  const products = usingCache ? cachedProducts ?? [] : serverProducts;
   const mySales = mySalesData?.data || [];
   // Sales this device has made but the server hasn't confirmed yet, newest
   // first — shown ahead of the server page so a sale appears the instant
@@ -577,8 +586,8 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   // sales, so they'd be a duplicate/out-of-order mess on any later page.
   const displayedSales = salesPage === 1 ? [...localSales, ...mySales] : mySales;
   // Local search returns the whole matching set at once — there is no "next
-  // page" at a counter. Pagination only exists on the fallback path.
-  const productsTotalPages = usingCache ? 1 : productsData?.pagination?.pages ?? 1;
+  // page" at a counter. Paging only exists on the server fallback path.
+  const canLoadMoreProducts = !usingCache && !!hasMoreProducts;
   const salesTotalPages = mySalesData?.pagination?.pages ?? 1;
 
   const addToCart = (product: Product) => {
@@ -1055,6 +1064,10 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           />
         )}
         contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
+        // The catalogue arrives as the cashier scrolls. Never on the cached
+        // path: a local search already returns every match at once.
+        onEndReached={() => { if (canLoadMoreProducts && !loadingMoreProducts) fetchMoreProducts(); }}
+        onEndReachedThreshold={0.5}
         refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={onPullRefresh} tintColor={Colors.primary} />}
         // Search used to fail silently here — zero matches rendered nothing
         // between the header and footer, indistinguishable from a stuck
@@ -1131,35 +1144,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                   manualReceiptCode={manualReceiptCode}
                   onManualReceiptCodeChange={setManualReceiptCode}
                 />
-              </View>
-            )}
-            {/* Product pagination sits above the product list so staff never
-                need to scroll past products to change pages. */}
-            {productsTotalPages > 1 && (
-              <View style={[styles.paginationRow, styles.productsPaginationHeader]}>
-                <AnimatedPressable
-                  onPress={() => setProductsPage((p) => Math.max(1, p - 1))}
-                  disabled={productsPage <= 1}
-                  style={[styles.paginationBtn, productsPage <= 1 && styles.paginationBtnDisabled]}
-                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Previous page, page ${productsPage - 1}`}
-                  accessibilityState={{ disabled: productsPage <= 1 }}
-                >
-                  <Ionicons name="chevron-back" size={16} color={productsPage <= 1 ? Colors.textSecondary : Colors.primary} />
-                </AnimatedPressable>
-                <Text style={styles.paginationLabel}>Page {productsPage} of {productsTotalPages}</Text>
-                <AnimatedPressable
-                  onPress={() => setProductsPage((p) => Math.min(productsTotalPages, p + 1))}
-                  disabled={productsPage >= productsTotalPages}
-                  style={[styles.paginationBtn, productsPage >= productsTotalPages && styles.paginationBtnDisabled]}
-                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Next page, page ${productsPage + 1}`}
-                  accessibilityState={{ disabled: productsPage >= productsTotalPages }}
-                >
-                  <Ionicons name="chevron-forward" size={16} color={productsPage >= productsTotalPages ? Colors.textSecondary : Colors.primary} />
-                </AnimatedPressable>
               </View>
             )}
           </View>
@@ -1422,14 +1406,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 20,
     paddingVertical: Spacing.md,
-  },
-  productsPaginationHeader: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    backgroundColor: Colors.surface,
   },
   paginationBtn: {
     width: 36,

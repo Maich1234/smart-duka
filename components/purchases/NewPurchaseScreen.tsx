@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useNavigation } from 'expo-router/react-navigation';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAlert } from '@/context/AlertContext';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { purchasingBasePath } from '@/utils/purchasingRoutes';
@@ -63,26 +63,31 @@ export function NewPurchaseScreen() {
     selectRecent, recentSearches, clearRecent,
   } = useSearch('purchase_products');
 
-  // Page is stored with the term it belongs to, so a new search derives page 1
-  // instead of setting it from an effect — the effect version briefly queried
-  // page N of the new term before correcting itself, wasting a request.
-  const [productPaging, setProductPaging] = useState({ term: searchQuery, page: 1 });
-  const productsPage = productPaging.term === searchQuery ? productPaging.page : 1;
-  const setProductsPage = (next: number | ((current: number) => number)) =>
-    setProductPaging({ term: searchQuery, page: typeof next === 'function' ? next(productsPage) : next });
-
-  const { data: productsData, refetch: refetchProducts } = useQuery({
-    queryKey: ['products', searchQuery, productsPage, EXCLUDE_TYPES],
-    queryFn: () => getProducts({ search: searchQuery, page: productsPage, limit: 10, excludeTypes: EXCLUDE_TYPES }),
+  // The search term is part of the query key, so a new search starts its own
+  // paging — no page number to keep in step with it, and none of the wasted
+  // page-N-of-the-new-term request that the derived-page dance existed to
+  // avoid.
+  const {
+    data: productsData,
+    refetch: refetchProducts,
+    fetchNextPage: fetchMoreProducts,
+    hasNextPage: hasMoreProducts,
+    isFetchingNextPage: loadingMoreProducts,
+  } = useInfiniteQuery({
+    queryKey: ['products', searchQuery, EXCLUDE_TYPES],
+    queryFn: ({ pageParam }) =>
+      getProducts({ search: searchQuery, page: pageParam, limit: 10, excludeTypes: EXCLUDE_TYPES }),
     enabled: canCreate,
-    // Keep the current matches mounted while a new search/page loads,
-    // instead of the list flashing empty on every keystroke.
-    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
   // Server already hides bundle/service; this only catches the rarer
   // untracked-inventory case, which isn't a distinct productType to filter on.
-  const products = (productsData?.data ?? []).filter((p) => p.trackInventory !== false);
-  const productsTotalPages = productsData?.pagination?.pages ?? 1;
+  const products = useMemo(
+    () => (productsData?.pages.flatMap((page) => page.data) ?? []).filter((p) => p.trackInventory !== false),
+    [productsData],
+  );
 
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const onPullRefresh = async () => {
@@ -282,6 +287,9 @@ export function NewPurchaseScreen() {
           />
         )}
         contentContainerStyle={styles.listContent}
+        // More of the catalogue arrives as the buyer scrolls.
+        onEndReached={() => { if (hasMoreProducts && !loadingMoreProducts) fetchMoreProducts(); }}
+        onEndReachedThreshold={0.5}
         refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={onPullRefresh} tintColor={Colors.primary} />}
         ListEmptyComponent={<EmptyState title="No products found" subtitle="Try a different search term." />}
         ListHeaderComponent={
@@ -329,29 +337,6 @@ export function NewPurchaseScreen() {
               />
             )}
 
-            {productsTotalPages > 1 && (
-              <View style={styles.paginationRow}>
-                <AnimatedPressable
-                  onPress={() => setProductsPage((p) => Math.max(1, p - 1))}
-                  disabled={productsPage <= 1}
-                  style={[styles.paginationBtn, productsPage <= 1 && styles.paginationBtnDisabled]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Previous page"
-                >
-                  <Ionicons name="chevron-back" size={16} color={productsPage <= 1 ? Colors.textSecondary : Colors.primary} />
-                </AnimatedPressable>
-                <Text style={styles.paginationLabel}>Page {productsPage} of {productsTotalPages}</Text>
-                <AnimatedPressable
-                  onPress={() => setProductsPage((p) => Math.min(productsTotalPages, p + 1))}
-                  disabled={productsPage >= productsTotalPages}
-                  style={[styles.paginationBtn, productsPage >= productsTotalPages && styles.paginationBtnDisabled]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Next page"
-                >
-                  <Ionicons name="chevron-forward" size={16} color={productsPage >= productsTotalPages ? Colors.textSecondary : Colors.primary} />
-                </AnimatedPressable>
-              </View>
-            )}
           </View>
         }
       />
@@ -432,7 +417,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, marginBottom: Spacing.sm, color: Colors.textPrimary },
 
-  paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingVertical: Spacing.md, marginHorizontal: Spacing.lg },
   paymentMethodCard: {
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
@@ -443,7 +427,4 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
   },
-  paginationBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  paginationBtnDisabled: { borderColor: Colors.border },
-  paginationLabel: { fontSize: 13, fontFamily: Typography.fontFamilySemiBold, color: Colors.textSecondary },
 });

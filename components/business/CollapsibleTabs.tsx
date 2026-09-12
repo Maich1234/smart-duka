@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useSharedValue, withSpring } from 'react-native-reanimated';
-import { BusinessTabBar } from './BusinessTabBar';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import type { CollapsibleTabsProps } from './CollapsibleTabs.types';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
@@ -25,6 +32,13 @@ import { Motion } from '@/constants/Motion';
  * refresh keeps working — the header is part of the content rather than
  * floating over it.
  */
+
+/** How close to the end counts as "reached", in points. */
+const END_REACHED_SLACK = 480;
+
+const nearEnd = ({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) =>
+  contentOffset.y + layoutMeasurement.height >= contentSize.height - END_REACHED_SLACK;
+
 export const CollapsibleTabs: React.FC<CollapsibleTabsProps> = ({
   header,
   tabs,
@@ -61,11 +75,12 @@ export const CollapsibleTabs: React.FC<CollapsibleTabsProps> = ({
   );
 
   const tabBar = (
-    <BusinessTabBar
+    <ScrollableTabBar
       tabs={tabs}
       activeIndex={activeIndex}
       onSelect={handleSelect}
       progress={progress}
+      accessibilityLabel="Business sections"
     />
   );
 
@@ -83,6 +98,14 @@ export const CollapsibleTabs: React.FC<CollapsibleTabsProps> = ({
             // tab bar stops at the top and stays reachable.
             stickyHeaderIndices={[1]}
             showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={
+              tab.onEndReached
+                ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                  if (nearEnd(e.nativeEvent)) tab.onEndReached!();
+                }
+                : undefined
+            }
             refreshControl={
               onRefresh ? (
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />

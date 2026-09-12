@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, RefreshControl, ScrollView, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
+import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { QueryError } from '@/components/ui/QueryError';
@@ -118,7 +119,6 @@ export function PurchaseHistoryScreen() {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [sort, setSort] = useState<SortOption>('newest');
   const [sortOpen, setSortOpen] = useState(false);
-  const [page, setPage] = useState(1);
 
   const {
     value: searchValue,
@@ -132,38 +132,40 @@ export function PurchaseHistoryScreen() {
     isSearching,
   } = useSearch('purchase_history');
 
-  const { data, isLoading, isPlaceholderData, isRefetching, isError, refetch } = useQuery({
-    queryKey: ['purchases', searchQuery, status, sort, page],
-    queryFn: () =>
+  const {
+    data, isLoading, isRefetching, isError, refetch,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    // Search, status and sort are the key; paging is the cursor within it, so
+    // changing a filter restarts from the first page on its own.
+    queryKey: ['purchases', searchQuery, status, sort],
+    queryFn: ({ pageParam }) =>
       getPurchases({
         search: searchQuery || undefined,
         status: status === 'all' ? undefined : status,
         sort,
-        page,
+        page: pageParam,
         limit: PAGE_SIZE,
       }),
     enabled: canView,
-    // Every filter/sort/page change is a new query key. Without this the whole
-    // screen — search bar and chips included — was replaced by a skeleton on
-    // each tap, so the control you just used vanished under your finger.
-    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
 
-  const purchases = data?.data ?? [];
-  const totalPages = data?.pagination?.pages ?? 1;
-  const total = data?.pagination?.total ?? 0;
+  const purchases = useMemo<Purchase[]>(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
+  // First page carries the authoritative count; later pages only a lower bound.
+  const total = data?.pages[0]?.pagination.total ?? 0;
 
   const selectStatus = (value: StatusFilter) => {
     haptics.light();
     setStatus(value);
-    setPage(1);
   };
 
   const selectSort = (value: SortOption) => {
     haptics.light();
     setSort(value);
     setSortOpen(false);
-    setPage(1);
   };
 
   if (!canView) {
@@ -277,7 +279,7 @@ export function PurchaseHistoryScreen() {
               {/* Placeholder data means the rows below are the previous page's
                   while the new one loads — say so instead of showing them as
                   though they were the result. */}
-              {isPlaceholderData && <ActivityIndicator size="small" color={Colors.primary} />}
+              {isRefetching && <ActivityIndicator size="small" color={Colors.primary} />}
             </View>
           ) : null
         }
@@ -298,31 +300,10 @@ export function PurchaseHistoryScreen() {
             />
           )
         }
-        ListFooterComponent={
-          totalPages > 1 ? (
-            <View style={styles.paginationBar}>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel="Previous page"
-              >
-                <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textTertiary : Colors.primary} />
-              </AnimatedPressable>
-              <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel="Next page"
-              >
-                <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textTertiary : Colors.primary} />
-              </AnimatedPressable>
-            </View>
-          ) : null
-        }
+        // Pages load as the buyer scrolls rather than from Prev/Next buttons.
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<ListFooterLoader loading={isFetchingNextPage} />}
       />
 
       <BottomSheet visible={sortOpen} onClose={() => setSortOpen(false)}>
@@ -547,27 +528,4 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  paginationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  pageBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageLabel: {
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textSecondary,
-  },
 });

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
@@ -81,7 +82,6 @@ export function SuppliersScreen() {
   // A purchase's supplier row deep-links here with the sheet pre-opened.
   const { supplierId: deepLinkedSupplierId } = useLocalSearchParams<{ supplierId?: string }>();
 
-  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(deepLinkedSupplierId ?? null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<SupplierFormState>(EMPTY_FORM);
@@ -101,13 +101,17 @@ export function SuppliersScreen() {
     isSearching,
   } = useSearch('suppliers');
 
-  const { data, isLoading, isRefetching, isError, refetch } = useQuery({
-    queryKey: ['suppliers', searchQuery, page],
-    queryFn: () => getSuppliers({ search: searchQuery || undefined, page, limit: PAGE_SIZE }),
+  const {
+    data, isLoading, isRefetching, isError, refetch,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['suppliers', searchQuery],
+    queryFn: ({ pageParam }) =>
+      getSuppliers({ search: searchQuery || undefined, page: pageParam, limit: PAGE_SIZE }),
     enabled: canView,
-    // Keeps the current page on screen while the next one loads, instead of
-    // blanking the list (and the search box with it) between keystrokes.
-    placeholderData: keepPreviousData,
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
 
   const { data: detailData, isLoading: loadingDetail, isError: detailError, refetch: refetchDetail } = useQuery({
@@ -116,9 +120,10 @@ export function SuppliersScreen() {
     enabled: !!selectedId,
   });
 
-  const suppliers = data?.data ?? [];
-  const totalPages = data?.pagination?.pages ?? 1;
-  const total = data?.pagination?.total ?? 0;
+  const suppliers = useMemo<Supplier[]>(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
+  // First page carries the authoritative count; later pages only report a
+  // lower bound (see paginatedResult on the backend).
+  const total = data?.pages[0]?.pagination.total ?? 0;
   const detail = detailData?.data;
 
   const invalidate = () => {
@@ -149,7 +154,6 @@ export function SuppliersScreen() {
       const created = formMode === 'create';
       closeForm();
       invalidate();
-      if (created) setPage(1);
       toast({ type: 'success', message: res.message || (created ? 'Supplier added' : 'Supplier updated') });
     },
     onError: (error: any) => {
@@ -326,31 +330,10 @@ export function SuppliersScreen() {
             />
           )
         }
-        ListFooterComponent={
-          totalPages > 1 ? (
-            <View style={styles.paginationBar}>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel="Previous page"
-              >
-                <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textTertiary : Colors.primary} />
-              </AnimatedPressable>
-              <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel="Next page"
-              >
-                <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textTertiary : Colors.primary} />
-              </AnimatedPressable>
-            </View>
-          ) : null
-        }
+        // Pages load as the owner scrolls rather than from Prev/Next buttons.
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<ListFooterLoader loading={isFetchingNextPage} />}
       />
 
       {/* ── Detail / add / edit — one sheet, content by mode ───────── */}
@@ -621,29 +604,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  paginationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  pageBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageLabel: {
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textSecondary,
-  },
 
   // ── Sheets
   sheet: { padding: Spacing.lg, gap: Spacing.sm },

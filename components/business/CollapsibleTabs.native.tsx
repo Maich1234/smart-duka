@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useSharedValue, useEvent } from 'react-native-reanimated';
 import {
   CollapsibleTabView,
   TabScrollView,
   type Route,
 } from 'react-native-collapsible-tabs-native';
-import { BusinessTabBar } from './BusinessTabBar';
+import { ScrollableTabBar } from '@/components/ui/ScrollableTabBar';
 import type { CollapsibleTabsProps } from './CollapsibleTabs.types';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Spacing';
@@ -31,6 +31,13 @@ import { Spacing } from '@/constants/Spacing';
  * bundle. Same split the codebase already uses for DatePicker and the
  * Bluetooth printer.
  */
+
+/** How close to the end counts as "reached", in points. */
+const END_REACHED_SLACK = 480;
+
+const nearEnd = ({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) =>
+  contentOffset.y + layoutMeasurement.height >= contentSize.height - END_REACHED_SLACK;
+
 export const CollapsibleTabs: React.FC<CollapsibleTabsProps> = ({
   header,
   tabs,
@@ -86,6 +93,14 @@ export const CollapsibleTabs: React.FC<CollapsibleTabsProps> = ({
         <TabScrollView
           contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={
+            tab?.onEndReached
+              ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                if (nearEnd(e.nativeEvent)) tab.onEndReached!();
+              }
+              : undefined
+          }
         >
           {tab?.render()}
         </TabScrollView>
@@ -98,11 +113,12 @@ export const CollapsibleTabs: React.FC<CollapsibleTabsProps> = ({
 
   const renderTabBar = useCallback(
     ({ index: current }: { index: number }) => (
-      <BusinessTabBar
+      <ScrollableTabBar
         tabs={tabs}
         activeIndex={current}
         onSelect={handleIndexChange}
         progress={progress}
+        accessibilityLabel="Business sections"
       />
     ),
     [tabs, handleIndexChange, progress],

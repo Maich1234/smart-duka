@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { QueryError } from '@/components/ui/QueryError';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -52,17 +53,18 @@ const DiscrepancyBadge: React.FC<{ value: number | null | undefined }> = ({ valu
 
 export default function ShiftsList() {
   const tabBarHeight = useTabBarHeight();
-  const [page, setPage] = useState(1);
-  const { data, isLoading, isError, isRefetching, refetch } = useQuery({
-    queryKey: ['shifts', page],
-    queryFn: () => getShifts({ page, limit: 10 }),
-    // Keep the current page's shifts mounted while the next page loads,
-    // instead of the whole list dropping to a skeleton on every page tap.
-    placeholderData: keepPreviousData,
+  const {
+    data, isLoading, isError, isRefetching, refetch,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['shifts'],
+    queryFn: ({ pageParam }) => getShifts({ page: pageParam, limit: 10 }),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
 
-  const shifts = data?.data ?? [];
-  const totalPages = data?.pagination?.pages ?? 1;
+  const shifts = useMemo(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
 
   if (isLoading && shifts.length === 0) return <ListSkeleton />;
   // Only when there's nothing to fall back on — a page-switch error with
@@ -126,31 +128,12 @@ export default function ShiftsList() {
           </AnimatedPressable>
         </Animated.View>
       )}
-      ListFooterComponent={
-        totalPages > 1 ? (
-          <View style={styles.pagination}>
-            <AnimatedPressable
-              onPress={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-              accessibilityRole="button"
-              accessibilityLabel="Previous page"
-            >
-              <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textTertiary : Colors.primary} />
-            </AnimatedPressable>
-            <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-            <AnimatedPressable
-              onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-              accessibilityRole="button"
-              accessibilityLabel="Next page"
-            >
-              <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textTertiary : Colors.primary} />
-            </AnimatedPressable>
-          </View>
-        ) : null
-      }
+      // Pages arrive as the owner reaches the end of the list rather than
+      // from Prev/Next buttons: a shift list is read by scrolling back
+      // through time, and a pager made that a tap-wait-tap loop.
+      onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={<ListFooterLoader loading={isFetchingNextPage} />}
     />
   );
 }
@@ -214,28 +197,5 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilyBold,
     color: Colors.textPrimary,
     fontVariant: ['tabular-nums'],
-  },
-  pagination: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  pageBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageBtnDisabled: { opacity: 0.5 },
-  pageLabel: {
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textSecondary,
   },
 });

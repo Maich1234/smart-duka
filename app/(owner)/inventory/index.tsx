@@ -11,9 +11,10 @@ import { FlashList } from '@shopify/flash-list';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getProducts, deleteProduct, updateStock, type Product } from '@/services/products';
@@ -91,21 +92,17 @@ export default function OwnerInventory() {
   });
   const depletion = depletionData?.data;
 
-  // Page is stored with the term it belongs to, so a new search derives page 1
-  // rather than setting it from an effect — the effect version rendered (and
-  // fetched) page N of the new term once before correcting itself.
-  const [paging, setPaging] = useState({ term: searchQuery, page: 1 });
-  const page = paging.term === searchQuery ? paging.page : 1;
-  const setPage = (next: number | ((current: number) => number)) =>
-    setPaging({ term: searchQuery, page: typeof next === 'function' ? next(page) : next });
-
-  const { data, isLoading, isRefetching, isError, refetch } = useQuery({
-    queryKey: ['products', searchQuery, page],
-    queryFn: () => getProducts({ search: searchQuery, page, limit: 10 }),
-    // Keep showing the current page/search results while the next one loads,
-    // instead of the whole screen (search bar included) dropping to a
-    // skeleton on every keystroke or page change.
-    placeholderData: keepPreviousData,
+  // The search term is the query key, so typing restarts paging on its own —
+  // there is no page state left to keep in step with it.
+  const {
+    data, isLoading, isRefetching, isError, refetch,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['products', searchQuery],
+    queryFn: ({ pageParam }) => getProducts({ search: searchQuery, page: pageParam, limit: 10 }),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
 
   const deleteMutation = useMutation({
@@ -153,8 +150,10 @@ export default function OwnerInventory() {
     }
   };
 
-  const allProducts = useMemo(() => data?.data || [], [data]);
-  const totalPages = data?.pagination?.pages ?? 1;
+  const allProducts = useMemo<Product[]>(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
+  // First page carries the authoritative count; later pages only a lower bound.
+  const catalogueTotal = data?.pages[0]?.pagination.total ?? allProducts.length;
+  const hasMorePages = !!hasNextPage;
 
   // Apply local search on top of server results so matches are instant while
   // the debounced API call is still in-flight (covers SKU, name, category).
@@ -192,7 +191,7 @@ export default function OwnerInventory() {
 
   const filterCounts: Record<VelocityFilter, number> = {
     // Use server total so "All" shows full catalogue count, not the 10-item page slice
-    all: data?.pagination?.total ?? allProducts.length,
+    all: catalogueTotal,
     fast: fastIds.size,
     slow: slowIds.size,
     stockout: stockoutIds.size,
@@ -208,14 +207,15 @@ export default function OwnerInventory() {
     );
     return {
       // Use server pagination total so the stats card reflects the full catalogue
-      totalProducts: data?.pagination?.total ?? allProducts.length,
+      totalProducts: catalogueTotal,
       lowStockCount,
       stockoutSoonCount: stockoutIds.size,
       totalValue,
-      // Flag that value/lowStock counts come from this page only (not whole catalogue)
-      isPageScope: (data?.pagination?.pages ?? 1) > 1,
+      // Flags that value/lowStock counts cover only what has been loaded so
+      // far, not the whole catalogue — still true while pages remain unread.
+      isPageScope: hasMorePages,
     };
-  }, [allProducts, stockoutIds, data?.pagination?.total, data?.pagination?.pages]);
+  }, [allProducts, stockoutIds, catalogueTotal, hasMorePages]);
 
   const alertCount = stats.lowStockCount + stats.stockoutSoonCount;
 
@@ -238,7 +238,7 @@ export default function OwnerInventory() {
         recentSearches={recentSearches}
         onSelectRecent={selectRecent}
         onClearRecent={clearRecent}
-        productCount={data?.pagination?.total ?? allProducts.length}
+        productCount={catalogueTotal}
         alertCount={alertCount}
         onBellPress={() => router.push('/(owner)/notifications')}
       />
@@ -332,33 +332,10 @@ export default function OwnerInventory() {
           { paddingBottom: tabBarHeight + Spacing.lg },
         ]}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
-        ListFooterComponent={
-          totalPages > 1 ? (
-            <View style={styles.paginationBar}>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel={`Previous page, page ${page - 1}`}
-                accessibilityState={{ disabled: page <= 1 }}
-              >
-                <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
-              </AnimatedPressable>
-              <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-              <AnimatedPressable
-                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-                accessibilityRole="button"
-                accessibilityLabel={`Next page, page ${page + 1}`}
-                accessibilityState={{ disabled: page >= totalPages }}
-              >
-                <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
-              </AnimatedPressable>
-            </View>
-          ) : null
-        }
+        // Pages load as the owner scrolls rather than from Prev/Next buttons.
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<ListFooterLoader loading={isFetchingNextPage} />}
         ListHeaderComponent={
           // Plain wrapper: the stat cards inside stagger themselves in, and an
           // `entering` here would be a second animation on the same path —
@@ -375,11 +352,11 @@ export default function OwnerInventory() {
                   onViewStockout={() => setVelocityFilter('stockout')}
                 />
               )}
-            {velocityFilter !== 'all' && totalPages > 1 && (
+            {velocityFilter !== 'all' && hasMorePages && (
               <View style={styles.filterScopeNote}>
-                <Ionicons name="information-circle-outline" size={13} color={Colors.textTertiary} />
+                <Ionicons name="information-circle-outline" size={13} color={Colors.textSecondary} />
                 <Text style={styles.filterScopeText}>
-                  Showing matches on this page. Browse pages to see all{' '}
+                  Showing matches loaded so far. Keep scrolling to see all{' '}
                   {filterCounts[velocityFilter]} items.
                 </Text>
               </View>
@@ -686,30 +663,6 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     paddingTop: Spacing.md,
-  },
-  paginationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-    paddingVertical: Spacing.lg,
-  },
-  pageBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageBtnDisabled: {
-    borderColor: Colors.border,
-  },
-  pageLabel: {
-    fontSize: 13,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textSecondary,
   },
   filterScopeNote: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import { BusinessHeader } from '@/components/business/BusinessHeader';
 import { CapitalBreakdownSheet } from '@/components/business/CapitalBreakdownSheet';
 import { OverviewTab } from '@/components/business/OverviewTab';
 import { SalesTab } from '@/components/business/SalesTab';
-import { ProductsTab } from '@/components/business/ProductsTab';
+import { ProductsTab, type ProductsTabHandle } from '@/components/business/ProductsTab';
 import { StaffTab } from '@/components/business/StaffTab';
 import { AssetsTab } from '@/components/business/AssetsTab';
 import { getBusinessOverview, type PeriodParams } from '@/services/business';
@@ -54,6 +54,9 @@ export default function OwnerBusiness() {
   // One period for the whole screen — see BusinessTabProps for why it doesn't
   // live inside each tab.
   const [period, setPeriod] = useState<PeriodParams>({ period: 'month' });
+  // Products is the only tab long enough to paginate; the shell reports when
+  // its page nears the end and this hands that to the tab's own query.
+  const productsRef = useRef<ProductsTabHandle>(null);
   const [capitalSheetOpen, setCapitalSheetOpen] = useState(false);
 
   const { data, isError, refetch, isRefetching, dataUpdatedAt } = useQuery({
@@ -92,7 +95,10 @@ export default function OwnerBusiness() {
         key: 'products',
         label: 'Products',
         icon: 'cube-outline',
-        render: () => <ProductsTab currency={currency} period={period} onPeriodChange={setPeriod} />,
+        render: () => (
+          <ProductsTab ref={productsRef} currency={currency} period={period} onPeriodChange={setPeriod} />
+        ),
+        onEndReached: () => productsRef.current?.loadMore(),
       },
       {
         key: 'staff',

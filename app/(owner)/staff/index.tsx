@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { View, RefreshControl, StyleSheet, Text } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { CrossfadeCircle } from '@/components/ui/motion';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
 import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { getStaff } from '@/services/staff';
+import { getStaff, type Staff } from '@/services/staff';
 import { useStaffDeletionRequests } from '@/hooks/useStaffDeletionRequests';
 import { formatDate as formatRequestDate } from '@/utils/formatters';
 import { StaffCard } from '@/components/staff/StaffCard';
@@ -41,20 +42,18 @@ export default function OwnerStaffList() {
   } = useSearch('staff');
 
   // Page is stored together with the term it belongs to, so a new search
-  // *derives* page 1 rather than setting it from an effect — the effect version
-  // rendered page 2 of the new term once before correcting itself, which is the
-  // cascading render react-hooks/set-state-in-effect flags.
-  const [paging, setPaging] = useState({ term: searchQuery, page: 1 });
-  const page = paging.term === searchQuery ? paging.page : 1;
-  const setPage = (next: number | ((current: number) => number)) =>
-    setPaging({ term: searchQuery, page: typeof next === 'function' ? next(page) : next });
-
-  const { data, isLoading, isRefetching, isError, refetch } = useQuery({
-    queryKey: ['staff', searchQuery, page],
-    queryFn: () => getStaff({ search: searchQuery, page, limit: 10 }),
-    // Keep the current team list mounted while a new search/page loads,
-    // instead of the whole screen dropping to a skeleton.
-    placeholderData: keepPreviousData,
+  // The search term is the query key, so typing restarts paging on its own —
+  // no page state to keep in step with it, and none of the cascading-render
+  // trouble the derived-page dance above existed to avoid.
+  const {
+    data, isLoading, isRefetching, isError, refetch,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['staff', searchQuery],
+    queryFn: ({ pageParam }) => getStaff({ search: searchQuery, page: pageParam, limit: 10 }),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.pagination.page < last.pagination.pages ? last.pagination.page + 1 : undefined,
   });
 
   // Independent of the paginated/searched list: a request must not disappear
@@ -63,8 +62,7 @@ export default function OwnerStaffList() {
   const deletionRequests = deletionRequestData?.data ?? [];
   const approvalWindowDays = deletionRequestData?.meta?.approvalWindowDays;
 
-  const staffList = data?.data || [];
-  const totalPages = data?.pagination?.pages ?? 1;
+  const staffList = useMemo<Staff[]>(() => data?.pages.flatMap((p) => p.data) ?? [], [data]);
   const activeCount = staffList.filter((s) => s.isActive).length;
   const inactiveCount = staffList.filter((s) => !s.isActive).length;
 
@@ -177,32 +175,7 @@ export default function OwnerStaffList() {
 
   const ListFooter = (
     <>
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <View style={styles.paginationBar}>
-          <AnimatedPressable
-            onPress={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-            accessibilityRole="button"
-            accessibilityLabel={`Previous page, page ${page - 1}`}
-            accessibilityState={{ disabled: page <= 1 }}
-          >
-            <Ionicons name="chevron-back" size={16} color={page <= 1 ? Colors.textSecondary : Colors.primary} />
-          </AnimatedPressable>
-          <Text style={styles.pageLabel}>Page {page} of {totalPages}</Text>
-          <AnimatedPressable
-            onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-            accessibilityRole="button"
-            accessibilityLabel={`Next page, page ${page + 1}`}
-            accessibilityState={{ disabled: page >= totalPages }}
-          >
-            <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? Colors.textSecondary : Colors.primary} />
-          </AnimatedPressable>
-        </View>
-      )}
+      <ListFooterLoader loading={isFetchingNextPage} />
 
       {staffList.length > 0 && (
         <View style={styles.promoBanner}>
@@ -259,6 +232,9 @@ export default function OwnerStaffList() {
         )}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
+        // Pages load as the owner scrolls rather than from Prev/Next buttons.
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
         contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
         ListEmptyComponent={<EmptyState title="No staff found" subtitle="Add a team member to get started." />}
@@ -514,29 +490,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.caption,
     color: Colors.textSecondary,
     lineHeight: 16,
-  },
-  paginationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-    paddingVertical: Spacing.lg,
-  },
-  pageBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageBtnDisabled: {
-    borderColor: Colors.border,
-  },
-  pageLabel: {
-    fontSize: 13,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textSecondary,
   },
 });

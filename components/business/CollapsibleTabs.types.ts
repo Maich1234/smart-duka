@@ -22,6 +22,13 @@ export interface TabDescriptor {
    * called once per route (elements are cheap; mounting is what's deferred).
    */
   render: () => React.ReactNode;
+  /**
+   * Called as this tab's page scrolls near its end. The shell owns the scroll
+   * view, so a page that paginates cannot fit its own `onEndReached` — this is
+   * how it gets one. Fires repeatedly while the end is in view, so the handler
+   * must guard on "already loading".
+   */
+  onEndReached?: () => void;
 }
 
 export interface CollapsibleTabsProps {
