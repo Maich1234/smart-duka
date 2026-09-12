@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { haptics } from '@/utils/haptics';
 import {
   View,
   StyleSheet,
   Platform,
-  Dimensions,
+  LayoutChangeEvent,
 } from 'react-native';
 import { Tabs, Redirect, usePathname, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -26,8 +26,6 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { TAB_BAR_BASE_HEIGHT } from '@/constants/Layout';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 interface TabConfig {
   name: string;
   label: string;
@@ -43,8 +41,11 @@ const TAB_CONFIGS: TabConfig[] = [
   { name: 'profile', label: 'Me', icon: 'person-outline', activeIcon: 'person' },
 ];
 
-const TAB_COUNT = TAB_CONFIGS.length;
-const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
+// No module-scope `Dimensions.get('window')` here. That value is read once,
+// when the bundle is evaluated, and never again — so the sliding indicator
+// kept using the launch width after a rotation, a foldable unfolding, an
+// Android split-screen resize or a browser resize, landing under the wrong
+// tab and drawing the wrong width. The row measures itself instead.
 
 /** Routes reachable from the tab bar — the only ones without a back button. */
 const TAB_ROUTE_NAMES = new Set(TAB_CONFIGS.map((tc) => tc.name));
@@ -121,17 +122,30 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
   const activeVisibleIndex = visibleRoutes.findIndex((r) => r.name === activeRoute?.name);
 
   // Sliding indicator position
-  const indicatorX = useSharedValue(activeVisibleIndex >= 0 ? activeVisibleIndex * TAB_WIDTH : 0);
+  const [barWidth, setBarWidth] = useState(0);
+  const tabWidth = visibleRoutes.length > 0 ? barWidth / visibleRoutes.length : 0;
 
+  const onBarLayout = useCallback((e: LayoutChangeEvent) => {
+    const next = e.nativeEvent.layout.width;
+    setBarWidth((prev) => (prev === next ? prev : next));
+  }, []);
+
+  const indicatorX = useSharedValue(0);
+  const lastIndex = useRef<number | null>(null);
+
+  // `tabWidth` is a dependency because a resize moves the indicator without
+  // the active tab changing. Only a tab change animates: the first paint and
+  // a resize snap, so the pill neither slides in from the left on launch nor
+  // glides across the bar when a foldable opens.
   useEffect(() => {
-    if (activeVisibleIndex >= 0) {
-      indicatorX.value = withSpring(activeVisibleIndex * TAB_WIDTH, {
-        damping: 20,
-        stiffness: 200,
-        mass: 0.8,
-      });
-    }
-  }, [activeVisibleIndex, indicatorX]);
+    if (activeVisibleIndex < 0 || tabWidth <= 0) return;
+    const target = activeVisibleIndex * tabWidth;
+    const tabChanged = lastIndex.current !== null && lastIndex.current !== activeVisibleIndex;
+    lastIndex.current = activeVisibleIndex;
+    indicatorX.value = tabChanged
+      ? withSpring(target, { damping: 20, stiffness: 200, mass: 0.8 })
+      : target;
+  }, [activeVisibleIndex, tabWidth, indicatorX]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: indicatorX.value }],
@@ -161,14 +175,16 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
       <View style={styles.topBorderLine} />
 
       {/* Sliding pill indicator */}
-      <Animated.View
-        style={[styles.pillContainer, indicatorStyle, { pointerEvents: 'none' }]}
-      >
-        <View style={styles.pill} />
-      </Animated.View>
+      {tabWidth > 0 && (
+        <Animated.View
+          style={[styles.pillContainer, { width: tabWidth }, indicatorStyle, { pointerEvents: 'none' }]}
+        >
+          <View style={styles.pill} />
+        </Animated.View>
+      )}
 
       {/* Tab items */}
-      <View style={[styles.tabsRow, { paddingBottom: insets.bottom }]}>
+      <View style={[styles.tabsRow, { paddingBottom: insets.bottom }]} onLayout={onBarLayout}>
         {visibleRoutes.map((route) => {
           const config = TAB_CONFIGS.find((tc) => tc.name === route.name)!;
           const isFocused = route.name === activeRoute?.name;
@@ -217,7 +233,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
               onPress={onPress}
               style={styles.tabItem}
               accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityState={{ selected: isFocused }}
               accessibilityLabel={config.label}
             >
               <AnimatedTabIcon config={config} isFocused={isFocused} />
@@ -537,6 +553,13 @@ export default function OwnerLayout() {
           title: 'Profile',
         }}
       />
+      <Tabs.Screen
+        name="close-account"
+        options={{
+          title: 'Close Account',
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
@@ -575,12 +598,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     left: 0,
-    width: TAB_WIDTH,
     alignItems: 'center',
     pointerEvents: 'none',
   },
   pill: {
-    width: TAB_WIDTH * 0.55,
+    width: '55%',
     height: 3,
     borderRadius: 2,
     backgroundColor: Colors.primary,

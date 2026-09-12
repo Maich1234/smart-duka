@@ -9,7 +9,6 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  Dimensions,
 } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -36,9 +35,6 @@ import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-
-const { width: W } = Dimensions.get('window');
-const STAT_W = (W - Spacing.lg * 2 - 10) / 2;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -77,12 +73,12 @@ const ProfileSkeleton = () => (
   <View style={sk.container}>
     <View style={sk.hero} />
     <View style={sk.row}>
-      <View style={[sk.stat, { width: STAT_W }]} />
-      <View style={[sk.stat, { width: STAT_W }]} />
+      <View style={sk.stat} />
+      <View style={sk.stat} />
     </View>
     <View style={sk.row}>
-      <View style={[sk.stat, { width: STAT_W }]} />
-      <View style={[sk.stat, { width: STAT_W }]} />
+      <View style={sk.stat} />
+      <View style={sk.stat} />
     </View>
     <View style={sk.card} />
     <View style={sk.card} />
@@ -93,7 +89,7 @@ const sk = StyleSheet.create({
   container: { padding: Spacing.lg, gap: 12, backgroundColor: Colors.background, flex: 1 },
   hero: { height: 152, borderRadius: 24, backgroundColor: '#E2E8F0' },
   row: { flexDirection: 'row', gap: 10 },
-  stat: { height: 90, borderRadius: 14, backgroundColor: '#E2E8F0' },
+  stat: { flex: 1, height: 90, borderRadius: 14, backgroundColor: '#E2E8F0' },
   card: { height: 100, borderRadius: 16, backgroundColor: '#E2E8F0', marginTop: 4 },
 });
 
@@ -127,7 +123,7 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColor, iconBg, delay = 0 }) => (
-  <Animated.View entering={FadeInUp.duration(360).delay(delay)} style={[sc.card, { width: STAT_W }]}>
+  <Animated.View entering={FadeInUp.duration(360).delay(delay)} style={sc.card}>
     <View style={[sc.iconWrap, { backgroundColor: iconBg }]}>
       <Ionicons name={icon} size={17} color={iconColor} />
     </View>
@@ -138,6 +134,11 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColor, icon
 
 const sc = StyleSheet.create({
   card: {
+    // Shares the row evenly instead of a width computed once from
+    // Dimensions.get('window') at import: that value never updates, so the
+    // cards kept the launch width through a rotation, a split-screen resize
+    // or a foldable opening — leaving a gap, or overflowing the row.
+    flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 14,
@@ -556,7 +557,7 @@ export default function OwnerProfile() {
 
         {/* ── LEGAL ─────────────────────────────────────────────────────── */}
         <SectionLabel label="LEGAL" />
-        <LegalSection />
+        <LegalSection closeAccountHref="/(owner)/close-account" />
 
         {/* ── SIGN OUT ──────────────────────────────────────────────────── */}
         <Animated.View entering={FadeIn.duration(300).delay(180)} style={styles.signOutWrap}>
@@ -570,6 +571,8 @@ export default function OwnerProfile() {
             <Ionicons name="chevron-forward" size={15} color={Colors.textTertiary} />
           </AnimatedPressable>
 
+          {/* Status only — the way IN to closure lives in the legal block
+              above, deliberately not under the sign-out button. */}
           <DeleteAccountSection />
         </Animated.View>
 

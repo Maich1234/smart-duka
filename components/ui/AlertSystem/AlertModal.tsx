@@ -5,7 +5,6 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -25,9 +24,6 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
 import type { AlertConfig, AlertButton } from '@/context/AlertContext';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const DIALOG_WIDTH = Math.min(SCREEN_WIDTH - 48, 360);
 
 // ─── Per-type visual config ────────────────────────────────────────────────────
 
@@ -394,7 +390,13 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   card: {
-    width: DIALOG_WIDTH,
+    // The centred container already insets by Spacing.lg on both sides, so
+    // filling it and capping at 360 is the same dialog — minus a width frozen
+    // from Dimensions.get('window') at import, which outlived rotations and
+    // Android split-screen resizes and could leave the dialog wider than the
+    // window it sits in.
+    width: '100%',
+    maxWidth: 360,
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
