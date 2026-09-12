@@ -83,7 +83,7 @@ export default function StaffProfile() {
         <PrinterSection href="/(staff)/printer" />
         {showScanFeedback && <ScanFeedbackSection />}
         <ChangePasswordForm onChangePassword={handlePasswordChange} loading={updatingPassword} />
-        <LegalSection />
+        <LegalSection closeAccountHref="/(staff)/close-account" />
         <Button title="Logout" onPress={handleLogout} variant="danger" style={styles.logoutButton} />
         <DeleteAccountSection />
       </ScrollView>

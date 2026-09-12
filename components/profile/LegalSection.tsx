@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { router, type Href } from 'expo-router';
 import { openLegal, type LegalDocument } from '@/utils/openLegal';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -21,10 +22,16 @@ const DOCUMENTS: { key: LegalDocument; label: string; icon: keyof typeof Ionicon
  * able to re-read what they agreed to without hunting for it. There is
  * deliberately no checkbox here: consent was captured once at registration and
  * recorded server-side, and an untick on this screen would have no coherent
- * meaning (it can't retract a signed agreement, and the account-closure flow
- * below is the actual way out).
+ * meaning (it can't retract a signed agreement, and account closure is the
+ * actual way out).
+ *
+ * Account closure is the last row here, and this is the only way to reach it.
+ * Play requires deletion to be findable in the app, not that it be one tap
+ * from anything — and it used to sit directly beneath "Sign out", where a
+ * mis-tap costs an owner their whole business. Legal is where a user looks
+ * for it, and it is a section away from the sign-out button.
  */
-export const LegalSection: React.FC = () => (
+export const LegalSection: React.FC<{ closeAccountHref: Href }> = ({ closeAccountHref }) => (
   <View style={styles.card}>
     {DOCUMENTS.map((doc, index) => (
       <AnimatedPressable
@@ -36,9 +43,20 @@ export const LegalSection: React.FC = () => (
       >
         <Ionicons name={doc.icon} size={18} color={Colors.textSecondary} />
         <Text style={styles.label}>{doc.label}</Text>
-        <Ionicons name="open-outline" size={15} color={Colors.textTertiary} />
+        <Ionicons name="open-outline" size={15} color={Colors.textSecondary} />
       </AnimatedPressable>
     ))}
+
+    <AnimatedPressable
+      onPress={() => router.push(closeAccountHref)}
+      style={[styles.row, styles.rowDivided]}
+      accessibilityRole="button"
+      accessibilityLabel="Close my account"
+    >
+      <Ionicons name="person-remove-outline" size={18} color={Colors.textSecondary} />
+      <Text style={styles.label}>Close my account</Text>
+      <Ionicons name="chevron-forward" size={15} color={Colors.textSecondary} />
+    </AnimatedPressable>
   </View>
 );
 

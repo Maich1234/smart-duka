@@ -35,8 +35,15 @@ import { BorderRadius } from '@/constants/BorderRadius';
  *
  * Getting *in* is deliberately effortful (password + typed DELETE); getting
  * back out is deliberately trivial, at every one of those states.
+ *
+ * Two modes, because the two halves of this belong in different places.
+ * `status` is what a profile shows: the recovery cards for a closure already
+ * filed, and nothing at all otherwise — the way in used to sit directly under
+ * "Sign out", one slip of the thumb from the most destructive action in the
+ * app. `full` adds the trigger and its confirmation sheet, and lives on the
+ * dedicated Close Account screen (see CloseAccountScreen).
  */
-export const DeleteAccountSection: React.FC = () => {
+export const DeleteAccountSection: React.FC<{ mode?: 'status' | 'full' }> = ({ mode = 'status' }) => {
   const { toast } = useAlert();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -140,6 +147,11 @@ export const DeleteAccountSection: React.FC = () => {
       </View>
     );
   }
+
+  // Nothing filed, and this is a profile: show no way in at all. The route to
+  // closure is a quiet row in the legal block, which pushes the screen that
+  // renders this in `full` mode.
+  if (mode === 'status') return null;
 
   return (
     <>
