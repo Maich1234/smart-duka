@@ -4,7 +4,7 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -101,61 +101,66 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
 
   return (
     <>
-      <Text style={styles.title}>Choose an Option</Text>
-      <Text style={styles.productName}>{productName}</Text>
+      <SheetScrollBody>
+        <Text style={styles.title}>Choose an Option</Text>
+        <Text style={styles.productName}>{productName}</Text>
 
-      <View style={styles.chipRow}>
-        {variants.map((v) => {
-          const active = v._id === selectedId;
-          // Still shown as an FYI on the chip below, but no longer blocks
-          // selecting it — selling past what's on hand is allowed.
-          const outOfStock = remaining(v) === 0;
-          return (
-            <AnimatedPressable
-              key={v._id}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => setSelectedId(v._id)}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{v.name}</Text>
-              <Text style={[styles.chipPrice, active && styles.chipTextActive]}>
-                {formatCurrency(v.sellingPrice)}{outOfStock ? ' · Out of stock' : ''}
-              </Text>
-              {v.commissionPreview != null && (
-                <Text style={[styles.chipCommission, active && styles.chipTextActive]}>
-                  Earn {formatCurrency(v.commissionPreview)}
+        <View style={styles.chipRow}>
+          {variants.map((v) => {
+            const active = v._id === selectedId;
+            // Still shown as an FYI on the chip below, but no longer blocks
+            // selecting it — selling past what's on hand is allowed.
+            const outOfStock = remaining(v) === 0;
+            return (
+              <AnimatedPressable
+                key={v._id}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => setSelectedId(v._id)}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{v.name}</Text>
+                <Text style={[styles.chipPrice, active && styles.chipTextActive]}>
+                  {formatCurrency(v.sellingPrice)}{outOfStock ? ' · Out of stock' : ''}
                 </Text>
-              )}
-            </AnimatedPressable>
-          );
-        })}
-      </View>
+                {v.commissionPreview != null && (
+                  <Text style={[styles.chipCommission, active && styles.chipTextActive]}>
+                    Earn {formatCurrency(v.commissionPreview)}
+                  </Text>
+                )}
+              </AnimatedPressable>
+            );
+          })}
+        </View>
 
-      {selected && (
-        <>
-          <Text style={styles.maxStock}>
-            Available: {available}
-            {inCart > 0 ? ` · ${inCart} already in this sale` : ''}
-          </Text>
-          <Input
-            label="Quantity"
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="numeric"
-            error={quantityError ?? quantityWarning}
+        {selected && (
+          <>
+            <Text style={styles.maxStock}>
+              Available: {available}
+              {inCart > 0 ? ` · ${inCart} already in this sale` : ''}
+            </Text>
+            <Input
+              label="Quantity"
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+              error={quantityError ?? quantityWarning}
+            />
+          </>
+        )}
+      </SheetScrollBody>
+
+      <SheetFooter>
+
+        <View style={styles.buttonRow}>
+          <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button
+            title="Add"
+            onPress={handleConfirm}
+            loading={loading}
+            disabled={!canAdd}
+            style={styles.flexBtn}
           />
-        </>
-      )}
-
-      <View style={styles.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button
-          title="Add"
-          onPress={handleConfirm}
-          loading={loading}
-          disabled={!canAdd}
-          style={styles.flexBtn}
-        />
-      </View>
+        </View>
+      </SheetFooter>
     </>
   );
 };
@@ -171,6 +176,6 @@ const styles = StyleSheet.create({
   chipCommission: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2, fontFamily: Typography.fontFamilySemiBold },
   chipTextActive: { color: Colors.white },
   maxStock: { fontSize: Typography.size.small, textAlign: 'center', color: Colors.textSecondary, marginBottom: Spacing.sm },
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });

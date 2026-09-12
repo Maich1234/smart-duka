@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { startShift } from '@/services/shifts';
@@ -14,7 +14,6 @@ import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
-import { BorderRadius } from '@/constants/BorderRadius';
 
 interface StartShiftSheetProps {
   visible: boolean;
@@ -99,7 +98,8 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
 
   return (
     <BottomSheet visible={visible} onClose={loading ? () => {} : onClose}>
-      <View style={styles.content}>
+      <SheetScrollBody>
+        <View style={styles.content}>
         <View style={styles.iconWrap}>
           <Ionicons name="play" size={24} color={Colors.primary} />
         </View>
@@ -126,14 +126,17 @@ export const StartShiftSheet: React.FC<StartShiftSheetProps> = ({
           maxLength={300}
         />
 
+        </View>
+      </SheetScrollBody>
+
+      <SheetFooter>
         <Button
           title={parsedFloat > 0 ? `Start Shift with KSh ${parsedFloat.toLocaleString()}` : 'Start Shift'}
           onPress={handleStart}
           loading={loading}
           size="lg"
-          style={styles.startBtn}
         />
-      </View>
+      </SheetFooter>
     </BottomSheet>
   );
 };
@@ -163,5 +166,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: Spacing.lg,
   },
-  startBtn: { marginTop: Spacing.sm, borderRadius: BorderRadius.lg },
 });

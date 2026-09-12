@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAlert } from '@/context/AlertContext';
@@ -153,6 +153,7 @@ export const StaffDeletionRequestCard: React.FC<StaffDeletionRequestCardProps> =
       </View>
 
       <BottomSheet visible={declineOpen} onClose={() => !busy && setDeclineOpen(false)}>
+        <SheetScrollBody>
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>Decline this request?</Text>
           <Text style={styles.sheetBody}>
@@ -167,15 +168,18 @@ export const StaffDeletionRequestCard: React.FC<StaffDeletionRequestCardProps> =
             multiline
             maxLength={300}
           />
+        </View>
+        </SheetScrollBody>
+
+        <SheetFooter>
           <Button
             title="Decline request"
             variant="danger"
             onPress={() => declineMutation.mutate()}
             loading={declineMutation.isPending}
-            style={styles.sheetBtn}
           />
           <Button title="Cancel" variant="ghost" onPress={() => setDeclineOpen(false)} disabled={busy} />
-        </View>
+        </SheetFooter>
       </BottomSheet>
     </>
   );
@@ -238,5 +242,4 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 22,
   },
-  sheetBtn: { marginTop: Spacing.sm },
 });

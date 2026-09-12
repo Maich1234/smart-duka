@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Modal, View, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -16,6 +16,16 @@ interface BottomSheetProps {
   onClose: () => void;
   children: React.ReactNode;
   maxHeightPercent?: number;
+  /**
+   * Actions pinned below the body, always on screen.
+   *
+   * A sheet that scrolls puts its buttons at the end of the scroll, so the
+   * one thing the sheet exists to do — confirm, save, close — is reachable
+   * only after reading everything above it. Worse on a small screen and worse
+   * again at a large font size, which is exactly where the body is longest.
+   * Passing them here keeps them in place while the body scrolls under them.
+   */
+  footer?: React.ReactNode;
 }
 
 /**
@@ -30,6 +40,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   onClose,
   children,
   maxHeightPercent = 90,
+  footer,
 }) => {
   const insets = useSafeAreaInsets();
   const dragY = useSharedValue(0);
@@ -110,7 +121,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                   <View style={styles.handle} />
                 </View>
               </GestureDetector>
-              {children}
+              {/* flexShrink lets the body give up height to the footer rather
+                  than pushing it off the sheet. Only applied when there is a
+                  footer, so sheets without one keep their existing layout. */}
+              {footer ? <View style={styles.body}>{children}</View> : children}
+              {!!footer && <View style={styles.footer}>{footer}</View>}
             </Animated.View>
           </KeyboardAvoidingView>
         </View>
@@ -127,6 +142,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.overlay,
     justifyContent: 'flex-end',
+  },
+  body: { flexShrink: 1 },
+  footer: {
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    gap: Spacing.sm,
   },
   sheet: {
     backgroundColor: Colors.surface,
@@ -155,3 +177,26 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
+
+/**
+ * A sheet's scrolling body, sized to give up height to a pinned footer rather
+ * than pushing it off the screen.
+ *
+ * Use it with `SheetFooter` for sheets whose actions live inside a separate
+ * body component (the mount-on-open pattern), where the `footer` prop on
+ * BottomSheet is out of scope. The two produce the same layout.
+ */
+export const SheetScrollBody: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ScrollView
+    style={styles.body}
+    keyboardShouldPersistTaps="handled"
+    showsVerticalScrollIndicator={false}
+  >
+    {children}
+  </ScrollView>
+);
+
+/** Actions pinned under a `SheetScrollBody`. Matches BottomSheet's `footer`. */
+export const SheetFooter: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <View style={styles.footer}>{children}</View>
+);

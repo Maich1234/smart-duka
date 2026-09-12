@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '../ui/AnimatedPressable';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
 import { haptics } from '@/utils/haptics';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -59,51 +59,56 @@ const StockUpdateModalBody: React.FC<Omit<StockUpdateModalProps, 'visible'>> = (
 
   return (
     <>
-      <Text style={styles.title}>Update Stock</Text>
-      <Text style={styles.productName}>{productName}</Text>
-      <Text style={styles.currentStock}>Current stock: {currentStock}</Text>
+      <SheetScrollBody>
+        <Text style={styles.title}>Update Stock</Text>
+        <Text style={styles.productName}>{productName}</Text>
+        <Text style={styles.currentStock}>Current stock: {currentStock}</Text>
 
-      <View style={styles.modeRow}>
-        <AnimatedPressable
-          style={[styles.modeBtn, mode === 'add' && styles.modeBtnActive]}
-          onPress={() => { haptics.selection(); setMode('add'); }}
-          accessibilityRole="button"
-          accessibilityState={{ selected: mode === 'add' }}
-          accessibilityLabel="Add to current stock"
-        >
-          <Text style={[styles.modeBtnText, mode === 'add' && styles.modeBtnTextActive]}>Add Stock</Text>
-        </AnimatedPressable>
-        <AnimatedPressable
-          style={[styles.modeBtn, mode === 'set' && styles.modeBtnActive]}
-          onPress={() => { haptics.selection(); setMode('set'); }}
-          accessibilityRole="button"
-          accessibilityState={{ selected: mode === 'set' }}
-          accessibilityLabel="Set stock to an exact total"
-        >
-          <Text style={[styles.modeBtnText, mode === 'set' && styles.modeBtnTextActive]}>Set Total</Text>
-        </AnimatedPressable>
-      </View>
+        <View style={styles.modeRow}>
+          <AnimatedPressable
+            style={[styles.modeBtn, mode === 'add' && styles.modeBtnActive]}
+            onPress={() => { haptics.selection(); setMode('add'); }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mode === 'add' }}
+            accessibilityLabel="Add to current stock"
+          >
+            <Text style={[styles.modeBtnText, mode === 'add' && styles.modeBtnTextActive]}>Add Stock</Text>
+          </AnimatedPressable>
+          <AnimatedPressable
+            style={[styles.modeBtn, mode === 'set' && styles.modeBtnActive]}
+            onPress={() => { haptics.selection(); setMode('set'); }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mode === 'set' }}
+            accessibilityLabel="Set stock to an exact total"
+          >
+            <Text style={[styles.modeBtnText, mode === 'set' && styles.modeBtnTextActive]}>Set Total</Text>
+          </AnimatedPressable>
+        </View>
 
-      <Input
-        label={mode === 'add' ? 'Quantity to Add' : 'New Total Quantity'}
-        value={amount}
-        onChangeText={setAmount}
-        keyboardType="number-pad"
-        placeholder={mode === 'add' ? 'e.g. 500' : String(currentStock)}
-        autoFocus
-      />
-      <Text style={styles.resultHint}>
-        {resultingStock !== null
-          ? `New stock will be ${resultingStock}`
-          : mode === 'add'
-            ? 'This adds to the current stock. The low stock alert works the same way.'
-            : 'This sets the total, replacing the current stock.'}
-      </Text>
+        <Input
+          label={mode === 'add' ? 'Quantity to Add' : 'New Total Quantity'}
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="number-pad"
+          placeholder={mode === 'add' ? 'e.g. 500' : String(currentStock)}
+          autoFocus
+        />
+        <Text style={styles.resultHint}>
+          {resultingStock !== null
+            ? `New stock will be ${resultingStock}`
+            : mode === 'add'
+              ? 'This adds to the current stock. The low stock alert works the same way.'
+              : 'This sets the total, replacing the current stock.'}
+        </Text>
+      </SheetScrollBody>
 
-      <View style={styles.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button title="Update" onPress={handleConfirm} loading={loading} disabled={resultingStock === null} style={styles.flexBtn} />
-      </View>
+      <SheetFooter>
+
+        <View style={styles.buttonRow}>
+          <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button title="Update" onPress={handleConfirm} loading={loading} disabled={resultingStock === null} style={styles.flexBtn} />
+        </View>
+      </SheetFooter>
     </>
   );
 };
@@ -141,6 +146,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
     textAlign: 'center',
   },
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });

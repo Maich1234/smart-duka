@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetFooter } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { StatRow, Divider, InfoNote, money } from './BusinessPrimitives';
 import type { CapitalPosition } from '@/services/business';
@@ -24,8 +24,17 @@ interface Props {
  * and is the single most misleading thing this screen could say.
  */
 export const CapitalBreakdownSheet: React.FC<Props> = ({ visible, onClose, capital, currency }) => (
-  <BottomSheet visible={visible} onClose={onClose} maxHeightPercent={80}>
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
+  <BottomSheet
+    visible={visible}
+    onClose={onClose}
+    maxHeightPercent={80}
+    footer={(
+      <SheetFooter>
+        <Button title="Close" variant="outline" onPress={onClose} />
+      </SheetFooter>
+    )}
+  >
+    <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
       <Text style={s.title} accessibilityRole="header">Estimated Capital</Text>
       <Text style={s.subtitle}>What the business owns, from what you have recorded.</Text>
 
@@ -63,12 +72,12 @@ export const CapitalBreakdownSheet: React.FC<Props> = ({ visible, onClose, capit
         </InfoNote>
       </View>
 
-      <Button title="Close" variant="outline" onPress={onClose} style={s.close} />
     </ScrollView>
   </BottomSheet>
 );
 
 const s = StyleSheet.create({
+  scroll: { flexShrink: 1 },
   content: { paddingBottom: Spacing.md },
   title: {
     fontSize: Typography.size.h3,
@@ -90,5 +99,4 @@ const s = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   note: { marginTop: Spacing.md },
-  close: { marginTop: Spacing.lg },
 });

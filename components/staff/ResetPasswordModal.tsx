@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -43,14 +43,19 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Reset Password</Text>
-      <Text style={styles.staffName}>For: {staffName}</Text>
-      <Input label="New Password" value={password} onChangeText={setPassword} secureTextEntry />
-      <Input label="Confirm Password" value={confirm} onChangeText={setConfirm} secureTextEntry />
-      <View style={styles.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button title="Reset" onPress={handleConfirm} loading={loading} style={styles.flexBtn} />
-      </View>
+      <SheetScrollBody>
+        <Text style={styles.title}>Reset Password</Text>
+        <Text style={styles.staffName}>For: {staffName}</Text>
+        <Input label="New Password" value={password} onChangeText={setPassword} secureTextEntry />
+        <Input label="Confirm Password" value={confirm} onChangeText={setConfirm} secureTextEntry />
+      </SheetScrollBody>
+
+      <SheetFooter>
+        <View style={styles.buttonRow}>
+          <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button title="Reset" onPress={handleConfirm} loading={loading} style={styles.flexBtn} />
+        </View>
+      </SheetFooter>
     </BottomSheet>
   );
 };
@@ -58,6 +63,6 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 const styles = StyleSheet.create({
   title: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, marginBottom: Spacing.sm, textAlign: 'center', color: Colors.textPrimary },
   staffName: { fontSize: Typography.size.body, textAlign: 'center', marginBottom: Spacing.md, color: Colors.textSecondary },
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Button } from '@/components/ui/Button';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
@@ -53,29 +53,34 @@ export const PurchaseConfirmationSheet: React.FC<PurchaseConfirmationSheetProps>
 }) => {
   return (
     <BottomSheet visible={visible} onClose={onClose}>
-      <Text style={styles.title}>Confirm Purchase</Text>
+      <SheetScrollBody>
+        <Text style={styles.title}>Confirm Purchase</Text>
 
-      <View style={styles.card}>
-        <SummaryRow icon="business-outline" label="Supplier" value={supplierName || 'Walk-in / no supplier'} />
-        <SummaryRow icon="cube-outline" label="Products" value={`${productCount} product${productCount === 1 ? '' : 's'}`} />
-        <SummaryRow icon="layers-outline" label="Total Quantity" value={String(totalQuantity)} />
-        <SummaryRow icon="cash-outline" label="Total Cost" value={formatCurrency(grandTotal)} />
-        <SummaryRow
-          icon={paymentMethod === 'credit' ? 'time-outline' : 'wallet-outline'}
-          label="Paid with"
-          value={paymentMethod === 'credit'
-            ? 'On credit, not paid yet'
-            : MONEY_OUT_METHOD_LABELS[paymentMethod]}
-        />
-        <SummaryRow icon="trending-up-outline" label="Inventory Impact" value={`+${totalQuantity} unit${totalQuantity === 1 ? '' : 's'}`} />
-        <SummaryRow icon="person-outline" label="Staff" value={staffName} />
-        <SummaryRow icon="calendar-outline" label="Date" value={formatDateTime(date)} />
-      </View>
+        <View style={styles.card}>
+          <SummaryRow icon="business-outline" label="Supplier" value={supplierName || 'Walk-in / no supplier'} />
+          <SummaryRow icon="cube-outline" label="Products" value={`${productCount} product${productCount === 1 ? '' : 's'}`} />
+          <SummaryRow icon="layers-outline" label="Total Quantity" value={String(totalQuantity)} />
+          <SummaryRow icon="cash-outline" label="Total Cost" value={formatCurrency(grandTotal)} />
+          <SummaryRow
+            icon={paymentMethod === 'credit' ? 'time-outline' : 'wallet-outline'}
+            label="Paid with"
+            value={paymentMethod === 'credit'
+              ? 'On credit, not paid yet'
+              : MONEY_OUT_METHOD_LABELS[paymentMethod]}
+          />
+          <SummaryRow icon="trending-up-outline" label="Inventory Impact" value={`+${totalQuantity} unit${totalQuantity === 1 ? '' : 's'}`} />
+          <SummaryRow icon="person-outline" label="Staff" value={staffName} />
+          <SummaryRow icon="calendar-outline" label="Date" value={formatDateTime(date)} />
+        </View>
+      </SheetScrollBody>
 
-      <View style={styles.buttonRow}>
-        <Button title="Back to Edit" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button title="Confirm & Save" onPress={onConfirm} loading={loading} style={styles.flexBtn} />
-      </View>
+      <SheetFooter>
+
+        <View style={styles.buttonRow}>
+          <Button title="Back to Edit" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button title="Confirm & Save" onPress={onConfirm} loading={loading} style={styles.flexBtn} />
+        </View>
+      </SheetFooter>
     </BottomSheet>
   );
 };

@@ -142,8 +142,28 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
           ? { icon: 'trending-up' as const, tint: Colors.info, title: `Drawer over by ${formatCurrency(discrepancy)}` }
           : { icon: 'alert-circle' as const, tint: Colors.danger, title: `Drawer short by ${formatCurrency(Math.abs(discrepancy))}` };
 
+  // The summary is long — longer at a large font size, and longest exactly
+  // when the drawer doesn't balance and there are refund/void/expense rows to
+  // explain it. Leaving the action at the end of that scroll meant the
+  // cashier had to read to the bottom before they could close the shift, or
+  // even dismiss a shift that had already closed.
+  const footer = closedOffline || closedShift ? (
+    <Button title="Done" onPress={handleClose} size="lg" />
+  ) : (
+    <>
+      <Button
+        title="Close Shift"
+        onPress={handleEnd}
+        loading={closing}
+        disabled={loadingPreview}
+        size="lg"
+      />
+      <Button title="Not yet" onPress={handleClose} variant="ghost" />
+    </>
+  );
+
   return (
-    <BottomSheet visible={visible} onClose={handleClose}>
+    <BottomSheet visible={visible} onClose={handleClose} footer={footer}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -163,7 +183,6 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
               You&apos;re clocked out. Your drawer count is saved on this device and the full
               reconciliation report will reach your owner as soon as you&apos;re back online.
             </Text>
-            <Button title="Done" onPress={handleClose} size="lg" style={styles.endBtn} />
           </View>
         ) : !closedShift ? (
           <>
@@ -237,15 +256,6 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
               </Text>
             ) : null}
 
-            <Button
-              title="Close Shift"
-              onPress={handleEnd}
-              loading={closing}
-              disabled={loadingPreview}
-              size="lg"
-              style={styles.endBtn}
-            />
-            <Button title="Not yet" onPress={handleClose} variant="ghost" />
           </>
         ) : (
           <View style={styles.doneWrap}>
@@ -276,7 +286,6 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
               shift report was sent to the owner.
             </Text>
 
-            <Button title="Done" onPress={handleClose} size="lg" style={styles.endBtn} />
           </View>
         )}
       </ScrollView>
@@ -285,7 +294,7 @@ export const EndShiftSheet: React.FC<EndShiftSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0 },
+  scroll: { flexGrow: 0, flexShrink: 1 },
   content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: Spacing.sm },
   title: {
     fontSize: Typography.size.h2,
@@ -362,7 +371,6 @@ const styles = StyleSheet.create({
     marginTop: -Spacing.xs,
     marginBottom: Spacing.sm,
   },
-  endBtn: { borderRadius: BorderRadius.lg, marginTop: Spacing.xs },
   doneWrap: { alignItems: 'center' },
   verdictIcon: {
     width: 76,

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
 import { HelpLink } from '../help/HelpLink';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -124,45 +124,50 @@ const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
 
   return (
     <>
-      <Text style={styles.title}>Add to Cart</Text>
-      <Text style={styles.productName}>{productName}</Text>
-      {maxStock < Infinity && (
-        <Text style={styles.maxStock}>
-          Available: {fmtQty(available)}
-          {isDecimal ? ` ${unitOfMeasure}` : ''}
-          {inCart > 0 ? ` · ${fmtQty(inCart)} already in this sale` : ''}
-        </Text>
-      )}
-      <Input
-        label={isDecimal ? `Quantity (${unitOfMeasure})` : 'Quantity'}
-        value={quantity}
-        onChangeText={setQuantity}
-        keyboardType={isDecimal ? 'decimal-pad' : 'numeric'}
-        placeholder={isDecimal ? `e.g. 0.5` : undefined}
-        error={quantityHint}
-      />
-      {priceEditable && (
-        <>
-          <Input
-            label={`Price${minPrice != null || maxPrice != null ? ` (${minPrice ?? 0}–${maxPrice ?? '∞'})` : ''}`}
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="numeric"
-            error={priceError}
-          />
-          <HelpLink slug="recording-sales" label="Why can I change this price?" />
-        </>
-      )}
-      <View style={styles.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button
-          title="Add"
-          onPress={handleConfirm}
-          loading={loading}
-          disabled={!canAdd}
-          style={styles.flexBtn}
+      <SheetScrollBody>
+        <Text style={styles.title}>Add to Cart</Text>
+        <Text style={styles.productName}>{productName}</Text>
+        {maxStock < Infinity && (
+          <Text style={styles.maxStock}>
+            Available: {fmtQty(available)}
+            {isDecimal ? ` ${unitOfMeasure}` : ''}
+            {inCart > 0 ? ` · ${fmtQty(inCart)} already in this sale` : ''}
+          </Text>
+        )}
+        <Input
+          label={isDecimal ? `Quantity (${unitOfMeasure})` : 'Quantity'}
+          value={quantity}
+          onChangeText={setQuantity}
+          keyboardType={isDecimal ? 'decimal-pad' : 'numeric'}
+          placeholder={isDecimal ? `e.g. 0.5` : undefined}
+          error={quantityHint}
         />
-      </View>
+        {priceEditable && (
+          <>
+            <Input
+              label={`Price${minPrice != null || maxPrice != null ? ` (${minPrice ?? 0}–${maxPrice ?? '∞'})` : ''}`}
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+              error={priceError}
+            />
+            <HelpLink slug="recording-sales" label="Why can I change this price?" />
+          </>
+        )}
+      </SheetScrollBody>
+
+      <SheetFooter>
+        <View style={styles.buttonRow}>
+          <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button
+            title="Add"
+            onPress={handleConfirm}
+            loading={loading}
+            disabled={!canAdd}
+            style={styles.flexBtn}
+          />
+        </View>
+      </SheetFooter>
     </>
   );
 };
@@ -171,6 +176,6 @@ const styles = StyleSheet.create({
   title: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, marginBottom: Spacing.sm, textAlign: 'center', color: Colors.textPrimary },
   productName: { fontSize: Typography.size.body, textAlign: 'center', marginBottom: Spacing.xs },
   maxStock: { fontSize: Typography.size.small, textAlign: 'center', color: Colors.textSecondary, marginBottom: Spacing.md },
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Button } from '../ui/Button';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetFooter } from '../ui/BottomSheet';
 import { iconForType, labelForType } from './notificationMeta';
 import type { AppNotification } from '@/services/notificationInbox';
 import { formatDateTime } from '@/utils/formatters';
@@ -33,7 +33,16 @@ export const NotificationDetailSheet: React.FC<NotificationDetailSheetProps> = (
   if (!notification) return null;
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} maxHeightPercent={80}>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      maxHeightPercent={80}
+      footer={(
+        <SheetFooter>
+          <Button title="Close" variant="outline" onPress={onClose} />
+        </SheetFooter>
+      )}
+    >
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.iconWrap}>
@@ -55,7 +64,6 @@ export const NotificationDetailSheet: React.FC<NotificationDetailSheetProps> = (
             style={styles.actionBtn}
           />
         ) : null}
-        <Button title="Close" variant="outline" onPress={onClose} style={styles.closeBtn} />
       </ScrollView>
     </BottomSheet>
   );
@@ -102,5 +110,4 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily,
   },
   actionBtn: { marginTop: Spacing.lg },
-  closeBtn: { marginTop: Spacing.sm },
 });

@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { useAlert } from '@/context/AlertContext';
 import { useSearch } from '@/hooks/useSearch';
 import { getSuppliers, createSupplier } from '@/services/suppliers';
@@ -85,6 +85,7 @@ export const SupplierPickerSheet: React.FC<SupplierPickerSheetProps> = ({ visibl
 
   return (
     <BottomSheet visible={visible} onClose={handleClose}>
+      <SheetScrollBody>
       {mode === 'search' ? (
         <>
           <Text style={styles.title}>Select Supplier</Text>
@@ -136,13 +137,6 @@ export const SupplierPickerSheet: React.FC<SupplierPickerSheetProps> = ({ visibl
           ) : searchQuery ? (
             <Text style={styles.emptyText}>No suppliers match &quot;{searchQuery}&quot;</Text>
           ) : null}
-
-          <Button
-            title="Continue without Supplier"
-            variant="ghost"
-            onPress={() => { handleClose(); onSelect(null); }}
-            style={styles.skipBtn}
-          />
         </>
       ) : (
         <>
@@ -150,12 +144,27 @@ export const SupplierPickerSheet: React.FC<SupplierPickerSheetProps> = ({ visibl
           <Input label="Name" value={newName} onChangeText={setNewName} placeholder="e.g. Wholesale Mart" />
           <Input label="Phone (optional)" value={newPhone} onChangeText={setNewPhone} keyboardType="phone-pad" placeholder="0700 000 000" />
           <Input label="Location (optional)" value={newLocation} onChangeText={setNewLocation} placeholder="e.g. Nairobi" />
+        </>
+      )}
+      </SheetScrollBody>
+
+      {/* Pinned per mode: picking a supplier and creating one end in
+          different actions, but both must stay reachable while a long
+          supplier list or the create form scrolls above them. */}
+      <SheetFooter>
+        {mode === 'search' ? (
+          <Button
+            title="Continue without Supplier"
+            variant="ghost"
+            onPress={() => { handleClose(); onSelect(null); }}
+          />
+        ) : (
           <View style={styles.buttonRow}>
             <Button title="Cancel" variant="outline" onPress={() => { setMode('search'); resetCreateForm(); }} style={styles.flexBtn} />
             <Button title="Save & Use" onPress={handleCreate} loading={createMutation.isPending} style={styles.flexBtn} />
           </View>
-        </>
-      )}
+        )}
+      </SheetFooter>
     </BottomSheet>
   );
 };
@@ -180,8 +189,7 @@ const styles = StyleSheet.create({
 
   emptyText: { fontSize: Typography.size.small, color: Colors.textSecondary, textAlign: 'center', marginVertical: Spacing.md },
 
-  skipBtn: { marginTop: Spacing.sm },
 
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.sm },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });

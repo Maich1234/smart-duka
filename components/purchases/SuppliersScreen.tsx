@@ -7,7 +7,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { ListFooterLoader } from '@/components/ui/ListFooterLoader';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -337,7 +337,48 @@ export function SuppliersScreen() {
       />
 
       {/* ── Detail / add / edit — one sheet, content by mode ───────── */}
-      <BottomSheet visible={sheetOpen} onClose={closeSheet}>
+      <BottomSheet
+        visible={sheetOpen}
+        onClose={closeSheet}
+        // Five fields on the form, and a detail view that grows with the
+        // supplier's purchase history — either can outrun the sheet, and the
+        // action must not be at the end of that scroll.
+        footer={formMode ? (
+          <SheetFooter>
+            <Button
+              title={formMode === 'edit' ? 'Save changes' : 'Add supplier'}
+              onPress={handleSave}
+              loading={saveMutation.isPending}
+            />
+            <Button
+              title={formMode === 'edit' ? 'Back' : 'Cancel'}
+              variant="ghost"
+              onPress={formMode === 'edit' ? closeForm : closeSheet}
+              disabled={saveMutation.isPending}
+            />
+          </SheetFooter>
+        ) : detail && !loadingDetail ? (
+          <SheetFooter>
+            {canEdit && (
+              <Button
+                title="Edit details"
+                variant="outline"
+                leftIcon="pencil-outline"
+                onPress={() => openEdit(detail)}
+              />
+            )}
+            {canDelete && detail.isActive && (
+              <Button
+                title="Remove supplier"
+                variant="ghost"
+                onPress={() => handleDelete(detail)}
+                loading={deleteMutation.isPending}
+              />
+            )}
+          </SheetFooter>
+        ) : undefined}
+      >
+        <SheetScrollBody>
         {formMode ? (
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>
@@ -375,18 +416,6 @@ export function SuppliersScreen() {
               value={form.notes}
               onChangeText={(notes) => setForm((f) => ({ ...f, notes }))}
               multiline
-            />
-            <Button
-              title={formMode === 'edit' ? 'Save changes' : 'Add supplier'}
-              onPress={handleSave}
-              loading={saveMutation.isPending}
-              style={styles.sheetBtn}
-            />
-            <Button
-              title={formMode === 'edit' ? 'Back' : 'Cancel'}
-              variant="ghost"
-              onPress={formMode === 'edit' ? closeForm : closeSheet}
-              disabled={saveMutation.isPending}
             />
           </View>
         ) : (
@@ -490,27 +519,11 @@ export function SuppliersScreen() {
                   </>
                 )}
 
-                {canEdit && (
-                  <Button
-                    title="Edit details"
-                    variant="outline"
-                    leftIcon="pencil-outline"
-                    onPress={() => openEdit(detail)}
-                    style={styles.sheetBtn}
-                  />
-                )}
-                {canDelete && detail.isActive && (
-                  <Button
-                    title="Remove supplier"
-                    variant="ghost"
-                    onPress={() => handleDelete(detail)}
-                    loading={deleteMutation.isPending}
-                  />
-                )}
               </>
             )}
           </View>
         )}
+        </SheetScrollBody>
       </BottomSheet>
     </View>
   );
@@ -709,5 +722,4 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
 
-  sheetBtn: { marginTop: Spacing.sm },
 });

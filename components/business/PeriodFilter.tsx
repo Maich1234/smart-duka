@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Text, StyleSheet, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { haptics } from '@/utils/haptics';
@@ -139,7 +139,19 @@ export const PeriodFilter: React.FC<PeriodFilterProps> = ({ value, onChange }) =
         accessibilityLabel="Reporting period"
       />
 
-      <BottomSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} maxHeightPercent={80}>
+      <BottomSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        maxHeightPercent={80}
+        // The inline date picker is tall on both platforms; Apply has to stay
+        // on screen while it is open.
+        footer={(
+          <SheetFooter>
+            <Button title="Show these dates" onPress={applyCustom} />
+          </SheetFooter>
+        )}
+      >
+        <SheetScrollBody>
         <Text style={s.sheetTitle} accessibilityRole="header">Pick dates</Text>
 
         <DateField
@@ -162,7 +174,7 @@ export const PeriodFilter: React.FC<PeriodFilterProps> = ({ value, onChange }) =
           <DatePicker value={draftEnd} onChange={(d) => { if (d) setDraftEnd(d); setEditing(null); }} />
         )}
 
-        <Button title="Show these dates" onPress={applyCustom} style={s.apply} />
+        </SheetScrollBody>
       </BottomSheet>
     </>
   );
@@ -236,5 +248,4 @@ const s = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
   },
-  apply: { marginTop: Spacing.md },
 });

@@ -117,6 +117,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   scroll: {
+    // Gives height back to the action buttons below rather than pushing them
+    // off the sheet on a long receipt.
+    flexShrink: 1,
     marginBottom: Spacing.md,
   },
   scrollContent: {

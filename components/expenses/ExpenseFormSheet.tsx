@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAlert } from '@/context/AlertContext';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
 import { DatePicker } from '../ui/DatePicker';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
@@ -84,6 +84,7 @@ const ExpenseFormSheetBody: React.FC<Omit<ExpenseFormSheetProps, 'visible'>> = (
 
   return (
     <>
+      <SheetScrollBody>
       <Text style={styles.title}>{expense ? 'Edit Expense' : 'Add Expense'}</Text>
 
       <Text style={styles.sectionLabel}>Category</Text>
@@ -120,16 +121,20 @@ const ExpenseFormSheetBody: React.FC<Omit<ExpenseFormSheetProps, 'visible'>> = (
         />
       )}
 
-      <View style={styles.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button
-          title={expense ? 'Save Changes' : 'Add Expense'}
-          onPress={handleSave}
-          loading={loading}
-          disabled={!amountValid}
-          style={styles.flexBtn}
-        />
-      </View>
+      </SheetScrollBody>
+
+      <SheetFooter>
+        <View style={styles.buttonRow}>
+          <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button
+            title={expense ? 'Save Changes' : 'Add Expense'}
+            onPress={handleSave}
+            loading={loading}
+            disabled={!amountValid}
+            style={styles.flexBtn}
+          />
+        </View>
+      </SheetFooter>
     </>
   );
 };
@@ -157,6 +162,6 @@ const styles = StyleSheet.create({
   },
   dateText: { fontSize: Typography.size.body, color: Colors.textPrimary },
 
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });

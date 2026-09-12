@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useAlert } from '@/context/AlertContext';
@@ -166,7 +166,26 @@ export const DeleteAccountSection: React.FC<{ mode?: 'status' | 'full' }> = ({ m
         <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
       </AnimatedPressable>
 
-      <BottomSheet visible={open} onClose={close}>
+      <BottomSheet
+        visible={open}
+        onClose={close}
+        // The warnings above the fields grow with what closing this account
+        // would take down — a shop, its staff — so the confirm and cancel
+        // must not sit at the end of that scroll.
+        footer={isLoading ? undefined : (
+          <SheetFooter>
+            <Button
+              title={requiresApproval ? 'Request closure' : 'Schedule closure'}
+              variant="danger"
+              onPress={() => deleteMutation.mutate()}
+              loading={deleteMutation.isPending}
+              disabled={!canSubmit}
+            />
+            <Button title="Cancel" variant="ghost" onPress={close} />
+          </SheetFooter>
+        )}
+      >
+        <SheetScrollBody>
         <View style={styles.sheet}>
           <Text style={styles.title}>
             {requiresApproval ? 'Request account closure?' : 'Delete your account?'}
@@ -232,18 +251,10 @@ export const DeleteAccountSection: React.FC<{ mode?: 'status' | 'full' }> = ({ m
                 autoCorrect={false}
               />
 
-              <Button
-                title={requiresApproval ? 'Request closure' : 'Schedule closure'}
-                variant="danger"
-                onPress={() => deleteMutation.mutate()}
-                loading={deleteMutation.isPending}
-                disabled={!canSubmit}
-                style={styles.confirmBtn}
-              />
-              <Button title="Cancel" variant="ghost" onPress={close} />
             </>
           )}
         </View>
+        </SheetScrollBody>
       </BottomSheet>
     </>
   );
@@ -350,5 +361,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: Spacing.sm,
   },
-  confirmBtn: { marginTop: Spacing.sm },
 });

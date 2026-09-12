@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Calendar, type DateData } from 'react-native-calendars';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
 import { Button } from '../ui/Button';
 import { AnimatedPressable } from '../ui/AnimatedPressable';
 import { haptics } from '@/utils/haptics';
@@ -156,56 +156,62 @@ const SalesDateRangeSheetBody: React.FC<Omit<SalesDateRangeSheetProps, 'visible'
 
   return (
     <>
-      <Text style={styles.title}>Filter by Date</Text>
-      <Text style={styles.rangeLabel}>{rangeLabel}</Text>
 
-      <View style={styles.presetsRow}>
-        {presets.map((preset) => (
-          <AnimatedPressable
-            key={preset.label}
-            style={styles.presetChip}
-            onPress={preset.onPress}
-            accessibilityRole="button"
-            accessibilityLabel={preset.label}
-          >
-            <Text style={styles.presetChipText}>{preset.label}</Text>
-          </AnimatedPressable>
-        ))}
-      </View>
+      <SheetScrollBody>
+        <Text style={styles.title}>Filter by Date</Text>
+        <Text style={styles.rangeLabel}>{rangeLabel}</Text>
 
-      <Calendar
-        current={pendingStart ?? maxDateStr}
-        minDate={minDateStr}
-        maxDate={maxDateStr}
-        markingType="period"
-        markedDates={markedDates}
-        onDayPress={handleDayPress}
-        enableSwipeMonths
-        theme={{
-          calendarBackground: Colors.surface,
-          textSectionTitleColor: Colors.textTertiary,
-          selectedDayBackgroundColor: Colors.primary,
-          selectedDayTextColor: Colors.white,
-          todayTextColor: Colors.primary,
-          todayBackgroundColor: Colors.primarySubtle,
-          dayTextColor: Colors.textPrimary,
-          textDisabledColor: Colors.textDisabled,
-          arrowColor: Colors.primary,
-          monthTextColor: Colors.textPrimary,
-          textDayFontFamily: Typography.fontFamily,
-          textMonthFontFamily: Typography.fontFamilySemiBold,
-          textDayHeaderFontFamily: Typography.fontFamilySemiBold,
-          textDayFontSize: 14,
-          textMonthFontSize: 15,
-          textDayHeaderFontSize: 12,
-        }}
-        style={styles.calendar}
-      />
+        <View style={styles.presetsRow}>
+          {presets.map((preset) => (
+            <AnimatedPressable
+              key={preset.label}
+              style={styles.presetChip}
+              onPress={preset.onPress}
+              accessibilityRole="button"
+              accessibilityLabel={preset.label}
+            >
+              <Text style={styles.presetChipText}>{preset.label}</Text>
+            </AnimatedPressable>
+          ))}
+        </View>
 
-      <View style={styles.footer}>
-        <Button title="Clear" variant="outline" onPress={handleClear} style={styles.flexBtn} />
-        <Button title="Apply" onPress={handleApply} disabled={!pendingStart} style={styles.flexBtn} />
-      </View>
+        <Calendar
+          current={pendingStart ?? maxDateStr}
+          minDate={minDateStr}
+          maxDate={maxDateStr}
+          markingType="period"
+          markedDates={markedDates}
+          onDayPress={handleDayPress}
+          enableSwipeMonths
+          theme={{
+            calendarBackground: Colors.surface,
+            textSectionTitleColor: Colors.textTertiary,
+            selectedDayBackgroundColor: Colors.primary,
+            selectedDayTextColor: Colors.white,
+            todayTextColor: Colors.primary,
+            todayBackgroundColor: Colors.primarySubtle,
+            dayTextColor: Colors.textPrimary,
+            textDisabledColor: Colors.textDisabled,
+            arrowColor: Colors.primary,
+            monthTextColor: Colors.textPrimary,
+            textDayFontFamily: Typography.fontFamily,
+            textMonthFontFamily: Typography.fontFamilySemiBold,
+            textDayHeaderFontFamily: Typography.fontFamilySemiBold,
+            textDayFontSize: 14,
+            textMonthFontSize: 15,
+            textDayHeaderFontSize: 12,
+          }}
+          style={styles.calendar}
+        />
+      </SheetScrollBody>
+
+      <SheetFooter>
+        <View style={styles.footer}>
+          <Button title="Clear" variant="outline" onPress={handleClear} style={styles.flexBtn} />
+          <Button title="Apply" onPress={handleApply} disabled={!pendingStart} style={styles.flexBtn} />
+        </View>
+
+      </SheetFooter>
     </>
   );
 };

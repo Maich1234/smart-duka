@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetFooter } from '@/components/ui/BottomSheet';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { useAlert } from '@/context/AlertContext';
 import { haptics } from '@/utils/haptics';
@@ -129,7 +129,8 @@ const AssetFormBody: React.FC<Omit<AssetFormSheetProps, 'visible'>> = ({
   };
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <>
+    <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <Text style={s.title} accessibilityRole="header">{asset ? 'Edit asset' : 'Add asset'}</Text>
 
       <Input
@@ -261,17 +262,6 @@ const AssetFormBody: React.FC<Omit<AssetFormSheetProps, 'visible'>> = ({
       </>
       )}
 
-      <View style={s.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={s.flexBtn} />
-        <Button
-          title={asset ? 'Save changes' : 'Add asset'}
-          onPress={handleSave}
-          loading={loading}
-          disabled={!canSave}
-          style={s.flexBtn}
-        />
-      </View>
-
       {asset && onArchiveToggle && (
         <Button
           title={asset.archivedAt ? 'Restore to my assets' : 'Remove from my assets'}
@@ -286,6 +276,23 @@ const AssetFormBody: React.FC<Omit<AssetFormSheetProps, 'visible'>> = ({
         </Text>
       )}
     </ScrollView>
+
+    {/* Cancel and Save stay put while nine fields scroll under them. The
+        archive action deliberately does not: it is destructive and belongs
+        at the end of the form, not under the thumb next to Save. */}
+    <SheetFooter>
+      <View style={s.buttonRow}>
+        <Button title="Cancel" variant="outline" onPress={onClose} style={s.flexBtn} />
+        <Button
+          title={asset ? 'Save changes' : 'Add asset'}
+          onPress={handleSave}
+          loading={loading}
+          disabled={!canSave}
+          style={s.flexBtn}
+        />
+      </View>
+    </SheetFooter>
+    </>
   );
 };
 
@@ -371,7 +378,8 @@ const s = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.primary,
   },
-  buttonRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  scroll: { flexShrink: 1 },
+  buttonRow: { flexDirection: 'row', gap: Spacing.sm },
   flexBtn: { flex: 1 },
   archiveBtn: { marginTop: Spacing.sm },
   archiveNote: {

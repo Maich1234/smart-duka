@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Switch } from 'react-native';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { BottomSheet } from '../ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
 import { haptics } from '@/utils/haptics';
 import { formatCurrency } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
@@ -98,58 +98,63 @@ const CommissionModalBody: React.FC<Omit<CommissionModalProps, 'visible'>> = ({
 
   return (
     <>
-      <Text style={styles.title}>Employee Commission</Text>
-      <Text style={styles.subjectName}>{subjectName || 'Untitled'}</Text>
-      <Text style={styles.hint}>Selling price: {formatCurrency(sellingPrice)}</Text>
+      <SheetScrollBody>
+        <Text style={styles.title}>Employee Commission</Text>
+        <Text style={styles.subjectName}>{subjectName || 'Untitled'}</Text>
+        <Text style={styles.hint}>Selling price: {formatCurrency(sellingPrice)}</Text>
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Enable commission for {scopeLabel}</Text>
-        <Switch
-          value={enabled}
-          onValueChange={(v) => { haptics.selection(); setEnabled(v); }}
-          trackColor={{ false: Colors.border, true: Colors.primarySubtle }}
-          thumbColor={enabled ? Colors.primary : undefined}
-        />
-      </View>
-
-      {enabled && (
-        <>
-          {basePriceEditable ? (
-            <Input
-              label="Shop's base price"
-              value={basePrice}
-              onChangeText={setBasePrice}
-              keyboardType="numeric"
-              placeholder="e.g. 400"
-            />
-          ) : (
-            <View style={styles.derivedBaseRow}>
-              <Text style={styles.derivedBaseLabel}>Shop&apos;s base price</Text>
-              <Text style={styles.derivedBaseValue}>{formatCurrency(parsedBase || 0)}</Text>
-              <Text style={styles.derivedBaseHint}>Matches this product&apos;s Min Price</Text>
-            </View>
-          )}
-          <Input
-            label="Employee's share of the excess (%)"
-            value={employeeSharePercent}
-            onChangeText={setEmployeeSharePercent}
-            keyboardType="numeric"
-            placeholder="100"
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>Enable commission for {scopeLabel}</Text>
+          <Switch
+            value={enabled}
+            onValueChange={(v) => { haptics.selection(); setEnabled(v); }}
+            trackColor={{ false: Colors.border, true: Colors.primarySubtle }}
+            thumbColor={enabled ? Colors.primary : undefined}
           />
-          {hasValidBase && hasValidShare && (
-            <Text style={styles.preview}>
-              At {formatCurrency(sellingPrice)}, employee earns {formatCurrency(employeeAmount)}, shop keeps {formatCurrency(shopAmount)}.
-              {priceVaries ? ' The price is set at the till, so the higher it is sold for, the more the employee earns.' : ''}
-            </Text>
-          )}
-          {!!error && <Text style={styles.error}>{error}</Text>}
-        </>
-      )}
+        </View>
 
-      <View style={styles.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button title="Save" onPress={handleConfirm} style={styles.flexBtn} />
-      </View>
+        {enabled && (
+          <>
+            {basePriceEditable ? (
+              <Input
+                label="Shop's base price"
+                value={basePrice}
+                onChangeText={setBasePrice}
+                keyboardType="numeric"
+                placeholder="e.g. 400"
+              />
+            ) : (
+              <View style={styles.derivedBaseRow}>
+                <Text style={styles.derivedBaseLabel}>Shop&apos;s base price</Text>
+                <Text style={styles.derivedBaseValue}>{formatCurrency(parsedBase || 0)}</Text>
+                <Text style={styles.derivedBaseHint}>Matches this product&apos;s Min Price</Text>
+              </View>
+            )}
+            <Input
+              label="Employee's share of the excess (%)"
+              value={employeeSharePercent}
+              onChangeText={setEmployeeSharePercent}
+              keyboardType="numeric"
+              placeholder="100"
+            />
+            {hasValidBase && hasValidShare && (
+              <Text style={styles.preview}>
+                At {formatCurrency(sellingPrice)}, employee earns {formatCurrency(employeeAmount)}, shop keeps {formatCurrency(shopAmount)}.
+                {priceVaries ? ' The price is set at the till, so the higher it is sold for, the more the employee earns.' : ''}
+              </Text>
+            )}
+            {!!error && <Text style={styles.error}>{error}</Text>}
+          </>
+        )}
+      </SheetScrollBody>
+
+      <SheetFooter>
+
+        <View style={styles.buttonRow}>
+          <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button title="Save" onPress={handleConfirm} style={styles.flexBtn} />
+        </View>
+      </SheetFooter>
     </>
   );
 };
@@ -204,6 +209,6 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     marginTop: Spacing.xs,
   },
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });

@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAlert } from '@/context/AlertContext';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
 import { usePurchaseLineCalc } from '@/hooks/usePurchaseLineCalc';
 import { formatCurrency } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
@@ -130,91 +130,96 @@ export const ProductEntrySheet: React.FC<ProductEntrySheetProps> = ({
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
-      <Text style={styles.title}>{initial ? 'Edit Product' : 'Add Product'}</Text>
-      <Text style={styles.productName}>{product.name}</Text>
+      <SheetScrollBody>
+        <Text style={styles.title}>{initial ? 'Edit Product' : 'Add Product'}</Text>
+        <Text style={styles.productName}>{product.name}</Text>
 
-      {isConfigurable && (
-        <View style={styles.chipRow}>
-          {(product.variants ?? []).map((v) => {
-            const active = v._id === selectedVariantId;
-            return (
-              <AnimatedPressable
-                key={v._id}
-                style={[styles.chip, active && styles.chipActive]}
-                onPress={() => setSelectedVariantId(v._id)}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{v.name}</Text>
-                <Text style={[styles.chipSub, active && styles.chipTextActive]}>
-                  In stock: {v.quantity}
-                </Text>
-              </AnimatedPressable>
-            );
-          })}
+        {isConfigurable && (
+          <View style={styles.chipRow}>
+            {(product.variants ?? []).map((v) => {
+              const active = v._id === selectedVariantId;
+              return (
+                <AnimatedPressable
+                  key={v._id}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setSelectedVariantId(v._id)}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{v.name}</Text>
+                  <Text style={[styles.chipSub, active && styles.chipTextActive]}>
+                    In stock: {v.quantity}
+                  </Text>
+                </AnimatedPressable>
+              );
+            })}
+          </View>
+        )}
+
+        {(referenceCost != null || referenceStock != null) && (
+          <View style={styles.referenceRow}>
+            {referenceStock != null && (
+              <Text style={styles.referenceText}>Current stock: {referenceStock} {unitLabel}</Text>
+            )}
+            {referenceCost != null && referenceCost > 0 && (
+              <Text style={styles.referenceText}>Current avg cost: {formatCurrency(referenceCost)}</Text>
+            )}
+          </View>
+        )}
+
+        <View style={styles.fieldRow}>
+          <Input
+            label={isDecimalType ? `Quantity (${unitLabel})` : 'Quantity'}
+            value={calc.quantity}
+            onChangeText={calc.setQuantity}
+            keyboardType={isDecimalType ? 'decimal-pad' : 'numeric'}
+            placeholder={isDecimalType ? 'e.g. 0.5' : 'e.g. 10'}
+            style={styles.flexField}
+          />
         </View>
-      )}
-
-      {(referenceCost != null || referenceStock != null) && (
-        <View style={styles.referenceRow}>
-          {referenceStock != null && (
-            <Text style={styles.referenceText}>Current stock: {referenceStock} {unitLabel}</Text>
-          )}
-          {referenceCost != null && referenceCost > 0 && (
-            <Text style={styles.referenceText}>Current avg cost: {formatCurrency(referenceCost)}</Text>
-          )}
+        <View style={styles.fieldRow}>
+          <Input
+            label="Unit Cost"
+            value={calc.unitCost}
+            onChangeText={calc.setUnitCost}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            style={styles.flexField}
+          />
+          <Input
+            label="Total Cost"
+            value={calc.totalCost}
+            onChangeText={calc.setTotalCost}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            style={styles.flexField}
+          />
         </View>
-      )}
 
-      <View style={styles.fieldRow}>
-        <Input
-          label={isDecimalType ? `Quantity (${unitLabel})` : 'Quantity'}
-          value={calc.quantity}
-          onChangeText={calc.setQuantity}
-          keyboardType={isDecimalType ? 'decimal-pad' : 'numeric'}
-          placeholder={isDecimalType ? 'e.g. 0.5' : 'e.g. 10'}
-          style={styles.flexField}
-        />
-      </View>
-      <View style={styles.fieldRow}>
-        <Input
-          label="Unit Cost"
-          value={calc.unitCost}
-          onChangeText={calc.setUnitCost}
-          keyboardType="decimal-pad"
-          placeholder="0.00"
-          style={styles.flexField}
-        />
-        <Input
-          label="Total Cost"
-          value={calc.totalCost}
-          onChangeText={calc.setTotalCost}
-          keyboardType="decimal-pad"
-          placeholder="0.00"
-          style={styles.flexField}
-        />
-      </View>
+        {helperText && (
+          <View style={styles.calcRow}>
+            <Ionicons name="calculator-outline" size={13} color={Colors.textSecondary} />
+            <Text style={styles.calcText}>{helperText}</Text>
+          </View>
+        )}
 
-      {helperText && (
-        <View style={styles.calcRow}>
-          <Ionicons name="calculator-outline" size={13} color={Colors.textSecondary} />
-          <Text style={styles.calcText}>{helperText}</Text>
+        {(lowCostWarning || highCostWarning) && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="alert-circle-outline" size={15} color="#B45309" />
+            <Text style={styles.warningText}>
+              {lowCostWarning
+                ? 'This unit cost looks unusually low compared to the current average cost.'
+                : 'This unit cost is significantly higher than the current average cost.'}
+            </Text>
+          </View>
+        )}
+      </SheetScrollBody>
+
+      <SheetFooter>
+
+        <View style={styles.buttonRow}>
+          <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
+          <Button title={initial ? 'Update' : 'Add'} onPress={handleConfirm} loading={loading} style={styles.flexBtn} />
         </View>
-      )}
-
-      {(lowCostWarning || highCostWarning) && (
-        <View style={styles.warningBanner}>
-          <Ionicons name="alert-circle-outline" size={15} color="#B45309" />
-          <Text style={styles.warningText}>
-            {lowCostWarning
-              ? 'This unit cost looks unusually low compared to the current average cost.'
-              : 'This unit cost is significantly higher than the current average cost.'}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.buttonRow}>
-        <Button title="Cancel" variant="outline" onPress={onClose} style={styles.flexBtn} />
-        <Button title={initial ? 'Update' : 'Add'} onPress={handleConfirm} loading={loading} style={styles.flexBtn} />
-      </View>
+      </SheetFooter>
     </BottomSheet>
   );
 };
@@ -256,6 +261,6 @@ const styles = StyleSheet.create({
   },
   warningText: { flex: 1, fontSize: Typography.size.caption, fontFamily: Typography.fontFamily, color: '#92400E', lineHeight: 16 },
 
-  buttonRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.sm },
+  buttonRow: { flexDirection: 'row', gap: Spacing.md },
   flexBtn: { flex: 1 },
 });
