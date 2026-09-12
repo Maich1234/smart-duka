@@ -138,7 +138,13 @@ export function PurchaseHistoryScreen() {
   } = useInfiniteQuery({
     // Search, status and sort are the key; paging is the cursor within it, so
     // changing a filter restarts from the first page on its own.
-    queryKey: ['purchases', searchQuery, status, sort],
+    // 'paged' namespaces the infinite cache entry away from the plain
+    // useQuery consumers of the same entity. React Query keeps ONE entry per
+    // key, and an infinite query stores { pages, pageParams } where a plain
+    // one stores the response itself — sharing a key makes whichever ran last
+    // hand the other a shape it cannot read. Prefix invalidation on
+    // ['<entity>'] still matches this.
+    queryKey: ['purchases', 'paged', searchQuery, status, sort],
     queryFn: ({ pageParam }) =>
       getPurchases({
         search: searchQuery || undefined,

@@ -75,7 +75,13 @@ export const ExpensesScreen: React.FC = () => {
     data, isLoading, isError, refetch, isRefetching,
     fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['expenses'],
+    // 'paged' namespaces the infinite cache entry away from the plain
+    // useQuery consumers of the same entity. React Query keeps ONE entry per
+    // key, and an infinite query stores { pages, pageParams } where a plain
+    // one stores the response itself — sharing a key makes whichever ran last
+    // hand the other a shape it cannot read. Prefix invalidation on
+    // ['<entity>'] still matches this.
+    queryKey: ['expenses', 'paged'],
     queryFn: ({ pageParam }) => getExpenses({ page: pageParam, limit: 10 }),
     enabled: canManageExpenses,
     initialPageParam: 1,

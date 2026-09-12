@@ -49,7 +49,13 @@ export default function OwnerStaffList() {
     data, isLoading, isRefetching, isError, refetch,
     fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['staff', searchQuery],
+    // 'paged' namespaces the infinite cache entry away from the plain
+    // useQuery consumers of the same entity. React Query keeps ONE entry per
+    // key, and an infinite query stores { pages, pageParams } where a plain
+    // one stores the response itself — sharing a key makes whichever ran last
+    // hand the other a shape it cannot read. Prefix invalidation on
+    // ['<entity>'] still matches this.
+    queryKey: ['staff', 'paged', searchQuery],
     queryFn: ({ pageParam }) => getStaff({ search: searchQuery, page: pageParam, limit: 10 }),
     initialPageParam: 1,
     getNextPageParam: (last) =>

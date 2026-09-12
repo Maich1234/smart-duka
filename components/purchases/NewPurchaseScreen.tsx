@@ -74,7 +74,13 @@ export function NewPurchaseScreen() {
     hasNextPage: hasMoreProducts,
     isFetchingNextPage: loadingMoreProducts,
   } = useInfiniteQuery({
-    queryKey: ['products', searchQuery, EXCLUDE_TYPES],
+    // 'paged' namespaces the infinite cache entry away from the plain
+    // useQuery consumers of the same entity. React Query keeps ONE entry per
+    // key, and an infinite query stores { pages, pageParams } where a plain
+    // one stores the response itself — sharing a key makes whichever ran last
+    // hand the other a shape it cannot read. Prefix invalidation on
+    // ['<entity>'] still matches this.
+    queryKey: ['products', 'paged', searchQuery, EXCLUDE_TYPES],
     queryFn: ({ pageParam }) =>
       getProducts({ search: searchQuery, page: pageParam, limit: 10, excludeTypes: EXCLUDE_TYPES }),
     enabled: canCreate,

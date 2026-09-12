@@ -142,12 +142,14 @@ function CriticalDataPrefetch() {
   const prefetch = useCallback(async () => {
     if (!user) return;
     // Products: first page. Must fetch exactly what the sales/inventory
-    // screens fetch — this shares their ['products', '', 1] cache key, so a
-    // different limit here makes the visible list flip sizes (and the page
-    // count jump) every time a prefetch lands.
-    queryClient.prefetchQuery({
-      queryKey: ['products', '', 1],
-      queryFn: () => getProducts({ search: '', page: 1, limit: 10 }),
+    // screens fetch — it shares their cache entry, so a different limit here
+    // makes the visible list flip sizes every time a prefetch lands. Those
+    // screens page by scrolling now, so this warms the infinite entry; a
+    // prefetchQuery would write the wrong shape into the same key.
+    queryClient.prefetchInfiniteQuery({
+      queryKey: ['products', 'paged', ''],
+      queryFn: ({ pageParam }) => getProducts({ search: '', page: pageParam, limit: 10 }),
+      initialPageParam: 1,
       staleTime: 1000 * 60 * 2,
     });
     // Shop config: receipt header, logo, motto, thank-you note.

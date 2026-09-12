@@ -105,7 +105,13 @@ export function SuppliersScreen() {
     data, isLoading, isRefetching, isError, refetch,
     fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['suppliers', searchQuery],
+    // 'paged' namespaces the infinite cache entry away from the plain
+    // useQuery consumers of the same entity. React Query keeps ONE entry per
+    // key, and an infinite query stores { pages, pageParams } where a plain
+    // one stores the response itself — sharing a key makes whichever ran last
+    // hand the other a shape it cannot read. Prefix invalidation on
+    // ['<entity>'] still matches this.
+    queryKey: ['suppliers', 'paged', searchQuery],
     queryFn: ({ pageParam }) =>
       getSuppliers({ search: searchQuery || undefined, page: pageParam, limit: PAGE_SIZE }),
     enabled: canView,
