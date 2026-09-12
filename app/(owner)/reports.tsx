@@ -81,7 +81,12 @@ export default function OwnerReports() {
     queryKey: ['shopConfig'],
     queryFn: getShopConfig,
   });
-  const showPurchasesShortcut = canViewPurchases && (shopConfigData?.data?.purchasingEnabled ?? false);
+  // Owners see Purchasing whether or not it is switched on: the flag defaults
+  // to false and used to gate every route into the module, so an owner who had
+  // never enabled it had no way to discover it existed.
+  const purchasing = canViewPurchases
+    ? ((shopConfigData?.data?.purchasingEnabled ?? false) ? 'on' : 'off')
+    : 'hidden';
 
   if (isLoading) return <ReportsSkeleton />;
   if (isError || !data) return <QueryError onRetry={refetch} />;
@@ -184,7 +189,7 @@ export default function OwnerReports() {
       <View style={s.gap} />
 
       {/* ── quick-access shortcuts ─────────────────────────────────── */}
-      <QuickShortcuts showPurchases={showPurchasesShortcut} />
+      <QuickShortcuts purchasing={purchasing} />
 
       <View style={s.sectionGap} />
 

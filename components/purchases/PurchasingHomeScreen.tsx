@@ -111,12 +111,21 @@ export function PurchasingHomeScreen() {
         <Text style={styles.centerTitle}>Purchasing isn&apos;t turned on yet</Text>
         <Text style={styles.centerSub}>
           {role === 'owner'
-            ? 'Turn on the Purchasing Module in Profile → Preferences to start recording stock purchases.'
+            ? 'Turn it on to record what you buy from suppliers, track landed costs, and have stock updated for you.'
             : 'Ask your shop owner to turn on the Purchasing Module.'}
         </Text>
+        {/* Straight to the switch. This used to say "Profile → Preferences",
+            a section that does not exist — the toggle lives in Profile →
+            Inventory — and the button dropped the owner at the top of the
+            profile screen to find it themselves. */}
         {role === 'owner' && (
-          <AnimatedPressable style={styles.enableBtn} onPress={() => go('/(owner)/profile')}>
-            <Text style={styles.enableBtnText}>Go to Settings</Text>
+          <AnimatedPressable
+            style={styles.enableBtn}
+            onPress={() => go('/(owner)/settings/inventory')}
+            accessibilityRole="button"
+            accessibilityLabel="Turn on the purchasing module"
+          >
+            <Text style={styles.enableBtnText}>Turn on Purchasing</Text>
           </AnimatedPressable>
         )}
       </View>

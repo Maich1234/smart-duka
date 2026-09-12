@@ -451,7 +451,7 @@ export default function OwnerProfile() {
             <SettingsRow
               icon="cube-outline"
               title="Inventory"
-              subtitle="Purchasing module"
+              subtitle="Purchasing, suppliers and stock buying"
               onPress={() => router.push('/(owner)/settings/inventory')}
             />
             <SettingsRowDivider />

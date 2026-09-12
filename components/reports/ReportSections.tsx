@@ -390,25 +390,34 @@ const SHORTCUTS = [
   },
 ] as const;
 
-const PURCHASES_SHORTCUT = {
+const purchasesShortcut = (enabled: boolean) => ({
   id: 'purchases',
   label: 'Purchases',
-  sub: 'Stock buying',
+  // Says which it is, so a tile that opens a setup screen isn't a surprise.
+  sub: enabled ? 'Stock buying' : 'Not set up',
   icon: 'cart-outline' as const,
-  colors: ['#0B5B54', '#0F766E'] as [string, string],
+  colors: (enabled ? ['#0B5B54', '#0F766E'] : ['#64748B', '#94A3B8']) as [string, string],
   route: '/(owner)/purchases',
-} as const;
+});
 
 interface QuickShortcutsProps {
-  /** Only true once the owner has turned on the Purchasing module — kept
-   * completely out of navigation otherwise, per that feature's own spec. */
-  showPurchases?: boolean;
+  /**
+   * 'hidden' keeps Purchasing out of navigation entirely — the right answer
+   * for staff, who cannot turn it on.
+   *
+   * Owners get 'on' or 'off', never 'hidden'. Every entry point used to be
+   * gated on the shop flag, and the flag defaults to false, so the whole
+   * module — purchases, suppliers, landed costs, purchase reports — was
+   * invisible to a shop that had never enabled it, with nothing anywhere to
+   * say it existed. 'off' shows the tile and routes to its setup screen.
+   */
+  purchasing?: 'on' | 'off' | 'hidden';
 }
 
-export function QuickShortcuts({ showPurchases = false }: QuickShortcutsProps) {
-  const shortcuts = showPurchases
-    ? [...SHORTCUTS.slice(0, 2), PURCHASES_SHORTCUT, ...SHORTCUTS.slice(2)]
-    : SHORTCUTS;
+export function QuickShortcuts({ purchasing = 'hidden' }: QuickShortcutsProps) {
+  const shortcuts = purchasing === 'hidden'
+    ? SHORTCUTS
+    : [...SHORTCUTS.slice(0, 2), purchasesShortcut(purchasing === 'on'), ...SHORTCUTS.slice(2)];
 
   return (
     <Animated.View entering={FadeInDown.duration(380).delay(260)}>
