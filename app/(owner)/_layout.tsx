@@ -383,6 +383,17 @@ export default function OwnerLayout() {
           headerShown: false,
         }}
       />
+      {/* The owner's business overview. Draws its own collapsing header, so
+          it takes the shared ScreenHeader (back + title) above it rather than
+          headerShown:false — the collapse must never scroll the way out of
+          the screen off the top. */}
+      <Tabs.Screen
+        name="business"
+        options={{
+          title: 'My Business',
+          href: null,
+        }}
+      />
       <Tabs.Screen
         name="reports"
         options={{

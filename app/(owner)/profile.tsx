@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { haptics } from '@/utils/haptics';
 import {
   View,
   Text,
@@ -377,6 +378,27 @@ export default function OwnerProfile() {
           />
         </View>
 
+        {/* The full picture behind the four figures above. */}
+        <Animated.View entering={FadeInUp.duration(360).delay(250)} style={styles.businessLinkWrap}>
+          <AnimatedPressable
+            onPress={() => { haptics.light(); router.push('/(owner)/business' as never); }}
+            style={styles.businessLink}
+            accessibilityRole="button"
+            accessibilityLabel="My Business: capital, stock, assets, product and staff performance"
+          >
+            <View style={styles.businessLinkIcon}>
+              <Ionicons name="business-outline" size={17} color={Colors.primary} />
+            </View>
+            <View style={styles.businessLinkText}>
+              <Text style={styles.businessLinkTitle}>My Business</Text>
+              <Text style={styles.businessLinkSub} numberOfLines={2}>
+                Capital, assets, and what each product and person sells
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+          </AnimatedPressable>
+        </Animated.View>
+
         {lowStockCount > 0 && (
           <Animated.View entering={FadeInUp.duration(340).delay(260)} style={styles.lowStockBanner}>
             <View style={styles.lowStockIconWrap}>
@@ -703,6 +725,39 @@ const styles = StyleSheet.create({
   },
 
   // Low stock banner
+  businessLinkWrap: { paddingHorizontal: Spacing.lg, marginTop: 10 },
+  businessLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    minHeight: 64,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  businessLinkIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: Colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  businessLinkText: { flex: 1, gap: 2 },
+  businessLinkTitle: {
+    fontSize: 15,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  businessLinkSub: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
+    lineHeight: 15,
+  },
   lowStockBanner: {
     flexDirection: 'row',
     alignItems: 'center',

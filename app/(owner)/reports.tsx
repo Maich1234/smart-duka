@@ -123,6 +123,29 @@ export default function OwnerReports() {
           />
         }
       >
+      {/* ── business overview entry ────────────────────────────────── */}
+      {/* First, not last: Reports answers "how did this period go", while My
+          Business answers "what is the shop worth and what is it made of".
+          An owner arriving here with the second question should not have to
+          scroll past six analytics sections to find out it has an answer. */}
+      <AnimatedPressable
+        onPress={() => { haptics.light(); router.push('/(owner)/business' as never); }}
+        style={s.businessLink}
+        accessibilityRole="button"
+        accessibilityLabel="My Business: capital, stock, staff and product performance"
+      >
+        <View style={s.businessIcon}>
+          <Ionicons name="business-outline" size={20} color={Colors.white} />
+        </View>
+        <View style={s.booksText}>
+          <Text style={s.businessTitle}>My Business</Text>
+          <Text style={s.businessSub}>Capital, stock value, assets, and what each product and person sells</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+      </AnimatedPressable>
+
+      <View style={s.gap} />
+
       {/* ── period selector ────────────────────────────────────────── */}
       <Animated.View entering={FadeInDown.duration(340).delay(40)}>
         <PeriodSegmentControl value={period} onChange={setPeriod} />
@@ -224,6 +247,35 @@ export default function OwnerReports() {
 }
 
 const s = StyleSheet.create({
+  businessLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    minHeight: 64,
+  },
+  businessIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  businessTitle: {
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.white,
+  },
+  businessSub: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+    lineHeight: 17,
+  },
   booksLink: {
     flexDirection: 'row',
     alignItems: 'center',
