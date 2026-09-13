@@ -1180,6 +1180,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             total={totalAmount}
             totalSavings={totalSavings}
             itemCount={cart.length}
+            totalCommission={totalCommission}
             onReview={() => setReviewVisible(true)}
             methods={saleMethods}
             paymentMethod={paymentMethod}

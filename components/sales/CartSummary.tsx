@@ -47,6 +47,8 @@ interface CartSummaryProps {
   onManualReceiptCodeChange?: (code: string) => void;
   /** Items in the sale — shown beside the total as the way into the lines. */
   itemCount?: number;
+  /** What the cashier earns on this sale, when the shop shows commission. */
+  totalCommission?: number;
   /** Opens the line-item review. Makes the total row a control. */
   onReview?: () => void;
 }
@@ -106,6 +108,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   manualReceiptCode = '',
   onManualReceiptCodeChange,
   itemCount = 0,
+  totalCommission = 0,
   onReview,
 }) => {
   const isMpesa = paymentMethod === MPESA_METHOD_KEY;
@@ -129,8 +132,21 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
 
   return (
     <View style={styles.container}>
-      {totalSavings > 0 && (
-        <Text style={styles.savings}>You saved {formatCurrency(totalSavings, currency)}</Text>
+      {(totalSavings > 0 || totalCommission > 0) && (
+        <View style={styles.notesRow}>
+          {totalCommission > 0 && (
+            // The cashier's own earnings on this sale. It belongs on the till,
+            // not a tap away behind the line items: it is the reason a
+            // commission scheme changes anything about how someone sells.
+            <Text style={styles.commission}>
+              You earn {formatCurrency(totalCommission, currency)}
+            </Text>
+          )}
+          <View style={styles.notesSpacer} />
+          {totalSavings > 0 && (
+            <Text style={styles.savings}>Saved {formatCurrency(totalSavings, currency)}</Text>
+          )}
+        </View>
       )}
       {/* The total doubles as the way into the lines. They are only ever
           read to correct something, so they cost a tap rather than permanent
@@ -297,11 +313,17 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     fontVariant: ['tabular-nums'],
   },
+  notesRow: { flexDirection: 'row', alignItems: 'center' },
+  notesSpacer: { flex: 1 },
   savings: {
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.success,
-    textAlign: 'right',
+  },
+  commission: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.success,
   },
   paymentRow: {
     flexDirection: 'row',
