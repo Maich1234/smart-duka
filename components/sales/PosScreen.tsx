@@ -13,11 +13,12 @@ import { createSale, getMySales, voidSale, refundSale, type Sale, type SaleItem,
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { getTransactionStatus } from '@/services/mpesa';
-import { ProductCard } from '@/components/inventory/ProductCard';
+import { PosProductRow } from '@/components/sales/PosProductRow';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useSearch } from '@/hooks/useSearch';
 import { CartItem } from '@/components/sales/CartItem';
 import { CartSummary, isValidKenyanPhone } from '@/components/sales/CartSummary';
+import { PosCheckoutPanel } from '@/components/sales/PosCheckoutPanel';
 import { QuantityModal } from '@/components/sales/QuantityModal';
 import { VariantPickerModal } from '@/components/sales/VariantPickerModal';
 import { SaleCard } from '@/components/sales/SaleCard';
@@ -269,6 +270,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   // Manual pull state (not isLoading/isRefetching) so the spinner never
   // appears for query-key changes or background invalidation refetches.
+  // The checkout panel floats over the list, so the list has to be told how
+  // much of itself is covered. Measured rather than assumed: the panel's
+  // height moves with the item count, the payment method and the keyboard.
+  const [checkoutHeight, setCheckoutHeight] = useState(0);
+
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const onPullRefresh = async () => {
     setPullRefreshing(true);
@@ -1060,16 +1066,21 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         showsVerticalScrollIndicator={false}
         data={products}
         keyExtractor={(item) => item._id}
-        renderItem={({ item, index }) => (
-          <ProductCard
+        renderItem={({ item }) => (
+          <PosProductRow
             product={item}
-            showCostPrice={false}
-            showActions={false}
-            isLast={index === products.length - 1}
+            currency={user?.shop?.currency}
             onPress={() => addToCart(item)}
           />
         )}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
+        contentContainerStyle={{
+          paddingHorizontal: Spacing.lg,
+          // Only while the panel is on screen: the measured height survives
+          // the panel unmounting, and reusing it once the cart is cleared
+          // would leave a dead gap under the last product.
+          paddingBottom: tabBarHeight + (cart.length > 0 ? checkoutHeight : 0) + Spacing.lg,
+          gap: Spacing.sm,
+        }}
         // The catalogue arrives as the cashier scrolls. Never on the cached
         // path: a local search already returns every match at once.
         onEndReached={() => { if (canLoadMoreProducts && !loadingMoreProducts) fetchMoreProducts(); }}
@@ -1100,59 +1111,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                 : undefined
             }
           />
-        }
-        ListHeaderComponent={
-          <View>
-            {cart.length > 0 && (
-              <View style={styles.cartSection}>
-                <Text style={styles.sectionTitle}>Current Sale</Text>
-                {cart.map((item) => (
-                  <CartItem
-                    key={cartKey(item)}
-                    item={{
-                      ...item,
-                      quantity: item.cartQuantity,
-                      variantName: item.cartVariantName,
-                      bundleComponentNames: item.bundleItems?.map(
-                        (b) => products.find((p) => p._id === b.product)?.name || 'item'
-                      ),
-                    }}
-                    unitPrice={item.cartUnitPrice}
-                    commissionPerUnit={item.cartVariantCommission}
-                    onRemove={() => removeFromCart(cartKey(item))}
-                  />
-                ))}
-                {totalCommission > 0 && (
-                  <Text style={styles.cartCommissionTotal}>
-                    Your commission: {formatCurrency(totalCommission)}
-                  </Text>
-                )}
-                <CartSummary
-                  total={totalAmount}
-                  totalSavings={totalSavings}
-                  methods={saleMethods}
-                  paymentMethod={paymentMethod}
-                  onPaymentMethodChange={(m) => {
-                    setPaymentMethod(m);
-                    // Leaving M-Pesa drops anything only M-Pesa collects.
-                    if (m !== MPESA_METHOD_KEY) {
-                      resetSaleFields();
-                    }
-                  }}
-                  onCheckout={handleCheckout}
-                  loading={createSaleMutation.isPending}
-                  mpesaEnabled={mpesaEnabled}
-                  customerPhone={customerPhone}
-                  onCustomerPhoneChange={setCustomerPhone}
-                  currency={user?.shop?.currency}
-                  mpesaMode={mpesaMode}
-                  onMpesaModeChange={setMpesaMode}
-                  manualReceiptCode={manualReceiptCode}
-                  onManualReceiptCodeChange={setManualReceiptCode}
-                />
-              </View>
-            )}
-          </View>
         }
         ListFooterComponent={
           <View>
@@ -1212,6 +1170,64 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           </View>
         }
       />
+
+      {cart.length > 0 && (
+        <PosCheckoutPanel
+          itemCount={cart.length}
+          bottomInset={tabBarHeight}
+          onHeightChange={setCheckoutHeight}
+          lines={
+            <>
+              {cart.map((item) => (
+                <CartItem
+                  key={cartKey(item)}
+                  item={{
+                    ...item,
+                    quantity: item.cartQuantity,
+                    variantName: item.cartVariantName,
+                    bundleComponentNames: item.bundleItems?.map(
+                      (b) => products.find((p) => p._id === b.product)?.name || 'item'
+                    ),
+                  }}
+                  unitPrice={item.cartUnitPrice}
+                  commissionPerUnit={item.cartVariantCommission}
+                  onRemove={() => removeFromCart(cartKey(item))}
+                />
+              ))}
+              {totalCommission > 0 && (
+                <Text style={styles.cartCommissionTotal}>
+                  Your commission: {formatCurrency(totalCommission)}
+                </Text>
+              )}
+            </>
+          }
+          summary={
+            <CartSummary
+              total={totalAmount}
+              totalSavings={totalSavings}
+              methods={saleMethods}
+              paymentMethod={paymentMethod}
+              onPaymentMethodChange={(m) => {
+                setPaymentMethod(m);
+                // Leaving M-Pesa drops anything only M-Pesa collects.
+                if (m !== MPESA_METHOD_KEY) {
+                  resetSaleFields();
+                }
+              }}
+              onCheckout={handleCheckout}
+              loading={createSaleMutation.isPending}
+              mpesaEnabled={mpesaEnabled}
+              customerPhone={customerPhone}
+              onCustomerPhoneChange={setCustomerPhone}
+              currency={user?.shop?.currency}
+              mpesaMode={mpesaMode}
+              onMpesaModeChange={setMpesaMode}
+              manualReceiptCode={manualReceiptCode}
+              onManualReceiptCodeChange={setManualReceiptCode}
+            />
+          }
+        />
+      )}
 
       <QuantityModal
         visible={quantityModalVisible}
@@ -1371,7 +1387,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
     alignItems: 'center',
@@ -1379,13 +1395,6 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.background },
   restrictedText: { marginTop: Spacing.md, color: Colors.textSecondary, fontSize: Typography.size.body, textAlign: 'center' },
-  cartSection: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
-  },
   sectionTitle: {
     fontSize: Typography.size.body,
     fontFamily: Typography.fontFamilySemiBold,
@@ -1405,7 +1414,7 @@ const styles = StyleSheet.create({
   // used to stack on top of that unconditionally (unlike the pagination
   // footer above, which is conditional), inflating the gap under the last
   // sale card well past what the till's list screens use everywhere else.
-  historySection: { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg },
+  historySection: { marginTop: Spacing.lg },
   paginationRow: {
     flexDirection: 'row',
     alignItems: 'center',

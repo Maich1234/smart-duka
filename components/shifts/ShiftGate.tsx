@@ -159,17 +159,17 @@ export const ShiftGate: React.FC<ShiftGateProps> = ({ children }) => {
 };
 
 const styles = StyleSheet.create({
+  // A status strip, not a card. It reports a background fact — you are on
+  // shift, for this long, with this float — and a floating rounded panel with
+  // margins gave that the weight of something to act on, at the top of the
+  // one screen whose height belongs to the catalogue.
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#0F172A',
-    borderRadius: BorderRadius.lg,
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
-    paddingVertical: 8,
-    paddingLeft: Spacing.md,
-    paddingRight: 8,
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.lg,
   },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#34D399' },
   // Amber, not red: an unsynced shift is in-flight, not broken.
@@ -181,14 +181,16 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     fontVariant: ['tabular-nums'],
   },
+  // Reachable but quiet: ending a shift is a once-a-day action sitting on the
+  // screen used all day, so it gets a legible target and none of the emphasis.
   endBtn: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    marginRight: -8,
   },
   endBtnText: {
-    color: '#FFFFFF',
+    color: 'rgba(248,250,252,0.7)',
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
   },

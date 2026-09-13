@@ -1,5 +1,8 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { AnimatedPressable } from '../ui/AnimatedPressable';
+import { BorderRadius } from '@/constants/BorderRadius';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { Button } from '../ui/Button';
 import { Colors } from '@/constants/Colors';
@@ -128,22 +131,37 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         <Text style={styles.totalAmount}>{formatCurrency(total, currency)}</Text>
       </View>
 
-      {/* Payment method selector — the shop's own buttons, in its own order */}
-      <View style={styles.paymentRow}>
+      {/* The shop's own buttons, in its own order. Selection is carried by
+          fill, border and a tick together rather than fill alone: at arm's
+          length over a counter, one filled button among outlines is easy to
+          read the wrong way round. */}
+      <View style={styles.paymentRow} accessibilityRole="radiogroup">
         {methods.map((method) => {
           const selected = paymentMethod === method.key;
           return (
-            <Button
+            <AnimatedPressable
               key={method.key}
-              title={method.label}
-              variant={selected ? 'primary' : 'outline'}
               onPress={() => onPaymentMethodChange(method.key)}
-              size="sm"
-              style={styles.paymentBtn}
-              leftIcon={selected ? 'checkmark-circle' : (methodIcon(method) as any)}
-              accessibilityLabel={`Pay with ${method.label}`}
+              style={[styles.method, selected && styles.methodSelected]}
+              pressScale={0.985}
+              // "button" + selected, never "radio": RNGH-backed pressables do
+              // not fire on web under input-like roles.
+              accessibilityRole="button"
               accessibilityState={{ selected }}
-            />
+              accessibilityLabel={`Pay with ${method.label}`}
+            >
+              <Ionicons
+                name={selected ? 'checkmark-circle' : (methodIcon(method) as never)}
+                size={18}
+                color={selected ? Colors.white : Colors.textSecondary}
+              />
+              <Text
+                style={[styles.methodLabel, selected && styles.methodLabelSelected]}
+                numberOfLines={1}
+              >
+                {method.label}
+              </Text>
+            </AnimatedPressable>
           );
         })}
       </View>
@@ -217,12 +235,15 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         </Animated.View>
       )}
 
+      {/* size lg, full width, and the only filled teal below the payment
+          row — the end of every visit to this screen. */}
       <Button
         title={checkoutLabel}
         leftIcon={checkoutIcon}
         onPress={onCheckout}
         loading={loading}
         disabled={checkoutDisabled}
+        size="lg"
       />
     </View>
   );
@@ -230,47 +251,67 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: Spacing.md,
-    marginTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
+    gap: 10,
   },
   totalRow: {
     flexDirection: 'row',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
-    marginBottom: Spacing.md,
   },
   totalLabel: {
-    fontSize: Typography.size.body,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.textPrimary,
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textSecondary,
   },
   totalAmount: {
+    // Prominent, not a hero number: the cashier confirms it, they don't
+    // admire it, and every point it gains is a point the catalogue loses.
     fontSize: Typography.size.h3,
     fontFamily: Typography.fontFamilyBold,
     color: Colors.textPrimary,
+    letterSpacing: -0.5,
+    fontVariant: ['tabular-nums'],
   },
   savings: {
-    fontSize: Typography.size.small,
+    fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.success,
     textAlign: 'right',
-    marginBottom: Spacing.xs,
   },
   paymentRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
   },
-  // Two buttons split the row as before; a shop with more gets a tidy wrap
-  // instead of six slivers.
-  paymentBtn: { flexGrow: 1, flexBasis: '30%' },
+  method: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 48,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  methodSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  methodLabel: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textSecondary,
+  },
+  methodLabelSelected: { color: Colors.white },
 
   // Sub-mode selector
   subModeRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
     marginBottom: Spacing.sm,
     backgroundColor: Colors.background,
     borderRadius: 10,

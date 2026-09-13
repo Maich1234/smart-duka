@@ -44,17 +44,17 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionP
       layout={LinearTransition.duration(Motion.duration.slow)}
     >
       <View style={styles.info}>
-        <Text style={styles.name}>
+        <Text style={styles.name} numberOfLines={1}>
           {item.name}
           {item.variantName ? ` (${item.variantName})` : ''}
         </Text>
-        <Text style={styles.price}>{formatCurrency(price)}</Text>
-        {!!item.bundleComponentNames?.length && (
-          <Text style={styles.includes} numberOfLines={1}>Includes: {item.bundleComponentNames.join(', ')}</Text>
-        )}
+        <Text style={styles.meta} numberOfLines={1}>
+          {quantityLabel} · {formatCurrency(price)}
+          {item.bundleComponentNames?.length ? ` · ${item.bundleComponentNames.join(', ')}` : ''}
+        </Text>
         {discountAmount > 0 && (
           <Text style={styles.promo} numberOfLines={1}>
-            {appliedPromotionLabel} applied · saved {formatCurrency(discountAmount)}
+            {appliedPromotionLabel} · saved {formatCurrency(discountAmount)}
           </Text>
         )}
         {!!commissionPerUnit && (
@@ -63,19 +63,16 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionP
           </Text>
         )}
       </View>
-      <View style={styles.controls}>
-        <Text style={styles.quantity}>{quantityLabel}</Text>
-        <Text style={styles.subtotal}>{formatCurrency(subtotal)}</Text>
-        <AnimatedPressable
-          onPress={onRemove}
-          style={styles.removeBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel={`Remove ${item.name} from cart`}
-          accessibilityRole="button"
-        >
-          <Ionicons name="trash-outline" size={20} color={Colors.danger} />
-        </AnimatedPressable>
-      </View>
+      <Text style={styles.subtotal}>{formatCurrency(subtotal)}</Text>
+      <AnimatedPressable
+        onPress={onRemove}
+        style={styles.removeBtn}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityLabel={`Remove ${item.name} from sale`}
+        accessibilityRole="button"
+      >
+        <Ionicons name="close" size={17} color={Colors.textSecondary} />
+      </AnimatedPressable>
     </Animated.View>
   );
 };
@@ -83,20 +80,25 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionP
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    gap: Spacing.sm,
+    paddingVertical: 8,
+    // No divider between lines: two or three items with a rule under each
+    // reads as a table. Spacing separates them.
+    minHeight: 46,
   },
-  info: { flex: 2 },
-  name: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
-  price: { fontSize: Typography.size.small, color: Colors.textSecondary },
-  includes: { fontSize: Typography.size.caption, color: Colors.textSecondary, marginTop: 2 },
-  promo: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2 },
-  commission: { fontSize: Typography.size.caption, color: Colors.success, marginTop: 2, fontFamily: Typography.fontFamilySemiBold },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  quantity: { fontSize: Typography.size.body, color: Colors.textPrimary, minWidth: 40, textAlign: 'center' },
-  subtotal: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.success, minWidth: 70, textAlign: 'right' },
-  removeBtn: { padding: Spacing.xs },
+  info: { flex: 1, gap: 1 },
+  name: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  meta: { fontSize: Typography.size.caption, fontFamily: Typography.fontFamily, color: Colors.textSecondary },
+  promo: { fontSize: Typography.size.caption, color: Colors.success },
+  commission: { fontSize: Typography.size.caption, color: Colors.success, fontFamily: Typography.fontFamilySemiBold },
+  subtotal: {
+    fontSize: Typography.size.small,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  // A quiet close, not a red bin: removing a mistyped line is routine, and
+  // the loudest control on a till should be the one that completes the sale.
+  removeBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 });
