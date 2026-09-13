@@ -24,7 +24,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
-import { TAB_BAR_BASE_HEIGHT } from '@/constants/Layout';
+import { TAB_BAR_BASE_HEIGHT, TAB_BAR_MAX_HEIGHT } from '@/constants/Layout';
 
 interface TabConfig {
   name: string;
@@ -150,7 +150,11 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
     transform: [{ translateX: indicatorX.value }],
   }));
 
-  const tabBarHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
+  // A floor and a ceiling rather than a height: the row sizes itself between
+  // them, so the bar neither pads dead space under the labels at the default
+  // text size nor clips them once the system font grows.
+  const tabBarMinHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
+  const tabBarMaxHeight = TAB_BAR_MAX_HEIGHT + insets.bottom;
 
   // After the hooks above, not before — an early return has to come after
   // every hook call runs on every render, or the hook count changes between
@@ -158,7 +162,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
   if (activeRoute && HIDDEN_TAB_BAR_ROUTES.has(activeRoute.name)) return null;
 
   return (
-    <View style={[styles.tabBar, { maxHeight: tabBarHeight }]}>
+    <View style={[styles.tabBar, { minHeight: tabBarMinHeight, maxHeight: tabBarMaxHeight }]}>
       {/* Background layer */}
       {Platform.OS === 'ios' ? (
         <BlurView
