@@ -572,6 +572,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     overflow: 'hidden',
+    // Sits the row on the bottom edge. Without it, any slack between the
+    // content and the minHeight collects UNDER the tabs and floats them up
+    // off the edge they belong on.
+    justifyContent: 'flex-end',
   },
   blurBase: {
     borderTopLeftRadius: 0,

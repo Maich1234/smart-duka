@@ -19,6 +19,7 @@ import { useSearch } from '@/hooks/useSearch';
 import { CartItem } from '@/components/sales/CartItem';
 import { CartSummary, isValidKenyanPhone } from '@/components/sales/CartSummary';
 import { PosCheckoutPanel } from '@/components/sales/PosCheckoutPanel';
+import { CartReviewSheet } from '@/components/sales/CartReviewSheet';
 import { QuantityModal } from '@/components/sales/QuantityModal';
 import { VariantPickerModal } from '@/components/sales/VariantPickerModal';
 import { SaleCard } from '@/components/sales/SaleCard';
@@ -274,6 +275,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   // much of itself is covered. Measured rather than assumed: the panel's
   // height moves with the item count, the payment method and the keyboard.
   const [checkoutHeight, setCheckoutHeight] = useState(0);
+  const [reviewVisible, setReviewVisible] = useState(false);
 
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const onPullRefresh = async () => {
@@ -1075,10 +1077,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         )}
         contentContainerStyle={{
           paddingHorizontal: Spacing.lg,
-          // Only while the panel is on screen: the measured height survives
-          // the panel unmounting, and reusing it once the cart is cleared
-          // would leave a dead gap under the last product.
-          paddingBottom: tabBarHeight + (cart.length > 0 ? checkoutHeight : 0) + Spacing.lg,
+          // The panel sits on the screen edge and covers the tab bar, so it
+          // replaces that clearance rather than adding to it. Its measured
+          // height survives unmounting, hence the cart check — reusing it
+          // once the sale is cleared would leave a dead gap under the list.
+          paddingBottom: (cart.length > 0 ? checkoutHeight : tabBarHeight) + Spacing.lg,
           gap: Spacing.sm,
         }}
         // The catalogue arrives as the cashier scrolls. Never on the cached
@@ -1172,62 +1175,63 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       />
 
       {cart.length > 0 && (
-        <PosCheckoutPanel
-          itemCount={cart.length}
-          bottomInset={tabBarHeight}
-          onHeightChange={setCheckoutHeight}
-          lines={
-            <>
-              {cart.map((item) => (
-                <CartItem
-                  key={cartKey(item)}
-                  item={{
-                    ...item,
-                    quantity: item.cartQuantity,
-                    variantName: item.cartVariantName,
-                    bundleComponentNames: item.bundleItems?.map(
-                      (b) => products.find((p) => p._id === b.product)?.name || 'item'
-                    ),
-                  }}
-                  unitPrice={item.cartUnitPrice}
-                  commissionPerUnit={item.cartVariantCommission}
-                  onRemove={() => removeFromCart(cartKey(item))}
-                />
-              ))}
-              {totalCommission > 0 && (
-                <Text style={styles.cartCommissionTotal}>
-                  Your commission: {formatCurrency(totalCommission)}
-                </Text>
-              )}
-            </>
-          }
-          summary={
-            <CartSummary
-              total={totalAmount}
-              totalSavings={totalSavings}
-              methods={saleMethods}
-              paymentMethod={paymentMethod}
-              onPaymentMethodChange={(m) => {
-                setPaymentMethod(m);
-                // Leaving M-Pesa drops anything only M-Pesa collects.
-                if (m !== MPESA_METHOD_KEY) {
-                  resetSaleFields();
-                }
-              }}
-              onCheckout={handleCheckout}
-              loading={createSaleMutation.isPending}
-              mpesaEnabled={mpesaEnabled}
-              customerPhone={customerPhone}
-              onCustomerPhoneChange={setCustomerPhone}
-              currency={user?.shop?.currency}
-              mpesaMode={mpesaMode}
-              onMpesaModeChange={setMpesaMode}
-              manualReceiptCode={manualReceiptCode}
-              onManualReceiptCodeChange={setManualReceiptCode}
-            />
-          }
-        />
+        <PosCheckoutPanel onHeightChange={setCheckoutHeight}>
+          <CartSummary
+            total={totalAmount}
+            totalSavings={totalSavings}
+            itemCount={cart.length}
+            onReview={() => setReviewVisible(true)}
+            methods={saleMethods}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={(m) => {
+              setPaymentMethod(m);
+              // Leaving M-Pesa drops anything only M-Pesa collects.
+              if (m !== MPESA_METHOD_KEY) {
+                resetSaleFields();
+              }
+            }}
+            onCheckout={handleCheckout}
+            loading={createSaleMutation.isPending}
+            mpesaEnabled={mpesaEnabled}
+            customerPhone={customerPhone}
+            onCustomerPhoneChange={setCustomerPhone}
+            currency={user?.shop?.currency}
+            mpesaMode={mpesaMode}
+            onMpesaModeChange={setMpesaMode}
+            manualReceiptCode={manualReceiptCode}
+            onManualReceiptCodeChange={setManualReceiptCode}
+          />
+        </PosCheckoutPanel>
       )}
+
+      <CartReviewSheet
+        visible={reviewVisible}
+        onClose={() => setReviewVisible(false)}
+        itemCount={cart.length}
+        total={formatCurrency(totalAmount, user?.shop?.currency)}
+      >
+        {cart.map((item) => (
+          <CartItem
+            key={cartKey(item)}
+            item={{
+              ...item,
+              quantity: item.cartQuantity,
+              variantName: item.cartVariantName,
+              bundleComponentNames: item.bundleItems?.map(
+                (b) => products.find((p) => p._id === b.product)?.name || 'item'
+              ),
+            }}
+            unitPrice={item.cartUnitPrice}
+            commissionPerUnit={item.cartVariantCommission}
+            onRemove={() => removeFromCart(cartKey(item))}
+          />
+        ))}
+        {totalCommission > 0 && (
+          <Text style={styles.cartCommissionTotal}>
+            Your commission: {formatCurrency(totalCommission)}
+          </Text>
+        )}
+      </CartReviewSheet>
 
       <QuantityModal
         visible={quantityModalVisible}

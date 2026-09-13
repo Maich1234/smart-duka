@@ -45,6 +45,10 @@ interface CartSummaryProps {
   onMpesaModeChange?: (mode: 'stk' | 'manual') => void;
   manualReceiptCode?: string;
   onManualReceiptCodeChange?: (code: string) => void;
+  /** Items in the sale — shown beside the total as the way into the lines. */
+  itemCount?: number;
+  /** Opens the line-item review. Makes the total row a control. */
+  onReview?: () => void;
 }
 
 /**
@@ -101,6 +105,8 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   onMpesaModeChange,
   manualReceiptCode = '',
   onManualReceiptCodeChange,
+  itemCount = 0,
+  onReview,
 }) => {
   const isMpesa = paymentMethod === MPESA_METHOD_KEY;
   // STK Push is only on the table with Daraja credentials saved. Without them
@@ -126,10 +132,27 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
       {totalSavings > 0 && (
         <Text style={styles.savings}>You saved {formatCurrency(totalSavings, currency)}</Text>
       )}
-      <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>Total</Text>
+      {/* The total doubles as the way into the lines. They are only ever
+          read to correct something, so they cost a tap rather than permanent
+          height on every sale. */}
+      <AnimatedPressable
+        onPress={onReview}
+        disabled={!onReview}
+        style={styles.totalRow}
+        pressScale={0.995}
+        accessibilityRole={onReview ? 'button' : 'summary'}
+        accessibilityLabel={`${itemCount} item${itemCount === 1 ? '' : 's'}, total ${formatCurrency(total, currency)}`}
+        accessibilityHint={onReview ? 'Shows the items in this sale' : undefined}
+      >
+        <Text style={styles.totalLabel}>
+          {itemCount} item{itemCount === 1 ? '' : 's'}
+        </Text>
+        {!!onReview && (
+          <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} style={styles.totalChevron} />
+        )}
+        <View style={styles.totalSpacer} />
         <Text style={styles.totalAmount}>{formatCurrency(total, currency)}</Text>
-      </View>
+      </AnimatedPressable>
 
       {/* The shop's own buttons, in its own order. Selection is carried by
           fill, border and a tick together rather than fill alone: at arm's
@@ -255,9 +278,11 @@ const styles = StyleSheet.create({
   },
   totalRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 40,
   },
+  totalSpacer: { flex: 1 },
+  totalChevron: { marginLeft: 2 },
   totalLabel: {
     fontSize: Typography.size.small,
     fontFamily: Typography.fontFamily,
