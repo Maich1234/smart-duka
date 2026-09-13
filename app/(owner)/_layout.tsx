@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { haptics } from '@/utils/haptics';
 import {
   View,
   StyleSheet,
   Platform,
-  LayoutChangeEvent,
+  useWindowDimensions,
 } from 'react-native';
 import { Tabs, Redirect, usePathname, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -45,7 +45,9 @@ const TAB_CONFIGS: TabConfig[] = [
 // when the bundle is evaluated, and never again — so the sliding indicator
 // kept using the launch width after a rotation, a foldable unfolding, an
 // Android split-screen resize or a browser resize, landing under the wrong
-// tab and drawing the wrong width. The row measures itself instead.
+// tab and drawing the wrong width. `useWindowDimensions` re-renders on each
+// of those, and unlike measuring the row with onLayout it is already correct
+// on the first frame, so the indicator never pops in a beat late.
 
 /** Routes reachable from the tab bar — the only ones without a back button. */
 const TAB_ROUTE_NAMES = new Set(TAB_CONFIGS.map((tc) => tc.name));
@@ -122,15 +124,12 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
   const activeVisibleIndex = visibleRoutes.findIndex((r) => r.name === activeRoute?.name);
 
   // Sliding indicator position
-  const [barWidth, setBarWidth] = useState(0);
+  const { width: barWidth } = useWindowDimensions();
   const tabWidth = visibleRoutes.length > 0 ? barWidth / visibleRoutes.length : 0;
 
-  const onBarLayout = useCallback((e: LayoutChangeEvent) => {
-    const next = e.nativeEvent.layout.width;
-    setBarWidth((prev) => (prev === next ? prev : next));
-  }, []);
-
-  const indicatorX = useSharedValue(0);
+  const indicatorX = useSharedValue(
+    activeVisibleIndex >= 0 && tabWidth > 0 ? activeVisibleIndex * tabWidth : 0,
+  );
   const lastIndex = useRef<number | null>(null);
 
   // `tabWidth` is a dependency because a resize moves the indicator without
@@ -159,7 +158,7 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
   if (activeRoute && HIDDEN_TAB_BAR_ROUTES.has(activeRoute.name)) return null;
 
   return (
-    <View style={[styles.tabBar, { height: tabBarHeight }]}>
+    <View style={[styles.tabBar, { maxHeight: tabBarHeight }]}>
       {/* Background layer */}
       {Platform.OS === 'ios' ? (
         <BlurView
@@ -175,16 +174,14 @@ const PremiumTabBar: React.FC<PremiumTabBarProps> = ({ state, descriptors, navig
       <View style={styles.topBorderLine} />
 
       {/* Sliding pill indicator */}
-      {tabWidth > 0 && (
-        <Animated.View
-          style={[styles.pillContainer, { width: tabWidth }, indicatorStyle, { pointerEvents: 'none' }]}
-        >
-          <View style={styles.pill} />
-        </Animated.View>
-      )}
+      <Animated.View
+        style={[styles.pillContainer, { width: tabWidth }, indicatorStyle, { pointerEvents: 'none' }]}
+      >
+        <View style={styles.pill} />
+      </Animated.View>
 
       {/* Tab items */}
-      <View style={[styles.tabsRow, { paddingBottom: insets.bottom }]} onLayout={onBarLayout}>
+      <View style={[styles.tabsRow, { paddingBottom: insets.bottom }]}>
         {visibleRoutes.map((route) => {
           const config = TAB_CONFIGS.find((tc) => tc.name === route.name)!;
           const isFocused = route.name === activeRoute?.name;
