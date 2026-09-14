@@ -1227,11 +1227,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             onRemove={() => removeFromCart(cartKey(item))}
           />
         ))}
-        {totalCommission > 0 && (
-          <Text style={styles.cartCommissionTotal}>
-            Your commission: {formatCurrency(totalCommission)}
-          </Text>
-        )}
       </CartReviewSheet>
 
       <QuantityModal
@@ -1405,13 +1400,6 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     marginBottom: Spacing.sm,
     color: Colors.textPrimary,
-  },
-  cartCommissionTotal: {
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-    color: Colors.success,
-    textAlign: 'right',
-    marginTop: Spacing.xs,
   },
   // marginBottom deliberately omitted — this is the last thing in the
   // FlatList's footer, so the space above the tab bar is already the

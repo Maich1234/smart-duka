@@ -244,6 +244,8 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
                   placeholder="7XXXXXXXX"
                   placeholderTextColor={Colors.textTertiary}
                   returnKeyType="done"
+                  accessibilityLabel="Customer phone number"
+                  accessibilityHint="Nine digits after +254"
                 />
               </View>
               {customerPhone.length > 0 && !isValidKenyanPhone(customerPhone) && (
@@ -282,6 +284,10 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         onPress={onCheckout}
         loading={loading}
         disabled={checkoutDisabled}
+        // Greyed says "not now" to anyone who can see it and nothing at all to
+        // anyone who can't. This is the one control on the screen that is ever
+        // withheld, so it should be able to say what it is waiting for.
+        accessibilityHint={checkoutDisabled ? "Enter the customer's phone number first" : undefined}
         size="lg"
       />
     </View>
@@ -295,7 +301,10 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 40,
+    // A control's floor, not a label's: this row is the way into the lines,
+    // and the cashiers this is built for include older hands with less steady
+    // aim than a design review has.
+    minHeight: 44,
   },
   totalSpacer: { flex: 1 },
   totalChevron: { marginLeft: 2 },

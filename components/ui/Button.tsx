@@ -21,6 +21,8 @@ interface ButtonProps {
   leftIcon?: keyof typeof Ionicons.glyphMap;
   accessibilityLabel?: string;
   accessibilityState?: object;
+  /** Why the button is unavailable, for anyone who can't see that it's greyed. */
+  accessibilityHint?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -36,6 +38,7 @@ export const Button: React.FC<ButtonProps> = ({
   leftIcon,
   accessibilityLabel,
   accessibilityState,
+  accessibilityHint,
 }) => {
   const handlePress = () => {
     if (haptic && !disabled && !loading) {
@@ -93,6 +96,7 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: disabled || loading, ...accessibilityState }}
       style={[
         styles.button,
