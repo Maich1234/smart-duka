@@ -367,6 +367,7 @@ export default function RootLayout() {
     Inter_400Regular,
     Inter_600SemiBold,
     Inter_700Bold,
+    Gegola: require('@/assets/fonts/Gegola.otf'),
   });
 
   const isAuthLoading = useAuthStore((s: AuthState) => s.isLoading);

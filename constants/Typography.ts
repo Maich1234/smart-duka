@@ -17,6 +17,8 @@ export const Typography = {
   fontFamily: 'Inter_400Regular',
   fontFamilyBold: 'Inter_700Bold',
   fontFamilySemiBold: 'Inter_600SemiBold',
+  // Dedicated brand display font — the "DuQana" wordmark only, never body copy.
+  fontFamilyLogo: 'Gegola',
   fontWeight: {
     regular: '400',
     medium: '500',

@@ -64,7 +64,7 @@ export function DukanaWordmark({
         width,
         height,
         lineHeight: height,
-        fontFamily: Typography.fontFamilyBold,
+        fontFamily: Typography.fontFamilyLogo,
         fontSize: height,
         color,
         letterSpacing: -0.5,
