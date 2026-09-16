@@ -55,8 +55,10 @@ const TAB_ROUTE_NAMES = new Set(TAB_CONFIGS.map((tc) => tc.name));
  * to opt out by route name instead. Scan is a dark camera view edge-to-edge;
  * without this the bar floats on top of it and anything the screen anchors
  * to its own bottom edge (e.g. the "barcode not registered" panel) renders
- * partly underneath the bar instead of above it. */
-const HIDDEN_TAB_BAR_ROUTES = new Set(['scan']);
+ * partly underneath the bar instead of above it. The credit customer picker
+ * is the same push-and-return shape as scan (see PosScreen) and keeps the
+ * keyboard-open search list clear of the bar for the same reason. */
+const HIDDEN_TAB_BAR_ROUTES = new Set(['scan', 'pick-credit-customer']);
 
 interface AnimatedTabIconProps {
   config: TabConfig;
@@ -304,6 +306,14 @@ export default function StaffLayout() {
       <Tabs.Screen name="purchases" options={{ title: 'Purchases', href: null, headerShown: false }} />
       <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
       <Tabs.Screen name="commission" options={{ title: 'My Commission', href: null }} />
+      {/* Both nested-Stack destinations draw their own header
+          (CustomerListScreen/CustomerAccountScreen/CustomerPickerScreen all
+          render <ScreenHeader> themselves) — headerShown:false here matches
+          the same convention "expenses"/"purchases" already use above, and
+          without it the outer Tabs header and the inner ScreenHeader both
+          rendered, stacking two bars with the same title. */}
+      <Tabs.Screen name="customers" options={{ title: 'Customers', href: null, headerShown: false }} />
+      <Tabs.Screen name="pick-credit-customer" options={{ title: 'Choose Customer', href: null, headerShown: false }} />
       <Tabs.Screen name="refer" options={{ title: 'Refer & Earn', href: null }} />
       <Tabs.Screen name="reconciliation" options={{ title: 'My Reconciliation', href: null }} />
       <Tabs.Screen name="printer" options={{ title: 'Receipt Printer', href: null }} />

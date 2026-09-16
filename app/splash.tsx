@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Dimensions, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Dimensions, Image, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -10,7 +10,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BRAND, DukanaMark, DukanaWordmark } from '@/components/brand/DukanaMark';
+import { BRAND, DukanaWordmark } from '@/components/brand/DukanaMark';
 import { Typography } from '@/constants/Typography';
 import { useAuthStore } from '@/store/authStore';
 import { useOnboardingStore } from '@/store/onboardingStore';
@@ -20,9 +20,12 @@ const { height } = Dimensions.get('window');
 
 const FOOTER = 'Powered by Wabunifu Labs';
 
-// Both marks are sized from their own viewBox ratios so neither distorts.
+// Both marks are sized from their own asset ratios so neither distorts.
+// The mark's ratio comes from brand-mark-white.png's actual content bounds
+// (302x373 — the official storefront/phone mark, cropped to a tight safe
+// margin from the shipped android-icon-monochrome.png silhouette).
 const MARK_H = 132;
-const MARK_W = Math.round(MARK_H * (488 / 550));
+const MARK_W = Math.round(MARK_H * (302 / 373));
 const WORD_W = 208;
 const WORD_H = Math.round(WORD_W * (166 / 814));
 
@@ -190,12 +193,18 @@ export default function SplashScreen() {
         accessibilityLabel="DuQana"
       >
         <Animated.View style={markStyle}>
-          <DukanaMark width={MARK_W} height={MARK_H} />
+          <Image
+            source={require('@/assets/images/brand-mark-white.png')}
+            style={{ width: MARK_W, height: MARK_H }}
+            resizeMode="contain"
+          />
         </Animated.View>
 
         <View style={styles.wordTrack}>
           <Animated.View style={[styles.wordClip, wordClipStyle]}>
-            <DukanaWordmark width={WORD_W} height={WORD_H} />
+            {/* White, matching the new mark above it (was gold, to match the
+                old bag+D mark's own gold) — the two must read as one lockup. */}
+            <DukanaWordmark width={WORD_W} height={WORD_H} color="#FFFFFF" />
           </Animated.View>
         </View>
       </View>

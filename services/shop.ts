@@ -1,5 +1,6 @@
 import api from './api';
 import type { ShopPaymentMethod } from '@/constants/paymentMethods';
+import type { CreditSettings } from './credit';
 
 export interface Shop {
   _id: string;
@@ -36,6 +37,10 @@ export interface Shop {
    * that predate the setting — read it through resolveSaleMethods(), which
    * falls back to Cash + M-PESA. */
   paymentMethods?: ShopPaymentMethod[];
+  /** Customer credit ("deni"). Absent on shops that predate the module — the
+   * backend resolves defaults, so an absent value means the response itself is
+   * stale, not that credit is unconfigured. Read it as off either way. */
+  creditSettings?: CreditSettings;
   /** ISO timestamp — earliest possible date for any sale, used as a
    * lower bound on sales date-range pickers. */
   createdAt?: string;
@@ -65,6 +70,8 @@ export interface UpdateShopConfigData {
   barcodeScanningEnabled?: boolean;
   /** Sent as the complete ordered list — array position becomes button order. */
   paymentMethods?: ShopPaymentMethod[];
+  /** Merged server-side, so one switch can be written without resending the rest. */
+  creditSettings?: Partial<CreditSettings>;
 }
 
 export const getShopConfig = async (): Promise<ShopConfigResponse> => {

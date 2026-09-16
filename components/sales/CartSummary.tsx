@@ -10,6 +10,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { formatCurrency } from '@/utils/formatters';
 import {
+  CREDIT_METHOD_KEY,
   MPESA_METHOD_KEY,
   methodIcon,
   type ShopPaymentMethod,
@@ -51,6 +52,10 @@ interface CartSummaryProps {
   totalCommission?: number;
   /** Opens the line-item review. Makes the total row a control. */
   onReview?: () => void;
+  /** The customer chosen for a credit sale, if any — required to check out on credit. */
+  creditCustomerName?: string | null;
+  /** Opens the customer picker/creator sheet. */
+  onPickCreditCustomer?: () => void;
 }
 
 /**
@@ -110,8 +115,11 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   itemCount = 0,
   totalCommission = 0,
   onReview,
+  creditCustomerName = null,
+  onPickCreditCustomer,
 }) => {
   const isMpesa = paymentMethod === MPESA_METHOD_KEY;
+  const isCredit = paymentMethod === CREDIT_METHOD_KEY;
   // STK Push is only on the table with Daraja credentials saved. Without them
   // M-Pesa is an ordinary button: the customer paid on a Pochi, a till or a
   // personal number, and the cashier is recording that.
@@ -124,11 +132,19 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
     onCustomerPhoneChange?.(clean ? `+254${clean}` : '');
   };
 
-  const checkoutLabel = stkSelected ? 'Send Payment Request' : 'Complete Sale';
-  const checkoutIcon = stkSelected ? 'phone-portrait-outline' : 'checkmark-circle-outline';
-  // Only the STK path can block checkout, and only because it needs a number to
-  // push to. Every other combination records the sale and prints, like cash.
-  const checkoutDisabled = stkSelected && !mpesaReady;
+  const checkoutLabel = stkSelected
+    ? 'Send Payment Request'
+    : isCredit
+      ? 'Review Credit Sale'
+      : 'Complete Sale';
+  const checkoutIcon = stkSelected
+    ? 'phone-portrait-outline'
+    : isCredit
+      ? 'time-outline'
+      : 'checkmark-circle-outline';
+  // STK needs a number to push to; credit needs a named customer before there
+  // is anyone to owe the debt. Every other combination records and prints.
+  const checkoutDisabled = (stkSelected && !mpesaReady) || (isCredit && !creditCustomerName);
 
   return (
     <View style={styles.container}>
@@ -259,6 +275,36 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
               hint="Use this when the customer has already paid via M-Pesa directly. Enter the code from their M-Pesa confirmation SMS."
             />
           )}
+        </Animated.View>
+      )}
+
+      {/* Credit requires a named customer before anything else — there is no
+          such thing as an anonymous debt. Tapping opens the picker/creator
+          sheet; the actual limit/balance check happens in the confirmation
+          sheet PosScreen shows next, never here. */}
+      {isCredit && (
+        <Animated.View entering={FadeInDown.duration(220).springify()} exiting={FadeOut.duration(150)}>
+          <Text style={styles.phoneLabel}>Customer</Text>
+          <AnimatedPressable
+            onPress={onPickCreditCustomer}
+            style={styles.creditCustomerRow}
+            pressScale={0.99}
+            accessibilityRole="button"
+            accessibilityLabel={creditCustomerName ? `Customer: ${creditCustomerName}. Tap to change.` : 'Choose a customer'}
+          >
+            <Ionicons
+              name={creditCustomerName ? 'person-circle' : 'person-add-outline'}
+              size={18}
+              color={creditCustomerName ? Colors.primary : Colors.textTertiary}
+            />
+            <Text
+              style={[styles.creditCustomerText, !creditCustomerName && styles.creditCustomerPlaceholder]}
+              numberOfLines={1}
+            >
+              {creditCustomerName || 'Choose or add a customer'}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+          </AnimatedPressable>
         </Animated.View>
       )}
 
@@ -444,6 +490,27 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     borderLeftWidth: 3,
     borderLeftColor: Colors.primary,
+  },
+  creditCustomerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.md,
+    height: 46,
+  },
+  creditCustomerText: {
+    flex: 1,
+    fontSize: Typography.size.body,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.textPrimary,
+  },
+  creditCustomerPlaceholder: {
+    fontFamily: Typography.fontFamily,
+    color: Colors.textTertiary,
   },
   alreadyPaidHintText: {
     fontSize: 12,

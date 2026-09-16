@@ -1,4 +1,6 @@
 import api from './api';
+import type { CreditAccount } from './customers';
+import { CREDIT_METHOD_KEY } from '@/constants/paymentMethods';
 
 export interface SaleItem {
   productId: string;
@@ -33,6 +35,17 @@ export interface Sale {
   updatedAt: string;
   /** Only present on createSale responses — used to build the receipt QR code */
   receiptToken?: string;
+  /** The customer this sale was made to, when one was attached. */
+  customer?: string;
+  /** Their name at the time of sale — snapshotted, so a rename never rewrites a receipt. */
+  customerName?: string;
+  /** Present only on a credit sale's createSale response: when it falls due and
+   * where the customer now stands. Server-computed. */
+  credit?: {
+    transactionId: string;
+    dueAt: string;
+    account: CreditAccount;
+  };
   // M-Pesa fields (populated for mpesa payment method)
   mpesaTransactionId?: string;
   mpesaReceiptNumber?: string;
@@ -95,6 +108,16 @@ export interface CreateSaleData {
   mpesaTransactionId?: string;
   /** Offline fallback: M-Pesa receipt code entered manually from customer's SMS */
   mpesaReceiptNumber?: string;
+  /**
+   * Who the sale is for. Required when paymentMethod is 'credit' and the shop
+   * has credit switched on — a debt needs a debtor — and optional on any other
+   * sale so a shop can attach a regular to a cash purchase.
+   *
+   * Note what is deliberately absent: no credit limit, balance, available
+   * credit or due date. The server computes all four at commit; the client only
+   * ever displays them.
+   */
+  customerId?: string;
 }
 
 export interface SalesStats {
@@ -139,8 +162,22 @@ export interface SaleResponse {
  * Create a new sale (record customer purchase)
  * Staff requires 'record_sale' permission
  */
+/**
+ * Records a sale.
+ *
+ * `realtimeOnly` is set for a credit sale and only for a credit sale. The
+ * offline outbox exists so a duka can keep selling through a dead network, and
+ * that stays true for cash, M-Pesa and every other button. Credit is the one
+ * case the device cannot decide: the customer's balance and limit live on the
+ * server, two tills can be selling to the same person, and a queued credit sale
+ * replayed hours later could put someone thousands past a limit that was
+ * checked against a stale balance. Better to say "this one needs a connection"
+ * than to promise a debt the shop may not be able to collect.
+ */
 export const createSale = async (data: CreateSaleData): Promise<SaleResponse> => {
-  const response = await api.post('/sales', data);
+  const response = await api.post('/sales', data, {
+    realtimeOnly: data.paymentMethod === CREDIT_METHOD_KEY,
+  });
   return response.data;
 };
 

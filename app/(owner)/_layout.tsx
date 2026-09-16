@@ -57,8 +57,10 @@ const TAB_ROUTE_NAMES = new Set(TAB_CONFIGS.map((tc) => tc.name));
  * to opt out by route name instead. Scan is a dark camera view edge-to-edge;
  * without this the bar floats on top of it and anything the screen anchors
  * to its own bottom edge (e.g. the "barcode not registered" panel) renders
- * partly underneath the bar instead of above it. */
-const HIDDEN_TAB_BAR_ROUTES = new Set(['scan']);
+ * partly underneath the bar instead of above it. The credit customer picker
+ * is the same push-and-return shape as scan (see PosScreen) and keeps the
+ * keyboard-open search list clear of the bar for the same reason. */
+const HIDDEN_TAB_BAR_ROUTES = new Set(['scan', 'pick-credit-customer']);
 
 interface AnimatedTabIconProps {
   config: TabConfig;
@@ -409,6 +411,37 @@ export default function OwnerLayout() {
         options={{
           title: 'My Business',
           href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="credit"
+        options={{
+          title: 'Credit',
+          href: null,
+          // The nested Stack at app/(owner)/credit/_layout.tsx draws its own
+          // header (CreditOverviewScreen renders <ScreenHeader> itself) — without
+          // this the outer Tabs header and the inner ScreenHeader both rendered,
+          // stacking two bars that both said "Credit".
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="customers"
+        options={{
+          title: 'Customers',
+          href: null,
+          // Same reason as "credit" above — the nested Stack's own screens
+          // (CustomerListScreen, CustomerAccountScreen) draw their own header.
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="pick-credit-customer"
+        options={{
+          title: 'Choose Customer',
+          href: null,
+          // CustomerPickerScreen draws its own <ScreenHeader> — same reason.
+          headerShown: false,
         }}
       />
       <Tabs.Screen

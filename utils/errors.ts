@@ -16,6 +16,14 @@ export const isOfflineUnavailable = (error: any): boolean => !!error?.offlineUna
 export const isSubscriptionLocked = (error: any): boolean => !!error?.subscriptionLocked;
 
 /**
+ * True when the request needed a live connection and there wasn't one — an
+ * M-Pesa push, a refund, a credit sale. Nothing was queued and nothing will
+ * happen later, so the UI has to say so rather than leaving the user assuming
+ * it will sync.
+ */
+export const isOfflineRealtime = (error: any): boolean => !!error?.offlineRealtime;
+
+/**
  * Message for a failed mutation: the server's own wording where there is one,
  * otherwise `fallback`.
  *
@@ -25,6 +33,8 @@ export const isSubscriptionLocked = (error: any): boolean => !!error?.subscripti
  * is the only way through.
  */
 export const mutationErrorMessage = (error: any, fallback: string): string => {
-  if (isOfflineUnavailable(error) || isSubscriptionLocked(error)) return error.message;
+  if (isOfflineUnavailable(error) || isSubscriptionLocked(error) || isOfflineRealtime(error)) {
+    return error.message;
+  }
   return error?.response?.data?.message || fallback;
 };

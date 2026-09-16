@@ -30,10 +30,19 @@ interface CartStore {
   setMpesaMode: (value: 'stk' | 'manual') => void;
   manualReceiptCode: string;
   setManualReceiptCode: (value: string) => void;
-  /** Resets the three fields above. Deliberately separate from clearCart —
+  /**
+   * The customer chosen for a credit sale — persisted like customerPhone
+   * above, and for the same reason: an app kill mid-sale (low-memory reclaim,
+   * a crash) must not silently drop who a debt was about to be booked to.
+   * Cleared on every completed sale and on Discard, never carried customer-
+   * to-customer the way a phone number is.
+   */
+  creditCustomer: { _id: string; name: string } | null;
+  setCreditCustomer: (customer: { _id: string; name: string } | null) => void;
+  /** Resets the fields above. Deliberately separate from clearCart —
    *  a completed sale clears the cart but keeps customerPhone (a repeat
    *  customer's number is worth keeping prefilled); only actually *leaving*
-   *  the sale (Discard, or a tab switch mid-sale) should wipe all three. */
+   *  the sale (Discard, or a tab switch mid-sale) should wipe these. */
   resetSaleFields: () => void;
 }
 
@@ -62,7 +71,9 @@ export const useCartStore = create<CartStore>()(
       setMpesaMode: (value) => set({ mpesaMode: value }),
       manualReceiptCode: '',
       setManualReceiptCode: (value) => set({ manualReceiptCode: value }),
-      resetSaleFields: () => set({ customerPhone: '', mpesaMode: 'stk', manualReceiptCode: '' }),
+      creditCustomer: null,
+      setCreditCustomer: (customer) => set({ creditCustomer: customer }),
+      resetSaleFields: () => set({ customerPhone: '', mpesaMode: 'stk', manualReceiptCode: '', creditCustomer: null }),
     }),
     {
       name: 'staff-cart-storage',

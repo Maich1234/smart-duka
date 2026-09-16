@@ -54,6 +54,22 @@ export default function StaffDashboard() {
   const canManageExpenses = usePermission('manage_expenses');
   const canViewPurchases = usePermission('view_purchases');
   const canViewReconciliation = usePermission('view_reconciliation');
+  // Same eligibility the backend applies (customerController.canListCustomers):
+  // any credit grant, or just being able to record a sale — the directory
+  // doubles as the till's customer picker. Each usePermission is its own
+  // hook and must run unconditionally every render, so every check happens
+  // before they're combined — `||`'d directly, they'd short-circuit and skip
+  // whichever calls come after the first true one.
+  const canRecordSaleForCustomers = usePermission('record_sale');
+  const canMakeCreditSaleTile = usePermission('make_credit_sale');
+  const canRecordCreditPaymentTile = usePermission('record_credit_payment');
+  const canViewOwnCreditTile = usePermission('view_own_credit');
+  const canViewAllCreditTile = usePermission('view_all_credit');
+  const canOpenCustomers = canRecordSaleForCustomers
+    || canMakeCreditSaleTile
+    || canRecordCreditPaymentTile
+    || canViewOwnCreditTile
+    || canViewAllCreditTile;
   const { data, isLoading, isRefetching, isError, refetch } = useQuery({
     queryKey: ['staffDashboard'],
     queryFn: getStaffDashboard,
@@ -92,6 +108,9 @@ export default function StaffDashboard() {
     const list: QuickActionTile[] = [
       { id: 'inventory', title: 'Stock', icon: 'cube-outline', tint: Colors.accentDark, tintBg: Colors.accentSubtle, route: '/(staff)/inventory' },
     ];
+    if (canOpenCustomers) {
+      list.push({ id: 'customers', title: 'Customers', icon: 'people-outline', tint: Colors.info, tintBg: '#EFF6FF', route: '/(staff)/customers' });
+    }
     if (canManageExpenses) {
       list.unshift({ id: 'expense', title: 'Log Expense', icon: 'receipt-outline', tint: Colors.danger, tintBg: Colors.dangerSubtle, route: '/(staff)/expenses' });
     }
@@ -110,7 +129,7 @@ export default function StaffDashboard() {
     // state rather than the tile disappearing.
     list.push({ id: 'refer', title: 'Refer & Earn', icon: 'gift-outline', tint: Colors.primaryDark, tintBg: Colors.primarySubtle, route: '/(staff)/refer' });
     return list;
-  }, [canManageExpenses, showPurchasesTile, showCommissionTile, showReconciliationTile]);
+  }, [canManageExpenses, showPurchasesTile, showCommissionTile, showReconciliationTile, canOpenCustomers]);
 
   const unreadCount = useUnreadNotificationsCount();
   // Stable reference so the 60s unread-count poll (see useUnreadNotificationsCount)

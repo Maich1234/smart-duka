@@ -84,6 +84,42 @@ describe('services/api interceptors', () => {
     expect(getPendingCount()).toBe(0);
   });
 
+  // /sales is an ordinary offline-queueable endpoint — a cash sale relies on
+  // that. A credit sale posts to the exact same URL but opts out per-request,
+  // which is what config.realtimeOnly exists for (see createSale in
+  // services/sales.ts). These tests are on api.ts directly rather than through
+  // createSale, so a regression here is caught even if that call site drifts.
+  it('realtimeOnly:true on an otherwise-queueable endpoint fails fast offline instead of queuing', async () => {
+    __setState({ isConnected: false });
+
+    await expect(
+      api.post('/sales', { paymentMethod: 'credit' }, { realtimeOnly: true })
+    ).rejects.toMatchObject({ offlineRealtime: true });
+
+    expect(getPendingCount()).toBe(0);
+  });
+
+  it('the same endpoint without realtimeOnly still queues offline — a cash sale is unaffected', async () => {
+    __setState({ isConnected: false });
+
+    await expect(
+      api.post('/sales', { paymentMethod: 'cash' })
+    ).rejects.toMatchObject({ offlineQueued: true });
+
+    expect(getPendingCount()).toBe(1);
+  });
+
+  it('realtimeOnly:true also fails fast on a network failure discovered mid-flight, not only the offline pre-flight', async () => {
+    __setState({ isConnected: true });
+    mock.onPost('/sales').networkError();
+
+    await expect(
+      api.post('/sales', { paymentMethod: 'credit' }, { realtimeOnly: true })
+    ).rejects.toMatchObject({ offlineRealtime: true });
+
+    expect(getPendingCount()).toBe(0);
+  });
+
   it('refreshes the access token once on a 401 and transparently replays the original request', async () => {
     let calls = 0;
     mock.onPost('/expenses').reply(() => {

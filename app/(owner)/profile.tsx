@@ -400,6 +400,45 @@ export default function OwnerProfile() {
           </AnimatedPressable>
         </Animated.View>
 
+        {/* Who owes the shop money, and who to sell to on account. Two
+            distinct destinations sharing the same link style as My Business
+            above — Credit is the owner's ledger view, Customers is the
+            directory (search, add, and non-credit purchase history too). */}
+        <Animated.View entering={FadeInUp.duration(360).delay(270)} style={[styles.businessLinkWrap, styles.creditLinksRow]}>
+          <AnimatedPressable
+            onPress={() => { haptics.light(); router.push('/(owner)/credit' as never); }}
+            style={[styles.businessLink, styles.creditLinkHalf]}
+            accessibilityRole="button"
+            accessibilityLabel="Credit: outstanding and overdue customer balances"
+          >
+            <View style={styles.businessLinkIcon}>
+              <Ionicons name="time-outline" size={17} color={Colors.primary} />
+            </View>
+            <View style={styles.businessLinkText}>
+              <Text style={styles.businessLinkTitle}>Credit</Text>
+              <Text style={styles.businessLinkSub} numberOfLines={2}>
+                Who owes what, and what&rsquo;s overdue
+              </Text>
+            </View>
+          </AnimatedPressable>
+          <AnimatedPressable
+            onPress={() => { haptics.light(); router.push('/(owner)/customers' as never); }}
+            style={[styles.businessLink, styles.creditLinkHalf]}
+            accessibilityRole="button"
+            accessibilityLabel="Customers directory"
+          >
+            <View style={styles.businessLinkIcon}>
+              <Ionicons name="people-outline" size={17} color={Colors.primary} />
+            </View>
+            <View style={styles.businessLinkText}>
+              <Text style={styles.businessLinkTitle}>Customers</Text>
+              <Text style={styles.businessLinkSub} numberOfLines={2}>
+                Search, add, and view accounts
+              </Text>
+            </View>
+          </AnimatedPressable>
+        </Animated.View>
+
         {lowStockCount > 0 && (
           <Animated.View entering={FadeInUp.duration(340).delay(260)} style={styles.lowStockBanner}>
             <View style={styles.lowStockIconWrap}>
@@ -729,6 +768,12 @@ const styles = StyleSheet.create({
 
   // Low stock banner
   businessLinkWrap: { paddingHorizontal: Spacing.lg, marginTop: 10 },
+  // The Credit/Customers row splits the same card into two, so each keeps
+  // its icon+title+subtitle shape at roughly half width instead of a second
+  // full-width row — two destinations that belong together read as a pair,
+  // not as two separate business-link cards stacked vertically.
+  creditLinksRow: { flexDirection: 'row', gap: Spacing.sm },
+  creditLinkHalf: { flex: 1, minHeight: 72 },
   businessLink: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -47,6 +47,15 @@ export default function PosSalesSettingsScreen() {
             />
             <SettingsRowDivider />
             <SettingsRow
+              icon="time-outline"
+              iconColor={Colors.primary}
+              iconBg={Colors.primarySubtle}
+              title="Customer Credit"
+              subtitle="Let staff sell on account and track balances"
+              onPress={() => router.push('/(owner)/settings/credit' as never)}
+            />
+            <SettingsRowDivider />
+            <SettingsRow
               icon="print-outline"
               title="Receipt Printer"
               subtitle={
