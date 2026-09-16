@@ -28,7 +28,62 @@
 - Web: `/home/maich/Documents/smart-duka-web`
 - Mobile: `/home/maich/Documents/smart-duka`
 
-Run backend tests with `npm test` from the backend repo root (Jest, per existing `tests/` convention). Run web with `npm run build`/`npm run lint` from the web repo root. Mobile has no automated UI test suite today (per the spec) — mobile tasks end with a `npx tsc --noEmit` type-check instead of a test run, plus a manual QA note.
+Run web with `npm run build`/`npm run lint` from the web repo root. Mobile has no automated UI test suite today (per the spec) — mobile tasks end with a `npx tsc --noEmit` type-check instead of a test run, plus a manual QA note.
+
+## Backend testing convention — READ THIS BEFORE WRITING ANY BACKEND TEST
+
+**Correction to every backend task below:** every test snippet in this plan is written in Jest-flavored pseudocode (`describe`/`it`/`expect`/`jest.fn`/`jest.spyOn`, supertest against an `app`) to communicate *intent*. **That is not this codebase's test framework.** The real backend has no Jest, no supertest, and no real database connection in its test suite at all. Verified directly in the worktree: `package.json`'s `test` script is `node --test "tests/*.test.js"` — Node's built-in test runner — and neither `jest` nor `supertest` nor `mongodb-memory-server` appears anywhere in `package.json` or `tests/`.
+
+The real convention, read from `tests/creditAuthorization.test.js` and `tests/invoiceNumbering.test.js` (read whichever is closer to your task before writing tests — controller-shaped work reads the former, pure-function/service work reads the latter):
+
+1. **Runner/assertions:** `import { test, mock, beforeEach } from 'node:test'; import assert from 'node:assert/strict';`. Flat `test('description', async () => { ... })` calls — no `describe`, no `it`.
+2. **File location and naming:** every test file is flat directly under `tests/` (the npm glob `tests/*.test.js` is **not recursive** — a file under `tests/controllers/` or `tests/services/` will never run). Name the file for the *behavior* it covers, not the source file it exercises — e.g. `tests/quotationCrud.test.js`, not `tests/controllers/quotationController.test.js`.
+3. **Controllers are called directly as functions**, never through supertest/HTTP: `import { createQuotation } from '../src/controllers/quotationController.js';` then `await createQuotation(req, res);` where `req`/`res` are small hand-built fakes. Copy the `makeReq()`/`makeRes()` helpers from `tests/creditAuthorization.test.js` (adjust the fields `req` carries to what your controller reads) rather than reinventing them.
+4. **Mongoose model methods are stubbed, never really queried.** Use Node's built-in `mock.method(Model, 'methodName', fn)` — e.g. `mock.method(Quotation, 'findOne', async () => fakeDoc)` or the chainable `stubFind`/`stubFindOne` helpers shown in `tests/creditAuthorization.test.js` for methods that chain `.select()/.lean()`. Call `mock.restoreAll()` in a `beforeEach`.
+5. **Any transactional code path must stub `mongoose.startSession`,** or the test hangs forever waiting for a connection this suite deliberately never opens:
+   ```js
+   function stubSession() {
+     mock.method(mongoose, 'startSession', async () => ({
+       withTransaction: async (fn) => fn(),
+       endSession() {},
+     }));
+   }
+   beforeEach(() => { mock.restoreAll(); stubSession(); });
+   ```
+   Every task in this plan whose code calls `session.withTransaction` (B6, B8) needs this in its test file.
+6. **Assert what was passed to the stub, not just the response body**, wherever the point of the test is an authorization/scoping guarantee — e.g. capture the filter object a stubbed `find`/`findOne` was called with and assert it includes `shop: SHOP_ID`, the same way `tests/creditAuthorization.test.js` does. A response that "looks right" while the underlying query was unscoped is exactly the bug this style of test exists to catch.
+7. **Running a single new test file:** `node --test tests/<file>.test.js` (not `npm test -- <pattern>` — that flag doesn't filter this runner's fixed glob the way it would Jest). Running the whole suite is still `npm test`.
+
+**Worked translation example** (Task B2's test, shown as this plan wrote it vs. what to actually write):
+
+Plan's Jest-flavored version (wrong for this repo):
+```js
+import { ALL_PERMISSIONS, PERMISSION_DEPENDENCIES } from '../../src/constants/permissions.js';
+it('defines create_quotation and convert_quotation_to_sale with no implied dependencies', () => {
+  const values = ALL_PERMISSIONS.map((p) => p.value);
+  expect(values).toContain('create_quotation');
+  ...
+});
+```
+
+Actual file to write, `tests/quotationPermissions.test.js`:
+```js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { ALL_PERMISSIONS, PERMISSION_DEPENDENCIES } from '../src/constants/permissions.js';
+
+test('defines create_quotation and convert_quotation_to_sale with no implied dependencies', () => {
+  const values = ALL_PERMISSIONS.map((p) => p.value);
+  assert.ok(values.includes('create_quotation'));
+  assert.ok(values.includes('convert_quotation_to_sale'));
+  assert.equal(PERMISSION_DEPENDENCIES.create_quotation, undefined);
+  assert.equal(PERMISSION_DEPENDENCIES.convert_quotation_to_sale, undefined);
+});
+```
+
+Apply this same translation to every other backend task's test code in this plan: same assertions, same intent, `node:test`/`assert`/`mock.method` idiom, flat behavior-named file under `tests/`.
+
+**Also verified in the worktree and corrected here:** `src/middlewares/validate.js` is a **default export** (`import validate from '../../middlewares/validate.js'`), not a named one — every route-file snippet below that shows `import { validate } from ...` is wrong; use the default-import form. Route files also gate on `staffOrOwner` (from `middlewares/auth.js`) before the controller's own finer-grained permission check, matching `saleRoutes.js` — add it to `quotationRoutes.js`'s router chain alongside `protect`.
 
 ---
 
@@ -38,26 +93,56 @@ Run backend tests with `npm test` from the backend repo root (Jest, per existing
 
 **Files:**
 - Modify: `src/controllers/productController.js:52-77` (`getProducts`)
-- Test: `tests/controllers/productController.test.js` (add to existing file if present; if no such file exists yet, create it following the pattern of `tests/services/invoiceNumberService.test.js` for supertest/Jest conventions used elsewhere in `tests/`)
+- Test: `tests/productTypeFilter.test.js` — new flat file. Follow the "Backend testing convention" section above: call `getProducts(req, res)` directly with a hand-built `req`/`res`, stub `Product.find`/`Product.countDocuments` via `mock.method` (see `stubFind`/`stubCount` in `tests/creditAuthorization.test.js`), and assert on the filter object the stub received.
 
 **Interfaces:**
 - Produces: `GET /products?includeTypes=service` — narrows the list to the given comma-separated `productType` values. Mirrors the existing `excludeTypes` param exactly.
 
 - [ ] **Step 1: Write the failing test**
 
+Create `tests/productTypeFilter.test.js`. `getProducts` calls `product.toObject()` on each result (it is not a `.lean()` query), so the stub must return objects carrying that method:
+
 ```js
-it('filters to the given productType values via includeTypes', async () => {
-  const res = await request(app)
-    .get('/api/v1/products?includeTypes=service')
-    .set('Authorization', `Bearer ${ownerToken}`);
-  expect(res.status).toBe(200);
-  expect(res.body.data.every((p) => p.productType === 'service')).toBe(true);
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import mongoose from 'mongoose';
+import Product from '../src/models/Product.js';
+import { getProducts } from '../src/controllers/productController.js';
+
+function makeRes() {
+  return { statusCode: 200, body: undefined, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+}
+
+function fakeProduct(overrides) {
+  const doc = { _id: new mongoose.Types.ObjectId(), name: 'x', productType: 'standard', ...overrides };
+  return { ...doc, toObject: () => doc };
+}
+
+test('includeTypes narrows the query to the given productType values', async () => {
+  const filters = [];
+  mongoose.mock?.restoreAll?.();
+  const { mock } = await import('node:test');
+  mock.method(Product, 'find', (filter) => {
+    filters.push(filter);
+    return { skip() { return this; }, limit() { return this; }, sort() { return this; }, then: (res) => Promise.resolve([fakeProduct({ productType: 'service' })]).then(res) };
+  });
+  mock.method(Product, 'countDocuments', async () => 1);
+
+  const req = { user: { role: 'owner', shop: { _id: 'shop1' } }, query: { includeTypes: 'service' } };
+  const res = makeRes();
+  await getProducts(req, res);
+
+  assert.deepEqual(filters[0].productType, { $in: ['service'] });
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.body.data.every((p) => p.productType === 'service'));
 });
 ```
 
+(The inline `await import('node:test')` above is only to keep this snippet self-contained for the plan — in the real file, import `{ test, mock }` once at the top the normal way, per the Backend testing convention section.)
+
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm test -- productController` — expect FAIL (all products returned, not just service ones).
+Run: `node --test tests/productTypeFilter.test.js` — expect FAIL (all products returned, not just service ones; `filters[0].productType` is `undefined`).
 
 - [ ] **Step 3: Implement**
 
@@ -76,12 +161,12 @@ if (includeTypes) {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm test -- productController` — expect PASS.
+Run: `node --test tests/productTypeFilter.test.js` — expect PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/controllers/productController.js tests/controllers/productController.test.js
+git add src/controllers/productController.js tests/productTypeFilter.test.js
 git commit -m "Add includeTypes filter to the product list endpoint"
 ```
 
@@ -91,7 +176,7 @@ git commit -m "Add includeTypes filter to the product list endpoint"
 
 **Files:**
 - Modify: `src/constants/permissions.js`
-- Test: `tests/constants/permissions.test.js` (create if it doesn't exist — a small pure-function test file)
+- Test: `tests/quotationPermissions.test.js` (create if it doesn't exist — a small pure-function test file)
 
 **Interfaces:**
 - Produces: `ALL_PERMISSIONS` now includes `create_quotation` and `convert_quotation_to_sale` under category `'Quotations'`. `PERMISSION_DEPENDENCIES` gets no new entry for either (they must stay orthogonal from each other and from `make_credit_sale`).
@@ -99,20 +184,22 @@ git commit -m "Add includeTypes filter to the product list endpoint"
 - [ ] **Step 1: Write the failing test**
 
 ```js
-import { ALL_PERMISSIONS, PERMISSION_DEPENDENCIES } from '../../src/constants/permissions.js';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { ALL_PERMISSIONS, PERMISSION_DEPENDENCIES } from '../src/constants/permissions.js';
 
-it('defines create_quotation and convert_quotation_to_sale with no implied dependencies', () => {
+test('defines create_quotation and convert_quotation_to_sale with no implied dependencies', () => {
   const values = ALL_PERMISSIONS.map((p) => p.value);
-  expect(values).toContain('create_quotation');
-  expect(values).toContain('convert_quotation_to_sale');
-  expect(PERMISSION_DEPENDENCIES.create_quotation).toBeUndefined();
-  expect(PERMISSION_DEPENDENCIES.convert_quotation_to_sale).toBeUndefined();
+  assert.ok(values.includes('create_quotation'));
+  assert.ok(values.includes('convert_quotation_to_sale'));
+  assert.equal(PERMISSION_DEPENDENCIES.create_quotation, undefined);
+  assert.equal(PERMISSION_DEPENDENCIES.convert_quotation_to_sale, undefined);
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm test -- permissions.test` — expect FAIL (values not present).
+Run: `node --test tests/quotationPermissions.test.js` — expect FAIL (values not present).
 
 - [ ] **Step 3: Implement**
 
@@ -133,12 +220,12 @@ Run: `npm test -- permissions.test` — expect FAIL (values not present).
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm test -- permissions.test` — expect PASS.
+Run: `node --test tests/quotationPermissions.test.js` — expect PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/constants/permissions.js tests/constants/permissions.test.js
+git add src/constants/permissions.js tests/quotationPermissions.test.js
 git commit -m "Add create_quotation and convert_quotation_to_sale permissions"
 ```
 
@@ -150,7 +237,7 @@ git commit -m "Add create_quotation and convert_quotation_to_sale permissions"
 - Create: `src/models/Quotation.js`
 - Create: `src/services/quoteNumberService.js`
 - Modify: `src/models/Shop.js` (add the counter field the service increments, and `quotationTemplate`)
-- Test: `tests/services/quoteNumberService.test.js`
+- Test: `tests/quoteNumbering.test.js`
 
 **Interfaces:**
 - Produces: `Quotation` model; `formatQuoteNumber(seq, now)` and `nextQuoteNumber(shopId, { session })` from `quoteNumberService.js`, mirroring `formatInvoiceNumber`/`nextInvoiceNumber` in `src/services/invoiceNumberService.js` exactly (same atomic-`$inc`-on-Shop pattern, same per-shop-not-global uniqueness fix).
@@ -190,7 +277,7 @@ describe('quoteNumberService', () => {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npm test -- quoteNumberService` — expect FAIL (module not found).
+Run: `node --test tests/quoteNumbering.test.js` — expect FAIL (module not found).
 
 - [ ] **Step 4: Implement `quoteNumberService.js`**
 
@@ -239,7 +326,7 @@ Add near the existing `receiptThankYouNote`/`logoUrl`/`motto` fields:
 
 - [ ] **Step 6: Run test to verify it passes**
 
-Run: `npm test -- quoteNumberService` — expect PASS.
+Run: `node --test tests/quoteNumbering.test.js` — expect PASS.
 
 - [ ] **Step 7: Create `Quotation.js`**
 
@@ -366,7 +453,7 @@ export default mongoose.model('Quotation', quotationSchema);
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/models/Quotation.js src/services/quoteNumberService.js src/models/Shop.js tests/services/quoteNumberService.test.js
+git add src/models/Quotation.js src/services/quoteNumberService.js src/models/Shop.js tests/quoteNumbering.test.js
 git commit -m "Add the Quotation model and its per-shop quote-number counter"
 ```
 
@@ -379,7 +466,7 @@ git commit -m "Add the Quotation model and its per-shop quote-number counter"
 - Create: `src/controllers/quotationController.js`
 - Create: `src/routes/v1/quotationRoutes.js`
 - Modify: `src/routes/v1/index.js` (mount the new router — check this file for how other routers are mounted, e.g. `router.use('/credit', creditRoutes)`, and mirror it as `router.use('/quotations', quotationRoutes)`)
-- Test: `tests/controllers/quotationController.test.js`
+- Test: `tests/quotationCrud.test.js`
 
 **Interfaces:**
 - Consumes: `Quotation` model (Task B3), `create_quotation`/`convert_quotation_to_sale` permissions (Task B2), `parsePagination`/`paginatedResult` from `src/utils/pagination.js`, `escapeRegex` from `src/utils/escapeRegex.js`, `Customer` model.
@@ -388,7 +475,7 @@ git commit -m "Add the Quotation model and its per-shop quote-number counter"
 - [ ] **Step 1: Write the failing tests**
 
 ```js
-// tests/controllers/quotationController.test.js
+// tests/quotationCrud.test.js
 import request from 'supertest';
 import app from '../../src/app.js'; // match the app import used by other controller tests in this dir
 import Customer from '../../src/models/Customer.js';
@@ -445,7 +532,7 @@ describe('DELETE /quotations/:id', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test -- quotationController` — expect FAIL (route/module not found).
+Run: `node --test tests/quotationCrud.test.js` — expect FAIL (route/module not found).
 
 - [ ] **Step 3: Create `src/utils/quotationToken.js` (pulled forward from Task B7, which needs it too)**
 
@@ -715,8 +802,8 @@ export const deleteQuotation = async (req, res) => {
 
 ```js
 import express from 'express';
-import { protect } from '../../middlewares/auth.js'; // match the exact middleware name/path used by src/routes/v1/creditRoutes.js
-import { validate } from '../../middlewares/validate.js'; // match the exact helper used by saleRoutes.js
+import { protect, staffOrOwner } from '../../middlewares/auth.js';
+import validate from '../../middlewares/validate.js'; // default export, per saleRoutes.js — not a named import
 import {
   createQuotation,
   getQuotations,
@@ -730,6 +817,7 @@ import { createQuotationSchema, updateQuotationSchema } from '../../validations/
 const router = express.Router();
 
 router.use(protect);
+router.use(staffOrOwner);
 
 router.post('/', validate(createQuotationSchema), createQuotation);
 router.get('/', getQuotations);
@@ -755,12 +843,12 @@ router.use('/quotations', quotationRoutes);
 
 - [ ] **Step 8: Run tests to verify they pass**
 
-Run: `npm test -- quotationController` — expect PASS.
+Run: `node --test tests/quotationCrud.test.js` — expect PASS.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/utils/quotationToken.js src/validations/quotationValidation.js src/controllers/quotationController.js src/routes/v1/quotationRoutes.js src/routes/v1/index.js tests/controllers/quotationController.test.js
+git add src/utils/quotationToken.js src/validations/quotationValidation.js src/controllers/quotationController.js src/routes/v1/quotationRoutes.js src/routes/v1/index.js tests/quotationCrud.test.js
 git commit -m "Add quotation CRUD: create, list, get, edit, decline, delete"
 ```
 
@@ -771,32 +859,148 @@ git commit -m "Add quotation CRUD: create, list, get, edit, decline, delete"
 **Files:**
 - Modify: `src/models/Sale.js:6-9` (`saleItemSchema.productId`)
 - Modify: `src/controllers/saleController.js` (item-resolution loop, audited below)
-- Test: `tests/models/Sale.test.js` (add a case), `tests/controllers/saleController.test.js` (regression run only, no new assertions needed here — see Step 4)
+- Create: `tests/saleCreation.test.js` — a characterization suite for `createSale`'s current behavior. **No such test file exists in this codebase today** (verified: nothing under `tests/` imports `saleController.js`), so this task's own "no regression" claim has nothing to lean on unless this task creates that safety net itself. Write it, confirm it holds against the untouched code, then make the schema/loop changes.
+- Test (schema-level): `tests/saleCustomLineItem.test.js`
 
 **Interfaces:**
 - Produces: `Sale.items[]` entries may now omit `productId`. `unitCost`/`costTotal` stay `null` for such an item (existing "cost unknown → Estimated" semantics, unchanged).
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing schema test**
+
+`sale.validate()` runs Mongoose schema validation without touching a database, so this test needs no model stubbing at all:
 
 ```js
-// tests/models/Sale.test.js
-it('allows a sale item with no productId (a custom/service line)', async () => {
+// tests/saleCustomLineItem.test.js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import mongoose from 'mongoose';
+import Sale from '../src/models/Sale.js';
+
+test('allows a sale item with no productId (a custom/service line)', async () => {
   const sale = new Sale({
-    shop: someShopId,
-    items: [{ name: 'Custom labor', productName: 'Custom labor', quantity: 1, unitPrice: 500, subtotal: 500 }],
+    shop: new mongoose.Types.ObjectId(),
+    items: [{ productName: 'Custom labor', quantity: 1, unitPrice: 500, subtotal: 500 }],
     totalAmount: 500,
     paymentMethod: 'cash',
-    staff: someUserId,
+    staff: new mongoose.Types.ObjectId(),
   });
-  await expect(sale.validate()).resolves.toBeUndefined();
+  await assert.doesNotReject(() => sale.validate());
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm test -- Sale.test` — expect FAIL (`productId` required).
+Run: `node --test tests/saleCustomLineItem.test.js` — expect FAIL (`productId` required).
 
-- [ ] **Step 3: Implement the schema change**
+- [ ] **Step 3: Write the `createSale` characterization suite against the CURRENT (unmodified) code**
+
+Create `tests/saleCreation.test.js`. Follow the "Backend testing convention" section's pattern exactly — read `tests/creditService.test.js` first, since it's the closest precedent (it calls `bookDebt` directly with `Customer`/`CreditTransaction` model statics stubbed via `mock.method`, which is exactly what `createSale`'s credit branch needs here too):
+
+```js
+import { test, mock, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import mongoose from 'mongoose';
+import Product from '../src/models/Product.js';
+import Sale from '../src/models/Sale.js';
+import Customer from '../src/models/Customer.js';
+import CreditTransaction from '../src/models/CreditTransaction.js';
+import MpesaTransaction from '../src/models/MpesaTransaction.js';
+import { createSale } from '../src/controllers/saleController.js';
+
+function makeRes() {
+  return { statusCode: 200, body: undefined, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+}
+
+function makeReq({ items, paymentMethod = 'cash', customerId, mpesaTransactionId, headers = {} } = {}) {
+  return {
+    user: {
+      _id: 'user1', name: 'Amina', role: 'staff', permissions: ['record_sale', 'make_credit_sale'], commissionEligible: false,
+      shop: { _id: 'shop1', currency: 'KES', paymentMethods: undefined, creditSettings: { enabled: true, defaultCreditLimit: 3000, defaultCollectionPeriodDays: 7, productPolicy: 'ALL_PRODUCTS', overduePolicy: 'BLOCK' } },
+    },
+    body: { items, paymentMethod, customerId, mpesaTransactionId },
+    headers,
+  };
+}
+
+function stubSession() {
+  mock.method(mongoose, 'startSession', async () => ({ withTransaction: async (fn) => fn(), endSession() {} }));
+}
+
+beforeEach(() => { mock.restoreAll(); stubSession(); });
+
+// trackInventory: false is what keeps this fixture safe to run resolveSaleLine
+// against for real (pricingEngine.js's stock-adjustment helper returns
+// immediately when trackInventory is false — see line ~50) — no need to mock
+// resolveSaleLine itself, which sidesteps the open question of whether
+// mock.method reliably intercepts a plain named ESM function export the way
+// it reliably does a method on a shared Mongoose model object (used freely
+// below for Product/Sale/Customer/CreditTransaction, which are always the
+// same object reference across every importer, live-binding subtleties
+// aside). If resolveSaleLine's real behavior needs more product fields than
+// listed here to run cleanly, add them — do not fall back to mocking it
+// without first confirming mock.method actually intercepts the named import
+// inside saleController.js in this Node version; if it silently doesn't,
+// every assertion below would be exercising the mock's fake numbers instead
+// of the real pricing path, defeating the point of a characterization test.
+const PRODUCT = { _id: new mongoose.Types.ObjectId(), name: 'Haircut', sellingPrice: 500, productType: 'service', quantity: 0, trackInventory: false, save: async () => {} };
+
+test('cash sale: creates a Sale with the resolved total', async () => {
+  mock.method(Product, 'find', () => ({ session: async () => [PRODUCT] }));
+  let created;
+  mock.method(Sale, 'create', async (docs) => { created = docs[0]; return [{ ...created, _id: 'sale1', toObject: () => ({ ...created, _id: 'sale1' }) }]; });
+
+  const req = makeReq({ items: [{ productId: String(PRODUCT._id), quantity: 1 }] });
+  const res = makeRes();
+  await createSale(req, res);
+
+  assert.equal(res.statusCode, 201);
+  assert.equal(created.totalAmount, 500);
+  assert.equal(created.paymentMethod, 'cash');
+});
+
+test('credit sale: books a debt via bookDebt and returns the account summary', async () => {
+  mock.method(Product, 'find', () => ({ session: async () => [PRODUCT] }));
+  mock.method(Sale, 'create', async (docs) => [{ ...docs[0], _id: 'sale1', toObject: () => ({ ...docs[0], _id: 'sale1' }) }]);
+  mock.method(Customer, 'findOne', () => ({ select: () => ({ lean: async () => ({ _id: 'cust1', name: 'Jane', isActive: true }) }) }));
+  mock.method(Customer, 'findOneAndUpdate', async () => ({ _id: 'cust1', name: 'Jane', credit: { outstanding: 500, limit: null } }));
+  mock.method(CreditTransaction, 'create', async (docs) => [{ ...docs[0], _id: 'tx1' }]);
+
+  const req = makeReq({ items: [{ productId: String(PRODUCT._id), quantity: 1 }], paymentMethod: 'credit', customerId: 'cust1' });
+  const res = makeRes();
+  await createSale(req, res);
+
+  assert.equal(res.statusCode, 201);
+  assert.ok(res.body.data.credit, 'response must carry the credit summary the till confirmation sheet displays');
+});
+
+test('rejects a second sale linking an already-claimed M-Pesa transaction', async () => {
+  mock.method(MpesaTransaction, 'findOne', async () => ({ _id: 'mtx1', status: 'success', saleId: 'sale-already' }));
+
+  const req = makeReq({ items: [{ productId: String(PRODUCT._id), quantity: 1 }], paymentMethod: 'mpesa', mpesaTransactionId: 'mtx1' });
+  const res = makeRes();
+  await createSale(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.message, /already been linked/);
+});
+
+test('rejects an item referencing a product outside this shop', async () => {
+  mock.method(Product, 'find', () => ({ session: async () => [] })); // nothing found for this shop
+
+  const req = makeReq({ items: [{ productId: String(new mongoose.Types.ObjectId()), quantity: 1 }] });
+  const res = makeRes();
+  await createSale(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.message, /not found in this shop/);
+});
+```
+
+- [ ] **Step 4: Run the characterization suite against the UNMODIFIED code and confirm it passes**
+
+Run: `node --test tests/saleCreation.test.js` — expect ALL PASS. If any case fails here, the test is wrong (not the code — nothing has changed yet); fix the test until it accurately characterizes the current, working behavior before proceeding. This baseline is what makes the later re-run in Step 8 meaningful.
+
+- [ ] **Step 5: Implement the schema change**
 
 In `src/models/Sale.js`, change:
 
@@ -820,7 +1024,7 @@ to:
   },
 ```
 
-- [ ] **Step 4: Audit every reader of `items[].productId` and confirm/fix graceful handling**
+- [ ] **Step 6: Audit every reader of `items[].productId` and confirm/fix graceful handling**
 
 Run this search from the backend repo root and inspect every hit:
 
@@ -835,7 +1039,7 @@ For each hit inside `saleController.js`, `reportController.js`/`dashboardControl
 
 Write down exactly what you found and fixed (or confirmed already safe) as the commit message body in Step 6.
 
-- [ ] **Step 5: Update the item-resolution loop in `saleController.js`**
+- [ ] **Step 7: Update the item-resolution loop in `saleController.js`**
 
 This step is also part of Task B6's extraction — if executing B6 immediately after this task, do this edit as part of that extraction instead of here to avoid touching the same lines twice. If executing B5 standalone, apply this now in `createSale`:
 
@@ -875,14 +1079,14 @@ for (const item of items) {
 }
 ```
 
-- [ ] **Step 6: Run the full existing sale test suite to confirm no regression**
+- [ ] **Step 8: Re-run both test files to confirm no regression**
 
-Run: `npm test -- saleController Sale.test` — expect ALL PASS, including every pre-existing test (this is the regression gate for touching the till's core file).
+Run: `node --test tests/saleCustomLineItem.test.js tests/saleCreation.test.js` — expect ALL PASS. `saleCreation.test.js` passing unchanged (same assertions as Step 4's baseline) is the actual regression gate for touching the till's core file; `saleCustomLineItem.test.js` now also passes since the schema change landed.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/models/Sale.js src/controllers/saleController.js tests/models/Sale.test.js
+git add src/models/Sale.js src/controllers/saleController.js tests/saleCustomLineItem.test.js tests/saleCreation.test.js
 git commit -m "$(cat <<'EOF'
 Make Sale.items.productId optional for custom/service lines
 
@@ -901,7 +1105,7 @@ EOF
 **Files:**
 - Create: `src/services/saleCreationService.js`
 - Modify: `src/controllers/saleController.js:73-400` (`createSale` becomes a thin wrapper)
-- Test: run the existing `tests/controllers/saleController.test.js` unchanged — this task must not require a single new assertion to prove correctness; it proves correctness by leaving every existing test green.
+- Test: run `tests/saleCreation.test.js` and `tests/saleCustomLineItem.test.js` (both created in Task B5) unchanged — this task must not require a single new assertion to prove correctness; it proves correctness by leaving both files' every existing test green.
 
 **Interfaces:**
 - Produces: `createSaleTransaction({ user, items, paymentMethod, mpesaTransactionId, mpesaReceiptNumber, customerId, idempotencyKey, beforeCommit })` → `Promise<{ sale, saleObj, creditResult, negativeStockAlerts, creditCustomerName }>`. Throws `SaleRejection` or `CreditRejection` exactly as `createSale` did before. `beforeCommit` is an optional `async (session, sale) => void` run inside the same Mongo transaction, after the Sale document and any credit debt are written, before commit — Task B7's convert endpoint uses this to atomically flip the source Quotation's status.
@@ -1241,7 +1445,7 @@ export const createSale = async (req, res) => {
 
 - [ ] **Step 4: Run the full existing sale test suite**
 
-Run: `npm test -- saleController` — expect every pre-existing test to PASS unchanged. This is the acceptance criterion for this task — do not add new assertions here; if any existing test fails, the extraction has a behavioral diff and must be fixed before proceeding, not worked around.
+Run: `node --test tests/saleCreation.test.js tests/saleCustomLineItem.test.js` — expect every test to PASS unchanged. This is the acceptance criterion for this task — do not add new assertions here; if any existing test fails, the extraction has a behavioral diff and must be fixed before proceeding, not worked around.
 
 - [ ] **Step 5: Commit**
 
@@ -1258,7 +1462,7 @@ git commit -m "Extract createSale's transaction core into saleCreationService fo
 - Create: `src/utils/quotationToken.js`
 - Modify: `src/controllers/publicController.js` (add `getPublicQuotation`)
 - Modify: `src/routes/v1/publicRoutes.js` (find the file mounting `getPublicReceipt` and mirror it — check its exact filename/path first, e.g. `publicRoutes.js`)
-- Test: `tests/controllers/publicController.test.js`
+- Test: `tests/publicQuotation.test.js`
 
 **Interfaces:**
 - Produces: `signQuotationToken(quotationId)` / `verifyQuotationToken(token)`, mirroring `receiptToken.js` exactly. `GET /public/quotation/:token` → `{ quoteNumber, shopName, shopPhone, shopLogoUrl, customerSnapshot, items (name/description/quantity/unitPrice/subtotal only — no productId, no cost fields), subtotal, taxRate, taxAmount, total, notes, validUntil, status, createdAt }`.
@@ -1285,7 +1489,7 @@ it('returns 400 for a garbage token', async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm test -- publicController` — expect FAIL (route not found).
+Run: `node --test tests/publicQuotation.test.js` — expect FAIL (route not found).
 
 - [ ] **Step 3: Confirm `src/utils/quotationToken.js` exists**
 
@@ -1348,12 +1552,12 @@ router.get('/quotation/:token', getPublicQuotation);
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `npm test -- publicController` — expect PASS.
+Run: `node --test tests/publicQuotation.test.js` — expect PASS.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/controllers/publicController.js src/routes/v1/publicRoutes.js tests/controllers/publicController.test.js
+git add src/controllers/publicController.js src/routes/v1/publicRoutes.js tests/publicQuotation.test.js
 git commit -m "Add the public, redacted quotation view endpoint"
 ```
 
@@ -1364,7 +1568,7 @@ git commit -m "Add the public, redacted quotation view endpoint"
 **Files:**
 - Modify: `src/controllers/quotationController.js` (add `convertQuotation`)
 - Modify: `src/routes/v1/quotationRoutes.js` (mount `POST /:id/convert` with `idempotency` middleware)
-- Test: `tests/controllers/quotationController.test.js` (extend)
+- Test: `tests/quotationCrud.test.js` (extend)
 
 **Interfaces:**
 - Consumes: `createSaleTransaction` (Task B6), `idempotency` middleware (`src/middlewares/idempotency.js`, already used by `saleRoutes.js`).
@@ -1431,7 +1635,7 @@ describe('POST /quotations/:id/convert', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test -- quotationController` — expect FAIL (route not found).
+Run: `node --test tests/quotationCrud.test.js` — expect FAIL (route not found).
 
 - [ ] **Step 3: Implement `convertQuotation`**
 
@@ -1547,12 +1751,12 @@ router.post('/:id/convert', idempotency, convertQuotation);
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `npm test -- quotationController` — expect PASS.
+Run: `node --test tests/quotationCrud.test.js` — expect PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/controllers/quotationController.js src/routes/v1/quotationRoutes.js tests/controllers/quotationController.test.js
+git add src/controllers/quotationController.js src/routes/v1/quotationRoutes.js tests/quotationCrud.test.js
 git commit -m "Add idempotent convert-to-sale for quotations, reusing the shared sale-creation transaction"
 ```
 
@@ -1563,7 +1767,7 @@ git commit -m "Add idempotent convert-to-sale for quotations, reusing the shared
 **Files:**
 - Create: `src/services/quotationPdfService.js`
 - Modify: `package.json` (add `pdfkit` dependency)
-- Test: `tests/services/quotationPdfService.test.js`
+- Test: `tests/quotationPdf.test.js`
 
 **Interfaces:**
 - Produces: `renderQuotationPdf(quotationData, template)` → `Promise<Buffer>`, where `template` is `'classic' | 'modern' | 'minimal'` and `quotationData` is the same shape `getPublicQuotation` returns (`quoteNumber`, `shopName`, `shopPhone`, `shopLogoUrl`, `currency`, `customerSnapshot`, `items`, `subtotal`, `taxRate`, `taxAmount`, `total`, `notes`, `validUntil`, `createdAt`).
@@ -1608,7 +1812,7 @@ describe('renderQuotationPdf', () => {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `npm test -- quotationPdfService` — expect FAIL (module not found).
+Run: `node --test tests/quotationPdf.test.js` — expect FAIL (module not found).
 
 - [ ] **Step 4: Implement `quotationPdfService.js`**
 
@@ -1740,12 +1944,12 @@ export const renderQuotationPdf = async (data, template) => {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `npm test -- quotationPdfService` — expect PASS.
+Run: `node --test tests/quotationPdf.test.js` — expect PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add package.json package-lock.json src/services/quotationPdfService.js tests/services/quotationPdfService.test.js
+git add package.json package-lock.json src/services/quotationPdfService.js tests/quotationPdf.test.js
 git commit -m "Add pdfkit-based PDF rendering for the three quotation templates"
 ```
 
@@ -1757,7 +1961,7 @@ git commit -m "Add pdfkit-based PDF rendering for the three quotation templates"
 - Modify: `src/controllers/quotationController.js` (add `getQuotationPdf`)
 - Modify: `src/controllers/publicController.js` (add `getPublicQuotationPdf`)
 - Modify: `src/routes/v1/quotationRoutes.js`, `src/routes/v1/publicRoutes.js`
-- Test: extend `tests/controllers/quotationController.test.js` and `tests/controllers/publicController.test.js`
+- Test: extend `tests/quotationCrud.test.js` and `tests/publicQuotation.test.js`
 
 **Interfaces:**
 - Consumes: `renderQuotationPdf` (Task B9), the shop's `quotationTemplate` (Task B11 adds this field to `Shop` — if executing tasks in order, B11 comes after B10 in this document; move B11 earlier in your execution order, or read `req.user.shop.quotationTemplate` here with `|| 'classic'` as a safe default so this task doesn't hard-depend on B11's ordering).
@@ -1788,7 +1992,7 @@ it('GET /public/quotation/:token/pdf returns a PDF with no auth', async () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test -- quotationController publicController` — expect FAIL (routes not found).
+Run: `node --test tests/quotationCrud.test.js tests/publicQuotation.test.js` — expect FAIL (routes not found).
 
 - [ ] **Step 3: Implement both handlers**
 
@@ -1866,12 +2070,12 @@ The public router file: `router.get('/quotation/:token/pdf', getPublicQuotationP
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `npm test -- quotationController publicController` — expect PASS.
+Run: `node --test tests/quotationCrud.test.js tests/publicQuotation.test.js` — expect PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/controllers/quotationController.js src/controllers/publicController.js src/routes/v1/quotationRoutes.js src/routes/v1/publicRoutes.js tests/controllers/quotationController.test.js tests/controllers/publicController.test.js
+git add src/controllers/quotationController.js src/controllers/publicController.js src/routes/v1/quotationRoutes.js src/routes/v1/publicRoutes.js tests/quotationCrud.test.js tests/publicQuotation.test.js
 git commit -m "Add authenticated and public PDF download endpoints for quotations"
 ```
 
@@ -1883,7 +2087,7 @@ git commit -m "Add authenticated and public PDF download endpoints for quotation
 - Modify: `src/utils/email.js` (add `attachments` support to `sendEmail`)
 - Modify: `src/controllers/quotationController.js` (add `sendQuotationEmail`)
 - Modify: `src/routes/v1/quotationRoutes.js`
-- Test: `tests/utils/email.test.js` (extend if it exists, else create), `tests/controllers/quotationController.test.js` (extend)
+- Test: `tests/emailAttachments.test.js` (extend if it exists, else create), `tests/quotationCrud.test.js` (extend)
 
 **Interfaces:**
 - Produces: `sendEmail(to, subject, html, text, headers, attachments)` where `attachments` is the standard nodemailer `[{ filename, content }]` shape. `POST /quotations/:id/send-email` — 400 if `customerSnapshot.email` is empty.
@@ -1891,7 +2095,7 @@ git commit -m "Add authenticated and public PDF download endpoints for quotation
 - [ ] **Step 1: Write the failing tests**
 
 ```js
-// tests/utils/email.test.js
+// tests/emailAttachments.test.js
 it('passes attachments through to nodemailer sendMail', async () => {
   const sendMailSpy = jest.fn().mockResolvedValue({ messageId: '1' });
   jest.spyOn(nodemailer, 'createTransport').mockReturnValue({ sendMail: sendMailSpy, close: jest.fn() });
@@ -1925,7 +2129,7 @@ it('POST /quotations/:id/send-email sends with the PDF attached', async () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test -- email quotationController` — expect FAIL.
+Run: `node --test tests/emailAttachments.test.js tests/quotationCrud.test.js` — expect FAIL.
 
 - [ ] **Step 3: Extend `sendEmail`**
 
@@ -2016,12 +2220,12 @@ Check whether `process.env.PUBLIC_WEB_URL` is already the name used elsewhere in
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `npm test -- email quotationController` — expect PASS.
+Run: `node --test tests/emailAttachments.test.js tests/quotationCrud.test.js` — expect PASS.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/utils/email.js src/controllers/quotationController.js src/routes/v1/quotationRoutes.js tests/utils/email.test.js tests/controllers/quotationController.test.js
+git add src/utils/email.js src/controllers/quotationController.js src/routes/v1/quotationRoutes.js tests/emailAttachments.test.js tests/quotationCrud.test.js
 git commit -m "Send quotations by email with the PDF attached, using the default copy from the spec"
 ```
 
