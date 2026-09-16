@@ -50,11 +50,11 @@ The real convention, read from `tests/creditAuthorization.test.js` and `tests/in
    }
    beforeEach(() => { mock.restoreAll(); stubSession(); });
    ```
-   Every task in this plan whose code calls `session.withTransaction` (B6, B8) needs this in its test file.
+   Every task in this plan whose code calls `session.withTransaction` (6, 8) needs this in its test file.
 6. **Assert what was passed to the stub, not just the response body**, wherever the point of the test is an authorization/scoping guarantee — e.g. capture the filter object a stubbed `find`/`findOne` was called with and assert it includes `shop: SHOP_ID`, the same way `tests/creditAuthorization.test.js` does. A response that "looks right" while the underlying query was unscoped is exactly the bug this style of test exists to catch.
 7. **Running a single new test file:** `node --test tests/<file>.test.js` (not `npm test -- <pattern>` — that flag doesn't filter this runner's fixed glob the way it would Jest). Running the whole suite is still `npm test`.
 
-**Worked translation example** (Task B2's test, shown as this plan wrote it vs. what to actually write):
+**Worked translation example** (Task 2's test, shown as this plan wrote it vs. what to actually write):
 
 Plan's Jest-flavored version (wrong for this repo):
 ```js
@@ -89,7 +89,7 @@ Apply this same translation to every other backend task's test code in this plan
 
 # Phase 1 — Backend (`smart-duka-backend`)
 
-### Task B1: `includeTypes` filter on the product list endpoint
+### Task 1: `includeTypes` filter on the product list endpoint
 
 **Files:**
 - Modify: `src/controllers/productController.js:52-77` (`getProducts`)
@@ -172,7 +172,7 @@ git commit -m "Add includeTypes filter to the product list endpoint"
 
 ---
 
-### Task B2: Add the two new permissions
+### Task 2: Add the two new permissions
 
 **Files:**
 - Modify: `src/constants/permissions.js`
@@ -231,7 +231,7 @@ git commit -m "Add create_quotation and convert_quotation_to_sale permissions"
 
 ---
 
-### Task B3: `Quotation` model + per-shop quote-number counter
+### Task 3: `Quotation` model + per-shop quote-number counter
 
 **Files:**
 - Create: `src/models/Quotation.js`
@@ -459,7 +459,7 @@ git commit -m "Add the Quotation model and its per-shop quote-number counter"
 
 ---
 
-### Task B4: Quotation validation + CRUD controller + routes
+### Task 4: Quotation validation + CRUD controller + routes
 
 **Files:**
 - Create: `src/validations/quotationValidation.js`
@@ -469,7 +469,7 @@ git commit -m "Add the Quotation model and its per-shop quote-number counter"
 - Test: `tests/quotationCrud.test.js`
 
 **Interfaces:**
-- Consumes: `Quotation` model (Task B3), `create_quotation`/`convert_quotation_to_sale` permissions (Task B2), `parsePagination`/`paginatedResult` from `src/utils/pagination.js`, `escapeRegex` from `src/utils/escapeRegex.js`, `Customer` model.
+- Consumes: `Quotation` model (Task 3), `create_quotation`/`convert_quotation_to_sale` permissions (Task 2), `parsePagination`/`paginatedResult` from `src/utils/pagination.js`, `escapeRegex` from `src/utils/escapeRegex.js`, `Customer` model.
 - Produces: `POST /quotations`, `GET /quotations`, `GET /quotations/:id`, `PATCH /quotations/:id`, `PATCH /quotations/:id/decline`, `DELETE /quotations/:id`. Each response's `data` includes a computed `total`/`subtotal`/`taxAmount` — never trusts client-sent totals.
 
 - [ ] **Step 1: Write the failing tests**
@@ -534,7 +534,7 @@ describe('DELETE /quotations/:id', () => {
 
 Run: `node --test tests/quotationCrud.test.js` — expect FAIL (route/module not found).
 
-- [ ] **Step 3: Create `src/utils/quotationToken.js` (pulled forward from Task B7, which needs it too)**
+- [ ] **Step 3: Create `src/utils/quotationToken.js` (pulled forward from Task 7, which needs it too)**
 
 ```js
 import jwt from 'jsonwebtoken';
@@ -560,7 +560,7 @@ export const verifyQuotationToken = (token) => {
 };
 ```
 
-This file is created once, here — Task B7 (which needs `verifyQuotationToken` for the public endpoint) imports it rather than recreating it; its own Step 3 is a no-op check, not a second implementation.
+This file is created once, here — Task 7 (which needs `verifyQuotationToken` for the public endpoint) imports it rather than recreating it; its own Step 3 is a no-op check, not a second implementation.
 
 - [ ] **Step 4: Implement `quotationValidation.js`**
 
@@ -858,7 +858,7 @@ git commit -m "Add quotation CRUD: create, list, get, edit, decline, delete"
 
 ---
 
-### Task B5: `Sale.items.productId` optional + ripple-effect audit
+### Task 5: `Sale.items.productId` optional + ripple-effect audit
 
 **Files:**
 - Modify: `src/models/Sale.js:6-9` (`saleItemSchema.productId`)
@@ -1037,7 +1037,7 @@ grep -rn "\.productId" src/controllers src/services | grep -vi "req.body\|req.pa
 ```
 
 For each hit inside `saleController.js`, `reportController.js`/`dashboardController.js` (best-seller/product-performance aggregations), and `commissionService.js`:
-- A `Product.find({ _id: { $in: productIds } })` batch lookup: already scoped to `items.filter((i) => i.productId)` if you wrote it that way in Task B5 Step 5 below — verify no other batch lookup exists that isn't filtered.
+- A `Product.find({ _id: { $in: productIds } })` batch lookup: already scoped to `items.filter((i) => i.productId)` if you wrote it that way in Task 5 Step 5 below — verify no other batch lookup exists that isn't filtered.
 - A `$group` by `items.productId` in an aggregation pipeline: a missing `productId` groups under a `null` bucket in Mongo, which is harmless (it just becomes an unlabeled bucket) but must not be rendered as a real product row. If any reporting controller renders every `_id` from such a `$group` as a product name lookup, add a `$match: { 'items.productId': { $ne: null } }` stage before the `$group` in that pipeline.
 - The commission loop: confirm it already only assigns `commissionAmount` to items resolved through `resolveSaleLine` (catalog items) — a custom item never enters that function, so it can't wrongly earn commission. No code change needed there; this step is verification, not implementation, unless the audit finds a spot that isn't already safe.
 
@@ -1045,7 +1045,7 @@ Write down exactly what you found and fixed (or confirmed already safe) as the c
 
 - [ ] **Step 7: Update the item-resolution loop in `saleController.js`**
 
-This step is also part of Task B6's extraction — if executing B6 immediately after this task, do this edit as part of that extraction instead of here to avoid touching the same lines twice. If executing B5 standalone, apply this now in `createSale`:
+This step is also part of Task 6's extraction — if executing 6 immediately after this task, do this edit as part of that extraction instead of here to avoid touching the same lines twice. If executing 5 standalone, apply this now in `createSale`:
 
 Change:
 ```js
@@ -1104,15 +1104,15 @@ EOF
 
 ---
 
-### Task B6: Extract `createSale`'s transaction core into `saleCreationService.js`
+### Task 6: Extract `createSale`'s transaction core into `saleCreationService.js`
 
 **Files:**
 - Create: `src/services/saleCreationService.js`
 - Modify: `src/controllers/saleController.js:73-400` (`createSale` becomes a thin wrapper)
-- Test: run `tests/saleCreation.test.js` and `tests/saleCustomLineItem.test.js` (both created in Task B5) unchanged — this task must not require a single new assertion to prove correctness; it proves correctness by leaving both files' every existing test green.
+- Test: run `tests/saleCreation.test.js` and `tests/saleCustomLineItem.test.js` (both created in Task 5) unchanged — this task must not require a single new assertion to prove correctness; it proves correctness by leaving both files' every existing test green.
 
 **Interfaces:**
-- Produces: `createSaleTransaction({ user, items, paymentMethod, mpesaTransactionId, mpesaReceiptNumber, customerId, idempotencyKey, beforeCommit })` → `Promise<{ sale, saleObj, creditResult, negativeStockAlerts, creditCustomerName }>`. Throws `SaleRejection` or `CreditRejection` exactly as `createSale` did before. `beforeCommit` is an optional `async (session, sale) => void` run inside the same Mongo transaction, after the Sale document and any credit debt are written, before commit — Task B7's convert endpoint uses this to atomically flip the source Quotation's status.
+- Produces: `createSaleTransaction({ user, items, paymentMethod, mpesaTransactionId, mpesaReceiptNumber, customerId, idempotencyKey, beforeCommit })` → `Promise<{ sale, saleObj, creditResult, negativeStockAlerts, creditCustomerName }>`. Throws `SaleRejection` or `CreditRejection` exactly as `createSale` did before. `beforeCommit` is an optional `async (session, sale) => void` run inside the same Mongo transaction, after the Sale document and any credit debt are written, before commit — Task 7's convert endpoint uses this to atomically flip the source Quotation's status.
 - Consumes: everything `createSale` already imports (`Product`, `Customer`, `MpesaTransaction`, `resolveSaleLine`, `bookDebt`, etc.) — move those imports to the new file; `saleController.js` keeps only what its now-thin `createSale`/other exports still need (`signReceiptToken`, the `SaleRejection`/`CreditRejection` re-export or shared import, `notifyOwnersNegativeStock`).
 
 - [ ] **Step 1: Read the full current `createSale` body**
@@ -1460,7 +1460,7 @@ git commit -m "Extract createSale's transaction core into saleCreationService fo
 
 ---
 
-### Task B7: `quotationToken.js` + public view endpoint
+### Task 7: `quotationToken.js` + public view endpoint
 
 **Files:**
 - Create: `src/utils/quotationToken.js`
@@ -1497,7 +1497,7 @@ Run: `node --test tests/publicQuotation.test.js` — expect FAIL (route not foun
 
 - [ ] **Step 3: Confirm `src/utils/quotationToken.js` exists**
 
-This file was created in Task B4, Step 3 (pulled forward because the CRUD controller's `present()` helper needed `signQuotationToken` before this task runs). Nothing to implement here — just confirm the file is present with `signQuotationToken`/`verifyQuotationToken` exported before continuing.
+This file was created in Task 4, Step 3 (pulled forward because the CRUD controller's `present()` helper needed `signQuotationToken` before this task runs). Nothing to implement here — just confirm the file is present with `signQuotationToken`/`verifyQuotationToken` exported before continuing.
 
 - [ ] **Step 4: Implement `getPublicQuotation` in `publicController.js`**
 
@@ -1567,7 +1567,7 @@ git commit -m "Add the public, redacted quotation view endpoint"
 
 ---
 
-### Task B8: Convert-to-sale endpoint
+### Task 8: Convert-to-sale endpoint
 
 **Files:**
 - Modify: `src/controllers/quotationController.js` (add `convertQuotation`)
@@ -1575,7 +1575,7 @@ git commit -m "Add the public, redacted quotation view endpoint"
 - Test: `tests/quotationCrud.test.js` (extend)
 
 **Interfaces:**
-- Consumes: `createSaleTransaction` (Task B6), `idempotency` middleware (`src/middlewares/idempotency.js`, already used by `saleRoutes.js`).
+- Consumes: `createSaleTransaction` (Task 6), `idempotency` middleware (`src/middlewares/idempotency.js`, already used by `saleRoutes.js`).
 - Produces: `POST /quotations/:id/convert` — body `{ paymentMethod, mpesaTransactionId?, mpesaReceiptNumber? }`. Response mirrors `createSale`'s response shape (`{ success, data: saleObj, message }`) plus `data.quotationId`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1766,7 +1766,7 @@ git commit -m "Add idempotent convert-to-sale for quotations, reusing the shared
 
 ---
 
-### Task B9: PDF generation service (all three templates)
+### Task 9: PDF generation service (all three templates)
 
 **Files:**
 - Create: `src/services/quotationPdfService.js`
@@ -1959,7 +1959,7 @@ git commit -m "Add pdfkit-based PDF rendering for the three quotation templates"
 
 ---
 
-### Task B10: PDF download endpoints (authenticated + public)
+### Task 10: PDF download endpoints (authenticated + public)
 
 **Files:**
 - Modify: `src/controllers/quotationController.js` (add `getQuotationPdf`)
@@ -1968,7 +1968,7 @@ git commit -m "Add pdfkit-based PDF rendering for the three quotation templates"
 - Test: extend `tests/quotationCrud.test.js` and `tests/publicQuotation.test.js`
 
 **Interfaces:**
-- Consumes: `renderQuotationPdf` (Task B9), the shop's `quotationTemplate` field (added to the `Shop` model back in Task B3, Step 5 — already present by this point in task order). Default to `'classic'` wherever it's read (`req.user.shop.quotationTemplate || 'classic'`) since older shop documents predate the field.
+- Consumes: `renderQuotationPdf` (Task 9), the shop's `quotationTemplate` field (added to the `Shop` model back in Task 3, Step 5 — already present by this point in task order). Default to `'classic'` wherever it's read (`req.user.shop.quotationTemplate || 'classic'`) since older shop documents predate the field.
 - Produces: `GET /quotations/:id/pdf` (auth), `GET /public/quotation/:token/pdf` — both respond `Content-Type: application/pdf`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2085,7 +2085,7 @@ git commit -m "Add authenticated and public PDF download endpoints for quotation
 
 ---
 
-### Task B11: Email sending with PDF attachment
+### Task 11: Email sending with PDF attachment
 
 **Files:**
 - Modify: `src/utils/email.js` (add `attachments` support to `sendEmail`)
@@ -2237,7 +2237,7 @@ git commit -m "Send quotations by email with the PDF attached, using the default
 
 # Phase 2 — Web (`smart-duka-web`)
 
-### Task W1: `quotationHtml.ts` — three templates
+### Task 12: `quotationHtml.ts` — three templates
 
 **Files:**
 - Create: `src/utils/quotationHtml.ts`
@@ -2492,7 +2492,7 @@ git commit -m "Add the three professional quotation HTML templates"
 
 ---
 
-### Task W2: Quotations list + create page (owner and staff)
+### Task 13: Quotations list + create page (owner and staff)
 
 **Files:**
 - Create: `src/app/(dashboard)/owner/quotations/page.tsx`
@@ -2575,7 +2575,7 @@ Confirm `@/lib/api`'s exported client name and whether it already unwraps `.data
 
 - [ ] **Step 4: Implement the list + create page**
 
-Follow `owner/sales/page.tsx`'s exact structural pattern: a `useQuery(['quotations', statusFilter], () => getQuotations(statusFilter))`, a `Table` with columns `Quote #`, `Customer`, `Total`, `Status` (badge), `Valid Until`, `Actions` (View/Share/Decline/Delete/Convert — Convert and detail actions land on Task W3's detail page via a row click or a "View" button navigating to `/owner/quotations/[id]`), and a "New Quotation" button opening a `Modal` containing: a customer search field, a line-items editor (each row either a product-service dropdown populated from `GET /products?includeTypes=service` or a "Custom line" toggle revealing free-text name/description/quantity/unitPrice inputs), a notes textarea, a valid-until `<input type="date">` defaulting to +30 days from today, and a running total computed client-side from the current rows (recomputed on every keystroke — the server recomputes authoritatively on submit, this is purely for the person filling the form to see a live number).
+Follow `owner/sales/page.tsx`'s exact structural pattern: a `useQuery(['quotations', statusFilter], () => getQuotations(statusFilter))`, a `Table` with columns `Quote #`, `Customer`, `Total`, `Status` (badge), `Valid Until`, `Actions` (View/Share/Decline/Delete/Convert — Convert and detail actions land on Task 14's detail page via a row click or a "View" button navigating to `/owner/quotations/[id]`), and a "New Quotation" button opening a `Modal` containing: a customer search field, a line-items editor (each row either a product-service dropdown populated from `GET /products?includeTypes=service` or a "Custom line" toggle revealing free-text name/description/quantity/unitPrice inputs), a notes textarea, a valid-until `<input type="date">` defaulting to +30 days from today, and a running total computed client-side from the current rows (recomputed on every keystroke — the server recomputes authoritatively on submit, this is purely for the person filling the form to see a live number).
 
 Write the actual component now, mirroring the imports, `Button`/`Modal`/`Table`/`Spinner` usage, and `useMoney`/`formatCurrency` helper from `owner/sales/page.tsx`.
 
@@ -2616,13 +2616,13 @@ git commit -m "Add the quotations list and create page for owner and staff"
 
 ---
 
-### Task W3: Quotation detail page — view, print, share, convert, decline, delete
+### Task 14: Quotation detail page — view, print, share, convert, decline, delete
 
 **Files:**
-- Create: `src/app/(dashboard)/owner/quotations/[id]/page.tsx` (staff variant per Task W2's convention)
+- Create: `src/app/(dashboard)/owner/quotations/[id]/page.tsx` (staff variant per Task 13's convention)
 
 **Interfaces:**
-- Consumes: `GET /quotations/:id`, `buildQuotationHtml`/`printQuotationHtml` (Task W1), `convertQuotation`/`declineQuotation`/`deleteQuotation`/`sendQuotationEmail` (Task W2's service file), `resolveSaleMethods`/`saleMethodLabel` from `@/lib/paymentMethods` (same import `owner/sales/page.tsx` already uses), `MpesaPaymentModal` if the web app has an equivalent to mobile's (check `src/components/payments/MpesaPaymentModal.tsx`, already listed in the working-directory context — it exists in web too).
+- Consumes: `GET /quotations/:id`, `buildQuotationHtml`/`printQuotationHtml` (Task 12), `convertQuotation`/`declineQuotation`/`deleteQuotation`/`sendQuotationEmail` (Task 13's service file), `resolveSaleMethods`/`saleMethodLabel` from `@/lib/paymentMethods` (same import `owner/sales/page.tsx` already uses), `MpesaPaymentModal` if the web app has an equivalent to mobile's (check `src/components/payments/MpesaPaymentModal.tsx`, already listed in the working-directory context — it exists in web too).
 
 - [ ] **Step 1: Read `MpesaPaymentModal.tsx` in web and the convert-related section of `owner/sales/page.tsx`**
 
@@ -2677,14 +2677,14 @@ git commit -m "Add the quotation detail page: view, print, share, email, convert
 
 ---
 
-### Task W4: Public `/q/[token]` page
+### Task 15: Public `/q/[token]` page
 
 **Files:**
 - Create: `src/app/q/[token]/page.tsx`
 - Create: `src/app/q/[token]/layout.tsx` (mirror `src/app/r/[token]/layout.tsx` if that file sets up anything page-specific — check it first)
 
 **Interfaces:**
-- Consumes: `GET /public/quotation/:token` (bare axios, no auth header — same deliberate pattern as `src/app/r/[token]/page.tsx`), `buildQuotationHtml` (Task W1) for a "Download PDF" link and the printable rendering.
+- Consumes: `GET /public/quotation/:token` (bare axios, no auth header — same deliberate pattern as `src/app/r/[token]/page.tsx`), `buildQuotationHtml` (Task 12) for a "Download PDF" link and the printable rendering.
 
 - [ ] **Step 1: Read `src/app/r/[token]/page.tsx` in full**
 
@@ -2772,15 +2772,15 @@ export default function PublicQuotationPage() {
 }
 ```
 
-Note: the public endpoint doesn't currently return which template the shop picked (Task B7's `getPublicQuotation` response omits `shop.quotationTemplate` — go back and add it to that response's payload as `template: quotation.shop.quotationTemplate` before finishing this task, and use `quotation.template` here instead of the hardcoded `'classic'` string above) — fix this small gap in `publicController.js`'s `getPublicQuotation` as part of this task rather than shipping the public page always rendering as classic regardless of the shop's actual choice.
+Note: the public endpoint doesn't currently return which template the shop picked (Task 7's `getPublicQuotation` response omits `shop.quotationTemplate` — go back and add it to that response's payload as `template: quotation.shop.quotationTemplate` before finishing this task, and use `quotation.template` here instead of the hardcoded `'classic'` string above) — fix this small gap in `publicController.js`'s `getPublicQuotation` as part of this task rather than shipping the public page always rendering as classic regardless of the shop's actual choice.
 
 - [ ] **Step 3: Fix the gap identified above**
 
-In `src/controllers/publicController.js`'s `getPublicQuotation` (Task B7), add `template: quotation.shop.quotationTemplate,` to the returned `data` object, and add `quotationTemplate` to the `.populate('shop', 'name phone logoUrl currency quotationTemplate')` field list. Update `QuotationData` in `quotationHtml.ts` to include an optional `template` field, and use `quotation.template ?? 'classic'` in place of the hardcoded string in both this page and Task W3's detail page (which should also pass the shop's actual template rather than defaulting).
+In `src/controllers/publicController.js`'s `getPublicQuotation` (Task 7), add `template: quotation.shop.quotationTemplate,` to the returned `data` object, and add `quotationTemplate` to the `.populate('shop', 'name phone logoUrl currency quotationTemplate')` field list. Update `QuotationData` in `quotationHtml.ts` to include an optional `template` field, and use `quotation.template ?? 'classic'` in place of the hardcoded string in both this page and Task 14's detail page (which should also pass the shop's actual template rather than defaulting).
 
 - [ ] **Step 4: Manual verification**
 
-Visit a real `/q/[token]` link for each of the three templates (change the shop's `quotationTemplate` setting between visits — Task W5), confirm the correct layout renders, confirm an expired quotation shows the amber notice, confirm Print and Download PDF both work.
+Visit a real `/q/[token]` link for each of the three templates (change the shop's `quotationTemplate` setting between visits — Task 16), confirm the correct layout renders, confirm an expired quotation shows the amber notice, confirm Print and Download PDF both work.
 
 - [ ] **Step 5: Commit**
 
@@ -2793,7 +2793,7 @@ git commit -m "Add the public quotation page with print and PDF download"
 
 ---
 
-### Task W5: Shop settings — quotation template picker
+### Task 16: Shop settings — quotation template picker
 
 **Files:**
 - Modify: whichever file already renders the logo/motto/thank-you-note settings controls (find it via `grep -rln "receiptThankYouNote\|motto" src/app` in the web repo) — add a template picker there.
@@ -2822,14 +2822,14 @@ git commit -m "Add the quotation template picker to shop settings"
 
 # Phase 3 — Mobile (`smart-duka`)
 
-### Task M1: `services/quotations.ts`
+### Task 17: `services/quotations.ts`
 
 **Files:**
 - Create: `services/quotations.ts`
 - Test: none (mobile has no automated test suite per the spec) — verify via `npx tsc --noEmit` and a manual call from a scratch screen/log if needed.
 
 **Interfaces:**
-- Mirrors Task W2's web service file exactly in shape (same field names), using mobile's `api` client (`import api from './api'`) and matching the response-unwrapping convention already used in `services/sales.ts` (check whether `services/sales.ts`'s functions return `response.data.data` or the raw Axios response, and match it — do not guess).
+- Mirrors Task 13's web service file exactly in shape (same field names), using mobile's `api` client (`import api from './api'`) and matching the response-unwrapping convention already used in `services/sales.ts` (check whether `services/sales.ts`'s functions return `response.data.data` or the raw Axios response, and match it — do not guess).
 
 - [ ] **Step 1: Read `services/sales.ts` and `services/customers.ts` in full for the exact conventions (interface style, error handling, response unwrapping)**
 
@@ -2919,13 +2919,13 @@ git commit -m "Add the mobile quotations API client"
 
 ---
 
-### Task M2: Create Quotation screen
+### Task 18: Create Quotation screen
 
 **Files:**
 - Create: `app/(owner)/quotations/new.tsx` and `app/(staff)/quotations/new.tsx` (check whether the repo's existing owner/staff screen pairs are two files or one shared component behind two route entries — mirror `pick-credit-customer` or the credit screens' actual split, referenced earlier in this plan's research, rather than assuming)
 
 **Interfaces:**
-- Consumes: `CustomerPickerSheet` (`components/credit/CustomerPickerSheet.tsx`) for the customer field, a new small "line item row" list (catalog service-product search via `GET /products?includeTypes=service`, or a "custom line" toggle with free-text `name`/`description`/`quantity`/`unitPrice` inputs), `createQuotation` (Task M1), `usePermission('create_quotation')` gating screen access.
+- Consumes: `CustomerPickerSheet` (`components/credit/CustomerPickerSheet.tsx`) for the customer field, a new small "line item row" list (catalog service-product search via `GET /products?includeTypes=service`, or a "custom line" toggle with free-text `name`/`description`/`quantity`/`unitPrice` inputs), `createQuotation` (Task 17), `usePermission('create_quotation')` gating screen access.
 
 - [ ] **Step 1: Read `CustomerPickerSheet.tsx` and `components/credit/CustomerListScreen.tsx` in full**
 
@@ -2933,7 +2933,7 @@ Confirms the exact prop/callback shape (`onSelect(customer: Customer)`) and the 
 
 - [ ] **Step 2: Implement the screen**
 
-Structure: a header, a "Customer" row opening `CustomerPickerSheet` on tap and displaying the selected name/phone once chosen, a scrollable list of line-item rows each rendering `name — qty × unitPrice = subtotal` with a delete (✕) button, an "Add service" button (opens a lightweight product-search sheet filtered to `includeTypes=service`) and an "Add custom line" button (expands an inline mini-form: name, description, quantity, unit price, an "Add" confirm button), a notes `TextInput` (multiline, maxLength 500), a valid-until date field (use whatever date-picker component the app already uses elsewhere — check `components/credit/` for a due-date picker in the credit/opening-balance screens already touched on this branch, and reuse it) defaulting to `new Date(Date.now() + 30 * 86400000)`, a running total footer computed via `items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)`, and a "Create Quotation" submit button calling `createQuotation` then navigating to the Quotations list (Task M3) on success.
+Structure: a header, a "Customer" row opening `CustomerPickerSheet` on tap and displaying the selected name/phone once chosen, a scrollable list of line-item rows each rendering `name — qty × unitPrice = subtotal` with a delete (✕) button, an "Add service" button (opens a lightweight product-search sheet filtered to `includeTypes=service`) and an "Add custom line" button (expands an inline mini-form: name, description, quantity, unit price, an "Add" confirm button), a notes `TextInput` (multiline, maxLength 500), a valid-until date field (use whatever date-picker component the app already uses elsewhere — check `components/credit/` for a due-date picker in the credit/opening-balance screens already touched on this branch, and reuse it) defaulting to `new Date(Date.now() + 30 * 86400000)`, a running total footer computed via `items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)`, and a "Create Quotation" submit button calling `createQuotation` then navigating to the Quotations list (Task 19) on success.
 
 Gate the whole screen behind `usePermission('create_quotation')`/`hasPermission` — check `utils/permissions.ts`'s exact export name used elsewhere in a screen-level guard (e.g. how `app/(staff)/dashboard.tsx` currently gates a menu item) and mirror it, redirecting or hiding the entry point rather than rendering the form and 403ing on submit.
 
@@ -2943,7 +2943,7 @@ Run: `npx tsc --noEmit`.
 
 - [ ] **Step 4: Manual verification**
 
-Launch the app (`run` skill or `npx expo start`), as an owner create a quotation with one service-catalog item and one custom line, confirm the running total matches, confirm submission succeeds and the new quotation is fetchable from Task M3's list.
+Launch the app (`run` skill or `npx expo start`), as an owner create a quotation with one service-catalog item and one custom line, confirm the running total matches, confirm submission succeeds and the new quotation is fetchable from Task 19's list.
 
 - [ ] **Step 5: Commit**
 
@@ -2954,13 +2954,13 @@ git commit -m "Add the Create Quotation screen (customer picker, catalog + custo
 
 ---
 
-### Task M3: Quotations list screen
+### Task 19: Quotations list screen
 
 **Files:**
 - Create: `app/(owner)/quotations/index.tsx`, `app/(staff)/quotations/index.tsx`
 
 **Interfaces:**
-- Consumes: `getQuotations` (Task M1), `openWebPage` (`utils/openWebPage.ts`) for "View", React Native's `Share.share()` for "Share link", `declineQuotation`/`deleteQuotation` (Task M1), `PUBLIC_WEB_URL` (`constants/config.ts`).
+- Consumes: `getQuotations` (Task 17), `openWebPage` (`utils/openWebPage.ts`) for "View", React Native's `Share.share()` for "Share link", `declineQuotation`/`deleteQuotation` (Task 17), `PUBLIC_WEB_URL` (`constants/config.ts`).
 
 - [ ] **Step 1: Implement the list**
 
@@ -2971,11 +2971,11 @@ A `FlatList`/react-query-backed list (mirror `CustomerListScreen.tsx`'s data-fet
   import { Share } from 'react-native';
   await Share.share({ message: `Quotation ${item.quoteNumber} for ${item.customerSnapshot.name}: ${PUBLIC_WEB_URL}/q/${item.publicToken}` });
   ```
-- **Convert to Sale** (only when `status === 'draft'`, only when `usePermission('convert_quotation_to_sale')`) → navigates to Task M4's screen
+- **Convert to Sale** (only when `status === 'draft'`, only when `usePermission('convert_quotation_to_sale')`) → navigates to Task 20's screen
 - **Decline** (only when `draft`) → confirm alert, then `declineQuotation(item._id)`, invalidate the list query
 - **Delete** (when `draft` or `declined`) → confirm alert, then `deleteQuotation(item._id)`, invalidate the list query
 
-A floating "New Quotation" button navigating to Task M2's screen, shown only when `usePermission('create_quotation')`.
+A floating "New Quotation" button navigating to Task 18's screen, shown only when `usePermission('create_quotation')`.
 
 - [ ] **Step 2: Type-check**
 
@@ -2983,7 +2983,7 @@ Run: `npx tsc --noEmit`.
 
 - [ ] **Step 3: Manual verification**
 
-Confirm the list shows the quotation created in Task M2, confirm "View" opens the correct public page in the in-app browser, confirm "Share link" opens the native share sheet with the right text, confirm Decline and Delete both work and update the list.
+Confirm the list shows the quotation created in Task 18, confirm "View" opens the correct public page in the in-app browser, confirm "Share link" opens the native share sheet with the right text, confirm Decline and Delete both work and update the list.
 
 - [ ] **Step 4: Commit**
 
@@ -2994,13 +2994,13 @@ git commit -m "Add the Quotations list screen with view/share/decline/delete act
 
 ---
 
-### Task M4: Convert-to-Sale screen
+### Task 20: Convert-to-Sale screen
 
 **Files:**
 - Create: `app/(owner)/quotations/[id]/convert.tsx`, `app/(staff)/quotations/[id]/convert.tsx`
 
 **Interfaces:**
-- Consumes: `resolveSaleMethods`/`saleMethodLabel`/`methodIcon`/`CASH_METHOD_KEY`/`MPESA_METHOD_KEY`/`CREDIT_METHOD_KEY` (`constants/paymentMethods.ts`), `MpesaPaymentModal` (`components/payments/MpesaPaymentModal.tsx`), `getCustomerById` (`services/customers.ts`) for the credit-summary check, `convertQuotation` (Task M1).
+- Consumes: `resolveSaleMethods`/`saleMethodLabel`/`methodIcon`/`CASH_METHOD_KEY`/`MPESA_METHOD_KEY`/`CREDIT_METHOD_KEY` (`constants/paymentMethods.ts`), `MpesaPaymentModal` (`components/payments/MpesaPaymentModal.tsx`), `getCustomerById` (`services/customers.ts`) for the credit-summary check, `convertQuotation` (Task 17).
 
 **This screen intentionally does NOT reuse `PosScreen.tsx`.** `PosScreen`'s cart is built around real `Product` documents (`CartEntry { product: Product; qty; unitPrice }`) and does not accept a prefilled, already-fixed set of line items including custom/non-catalog lines. Retrofitting it would touch a large, heavily-race-hardened component for no benefit — a quotation's items are already fixed by the time this screen opens; all that's left to decide is the payment method. Building a small, self-contained screen is the surgical choice here.
 
@@ -3160,7 +3160,7 @@ git commit -m "Add the Convert-to-Sale screen for quotations (cash/mpesa/credit)
 
 ---
 
-### Task M5: Wire permission-gated navigation entry points
+### Task 21: Wire permission-gated navigation entry points
 
 **Files:**
 - Modify: the owner and staff dashboard/menu files that currently list entries like "Sales", "Customers", "Credit" (find via `grep -rln "'/(\owner)/sales'\|Sales'" app/(owner)/dashboard.tsx app/(staff)/dashboard.tsx` or wherever the home-screen menu grid/list is defined)
@@ -3172,11 +3172,11 @@ git commit -m "Add the Convert-to-Sale screen for quotations (cash/mpesa/credit)
 
 - [ ] **Step 2: Add a "Quotations" entry**
 
-Following the exact same conditional-render pattern already used for another permission-gated menu item (e.g. how "Reconciliation" or "Purchasing" is shown/hidden today), add a "Quotations" tile/row navigating to `app/(owner)/quotations` or `app/(staff)/quotations`, visible when `usePermission('create_quotation') || usePermission('convert_quotation_to_sale')` is true (either grant is enough to see the list, matching Task B4's `getQuotations` permission check).
+Following the exact same conditional-render pattern already used for another permission-gated menu item (e.g. how "Reconciliation" or "Purchasing" is shown/hidden today), add a "Quotations" tile/row navigating to `app/(owner)/quotations` or `app/(staff)/quotations`, visible when `usePermission('create_quotation') || usePermission('convert_quotation_to_sale')` is true (either grant is enough to see the list, matching Task 4's `getQuotations` permission check).
 
 - [ ] **Step 3: Type-check and manual verification**
 
-Run: `npx tsc --noEmit`. Log in as a staff account with neither permission and confirm the entry point is hidden; grant `create_quotation` only and confirm it appears and the create flow works but Convert is hidden on quotation rows (Task M3's `usePermission('convert_quotation_to_sale')` gate).
+Run: `npx tsc --noEmit`. Log in as a staff account with neither permission and confirm the entry point is hidden; grant `create_quotation` only and confirm it appears and the create flow works but Convert is hidden on quotation rows (Task 19's `usePermission('convert_quotation_to_sale')` gate).
 
 - [ ] **Step 4: Commit**
 
