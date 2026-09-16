@@ -38,9 +38,13 @@ import { BorderRadius } from '@/constants/BorderRadius';
 import { usePermission } from '@/utils/permissions';
 import {
   CASH_METHOD_KEY,
+  CREDIT_METHOD_KEY,
   MPESA_METHOD_KEY,
   resolveSaleMethods,
 } from '@/constants/paymentMethods';
+import { CreditSummarySheet } from '@/components/credit/CreditSummarySheet';
+import { getCustomerById } from '@/services/customers';
+import type { CreditAccount } from '@/services/customers';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCartStore, cartKey } from '@/store/staffCartStore';
 import { usePendingMpesaStore, type PendingMpesaPayment } from '@/store/pendingMpesaStore';
@@ -87,6 +91,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const user = useAuthStore((s: AuthState) => s.user);
   const tabBarHeight = useTabBarHeight();
   const canRecordSale = usePermission('record_sale');
+  const canMakeCreditSale = usePermission('make_credit_sale');
   const canViewSales = usePermission('view_sales');
   const canVoidSale = usePermission('void_sale');
   // This screen only lists the viewer's own sales, so either refund grant works
@@ -119,6 +124,8 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     setMpesaMode,
     manualReceiptCode,
     setManualReceiptCode,
+    creditCustomer,
+    setCreditCustomer,
     resetSaleFields,
   } = useCartStore();
   const [chosenMethod, setPaymentMethod] = useState<string>(CASH_METHOD_KEY);
@@ -343,11 +350,17 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   // sync) still sees the button.
   const barcodeScanningEnabled = shopConfigData?.data?.barcodeScanningEnabled ?? true;
 
-  // The shop's own till buttons. Falls back to Cash + M-PESA for shops that
-  // never opened the setting, so nobody is ever left without a way to sell.
+  // The shop's own till buttons, plus a system Credit button appended when
+  // the module is on and this person may use it — see resolveSaleMethods.
+  // Falls back to Cash + M-PESA for shops that never opened the payment-
+  // methods setting, so nobody is ever left without a way to sell.
+  const creditEnabled = shopConfigData?.data?.creditSettings?.enabled ?? false;
   const saleMethods = useMemo(
-    () => resolveSaleMethods(shopConfigData?.data?.paymentMethods),
-    [shopConfigData]
+    () => resolveSaleMethods(shopConfigData?.data?.paymentMethods, {
+      enabled: creditEnabled,
+      permitted: canMakeCreditSale,
+    }),
+    [shopConfigData, creditEnabled, canMakeCreditSale]
   );
 
   // If the selected button is removed or switched off mid-session, fall back to
@@ -388,7 +401,14 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             : 'This shop\'s subscription has ended. Ask the shop owner to renew.',
         };
       }
-      if (!isOfflineDbAvailable()) {
+      // Credit never takes the local-first path, on any device, regardless of
+      // SQLite availability. The balance and limit it's checked against live
+      // on the server, and this same customer may be mid-sale on another till
+      // right now — an optimistic local commit here could not enforce either.
+      // services/sales.ts marks this request realtimeOnly, so a genuine
+      // outage fails visibly instead of queuing a debt to be created later
+      // against whatever the balance happens to be by then.
+      if (!isOfflineDbAvailable() || data.paymentMethod === CREDIT_METHOD_KEY) {
         const res = await createSale(data);
         return { data: res.data, local: false };
       }
@@ -438,16 +458,29 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       clearCart();
       setManualReceiptCode('');
       setMpesaMode('stk');
+      setCreditCustomer(null);
       setCompletedSale(data);
       setReceiptVisible(true);
       if (local) {
         queryClient.invalidateQueries({ queryKey: ['productCache', shopId] });
       } else {
-        // No-SQLite fallback: this was a real network round trip, so the
-        // server's own response is already authoritative.
+        // No-SQLite fallback, and every credit sale: this was a real network
+        // round trip, so the server's own response is already authoritative.
         queryClient.invalidateQueries({ queryKey: ['mySales'] });
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['myCommission'] });
+        if (data.credit) {
+          // Only fetched for a credit sale — every other path leaves these
+          // caches alone rather than paying for a refetch nobody asked for.
+          // Keyed off the sale's own `customer` field (authoritative from the
+          // server response) rather than the till's local creditCustomer
+          // state, which this same callback clears just above.
+          queryClient.invalidateQueries({ queryKey: ['customers'] });
+          if (data.customer) {
+            queryClient.invalidateQueries({ queryKey: ['customer', data.customer] });
+          }
+          queryClient.invalidateQueries({ queryKey: ['creditOverview'] });
+        }
         resyncCatalogue();
       }
     },
@@ -757,6 +790,19 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       return;
     }
 
+    // Credit needs a named customer and a live server check of their account
+    // before anything is confirmed — never a client guess at their balance or
+    // limit. openCreditSummary loads the account and shows the confirmation
+    // sheet; the sale itself is only submitted from there.
+    if (paymentMethod === CREDIT_METHOD_KEY) {
+      if (!creditCustomer) {
+        toast({ type: 'warning', message: 'Choose a customer before selling on credit.' });
+        return;
+      }
+      openCreditSummary();
+      return;
+    }
+
     // A receipt code is proof of payment in the connected "Already Paid" flow,
     // so it's required there; elsewhere it's an optional reconciliation aid.
     const code = manualReceiptCode.trim();
@@ -771,6 +817,49 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       ...(paymentMethod === MPESA_METHOD_KEY && code.length >= 6
         ? { mpesaReceiptNumber: code }
         : {}),
+    });
+  };
+
+  // ── Credit checkout ────────────────────────────────────────────────────
+  // A credit sale never touches the offline-first path (see createSale in
+  // services/sales.ts, which marks it realtimeOnly): the balance and limit
+  // it's checked against live on the server, and two tills can be selling to
+  // the same customer at once. This block is the one confirmation-then-commit
+  // round trip on the till that requires a live connection end to end.
+  const [creditSummaryVisible, setCreditSummaryVisible] = useState(false);
+  const [creditAccount, setCreditAccount] = useState<CreditAccount | null>(null);
+  const [creditSummaryError, setCreditSummaryError] = useState<string | null>(null);
+  const [creditSummaryLoading, setCreditSummaryLoading] = useState(false);
+
+  const openCreditSummary = async () => {
+    if (!creditCustomer) return;
+    setCreditSummaryVisible(true);
+    setCreditAccount(null);
+    setCreditSummaryError(null);
+    setCreditSummaryLoading(true);
+    try {
+      const res = await getCustomerById(creditCustomer._id);
+      if (!res.data.account) {
+        // Server-side permission changed under the cashier mid-sale, or the
+        // account response is malformed — either way, nothing to confirm.
+        setCreditSummaryError('This account can no longer be checked. Pick the customer again.');
+        return;
+      }
+      setCreditAccount(res.data.account);
+    } catch {
+      setCreditSummaryError('Could not check this customer\'s account. Check your connection and try again.');
+    } finally {
+      setCreditSummaryLoading(false);
+    }
+  };
+
+  const confirmCreditSale = () => {
+    if (!creditCustomer) return;
+    setCreditSummaryVisible(false);
+    submitSale({
+      items: buildSaleItems(),
+      paymentMethod: CREDIT_METHOD_KEY,
+      customerId: creditCustomer._id,
     });
   };
 
@@ -1186,8 +1275,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             paymentMethod={paymentMethod}
             onPaymentMethodChange={(m) => {
               setPaymentMethod(m);
-              // Leaving M-Pesa drops anything only M-Pesa collects.
-              if (m !== MPESA_METHOD_KEY) {
+              // Leaving M-Pesa drops anything only M-Pesa collects. Re-tapping
+              // the method that's already selected drops nothing — added
+              // alongside credit so choosing the same Credit button twice
+              // (or re-rendering while it's selected) never re-wipes a
+              // customer the cashier already picked.
+              if (m !== MPESA_METHOD_KEY && m !== paymentMethod) {
                 resetSaleFields();
               }
             }}
@@ -1201,9 +1294,29 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             onMpesaModeChange={setMpesaMode}
             manualReceiptCode={manualReceiptCode}
             onManualReceiptCodeChange={setManualReceiptCode}
+            creditCustomerName={creditCustomer?.name}
+            onPickCreditCustomer={() =>
+              // `as never`: these routes are freshly added and the dev server
+              // hasn't regenerated .expo/types/router.d.ts yet — same cast the
+              // codebase already uses elsewhere for this (see business/customers
+              // pushes), not a real type hole.
+              router.push((user?.role === 'staff' ? '/(staff)/pick-credit-customer' : '/(owner)/pick-credit-customer') as never)
+            }
           />
         </PosCheckoutPanel>
       )}
+
+      <CreditSummarySheet
+        visible={creditSummaryVisible}
+        onClose={() => setCreditSummaryVisible(false)}
+        onConfirm={confirmCreditSale}
+        customerName={creditCustomer?.name ?? ''}
+        account={creditAccount}
+        saleAmount={totalAmount}
+        currency={user?.shop?.currency}
+        loading={creditSummaryLoading}
+        error={creditSummaryError}
+      />
 
       <CartReviewSheet
         visible={reviewVisible}

@@ -31,6 +31,15 @@ export const MONEY_OUT_METHOD_LABELS: Record<MoneyOutMethod, string> = {
 
 export const CASH_METHOD_KEY = 'cash';
 export const MPESA_METHOD_KEY = 'mpesa';
+/**
+ * Taking the goods on account. Behaviour, not just a label, once the owner
+ * switches customer credit on: it requires a customer, needs a connection, and
+ * books a debt the shop can collect against.
+ *
+ * Shops that added this button before the credit module existed keep the old
+ * behaviour while credit is off — a sale labelled "Credit" and nothing more.
+ */
+export const CREDIT_METHOD_KEY = 'credit';
 
 export type MethodIcon = 'cash' | 'phone' | 'bank' | 'card' | 'clock' | 'tag' | 'wallet';
 
@@ -77,13 +86,28 @@ export const methodIcon = (method?: ShopPaymentMethod): string =>
  * shop has no list — old shops, and any response that predates this field.
  */
 export const resolveSaleMethods = (
-  methods?: ShopPaymentMethod[] | null
+  methods?: ShopPaymentMethod[] | null,
+  /**
+   * Adds a Credit button when the shop has credit on and this user may sell on
+   * it. Appended rather than read from the shop's own list because credit is a
+   * system capability: an owner who enables it shouldn't also have to go and
+   * build the button, and a shop that already has one shouldn't end up with two.
+   * It sits last, after the ways money actually arrives today.
+   */
+  credit?: { enabled: boolean; permitted: boolean }
 ): ShopPaymentMethod[] => {
   const list = methods?.length ? methods : DEFAULT_SALE_METHODS;
-  return list
+  const visible = list
     .filter((m) => m.enabled !== false)
     .slice()
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  if (!credit?.enabled || !credit.permitted) {
+    return visible;
+  }
+  return visible.some((m) => m.key === CREDIT_METHOD_KEY)
+    ? visible
+    : [...visible, { key: CREDIT_METHOD_KEY, label: 'Credit', icon: 'clock' as MethodIcon, enabled: true }];
 };
 
 /** Turn a typed label into a valid key: "Airtel Money" → "airtel_money". */

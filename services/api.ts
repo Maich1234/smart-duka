@@ -6,6 +6,17 @@ import { refreshAuthToken } from '@/utils/tokenRefresh';
 import { randomUUID } from '@/utils/uuid';
 import NetInfo from '@react-native-community/netinfo';
 
+// Lets a single call opt out of the offline outbox: `api.post(url, data,
+// { realtimeOnly: true })`. Declared as a module augmentation rather than cast
+// at each call site so a typo is a compile error, not a silently queued
+// financial write.
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** Never queue this request offline — fail visibly instead. */
+    realtimeOnly?: boolean;
+  }
+}
+
 // axios also exports a bare `create`, which makes import/no-named-as-default-member
 // flag this — but `axios.create` on the default export is the documented way to
 // build a configured instance, and the bare export is not equivalent.
@@ -38,11 +49,17 @@ const REALTIME_ONLY = ['/mpesa/initiate', '/mpesa/verify-receipt', '/refund', '/
 // fail fast and visibly instead of queuing.
 const NEVER_QUEUE = ['/auth/', '/otp/request', '/otp/verify'];
 
-const isRealtimeOnly = (url: string) =>
-  REALTIME_ONLY.some(p => url.includes(p));
+// Per-request opt-out, for endpoints that are only realtime in some of their
+// uses. POST /sales is the case this exists for: a cash sale is the offline
+// path's whole reason for being, while a credit sale on the same endpoint
+// cannot be authorised without the server (the balance and the limit live
+// there), so it carries `realtimeOnly: true` on its own config instead of the
+// URL going on the list above and taking every cash sale down with it.
+const isRealtimeOnly = (url: string, config?: { realtimeOnly?: boolean }) =>
+  config?.realtimeOnly === true || REALTIME_ONLY.some(p => url.includes(p));
 
-const isNeverQueued = (url: string) =>
-  isRealtimeOnly(url) || NEVER_QUEUE.some(p => url.includes(p));
+const isNeverQueued = (url: string, config?: { realtimeOnly?: boolean }) =>
+  isRealtimeOnly(url, config) || NEVER_QUEUE.some(p => url.includes(p));
 
 // True for errors that mean the request never reached (or never returned from)
 // the server — safe to queue and retry.
@@ -119,7 +136,7 @@ api.interceptors.request.use(async (config) => {
 
     const offline = await checkOffline();
     if (offline) {
-      if (isRealtimeOnly(config.url ?? '')) {
+      if (isRealtimeOnly(config.url ?? '', config as { realtimeOnly?: boolean })) {
         throw new Error('OFFLINE_REALTIME');
       }
       // NEVER_QUEUE (auth) is exempt from the pre-flight block: NetInfo can
@@ -127,7 +144,7 @@ api.interceptors.request.use(async (config) => {
       // rejecting here would brick login while the network is actually fine.
       // Attempt the request anyway — a real outage rejects below and is
       // mapped to a connection error in the response interceptor.
-      if (!isNeverQueued(config.url ?? '')) {
+      if (!isNeverQueued(config.url ?? '', config as { realtimeOnly?: boolean })) {
         return queueAndReject(
           config.method,
           config.url ?? '',
@@ -171,7 +188,7 @@ api.interceptors.response.use(
     // Queue it so the mutation isn't lost — this is the "forever loading" fix.
     const config = error.config;
     if (isNetworkFailure(error) && config?.method && config.method.toLowerCase() !== 'get') {
-      if (!isNeverQueued(config?.url ?? '')) {
+      if (!isNeverQueued(config?.url ?? '', config)) {
         // Re-use the key generated in the request interceptor so the idempotency
         // table deduplicates this if it was already queued by a fast pre-flight.
         const key =
@@ -179,13 +196,23 @@ api.interceptors.response.use(
           `net-fail:${config.method}:${config.url}:${randomUUID()}`;
         return queueAndReject(config.method, config.url ?? '', config.data, key);
       }
-      if (!isRealtimeOnly(config?.url ?? '')) {
-        // Auth request that genuinely couldn't reach the server — never
-        // queued, so surface a connection error the UI can show verbatim.
+      if (isRealtimeOnly(config?.url ?? '', config)) {
+        // A realtime-only write (M-Pesa, a refund, a credit sale, …) that was
+        // dispatched — pre-flight said online — but then failed mid-flight.
+        // Never queued and never a bare "Network Error" either: same message
+        // the pre-flight check above already gives this same class of
+        // endpoint, so a connection that drops mid-tap and one that's down
+        // from the start read identically to the cashier.
         return Promise.reject({
-          message: 'No internet connection. Please check your network and try again.',
+          offlineRealtime: true,
+          message: 'This requires an internet connection. Please connect and try again.',
         });
       }
+      // Auth request that genuinely couldn't reach the server — never
+      // queued, so surface a connection error the UI can show verbatim.
+      return Promise.reject({
+        message: 'No internet connection. Please check your network and try again.',
+      });
     }
 
     if (error.response?.status === 401) {
