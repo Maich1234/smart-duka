@@ -577,14 +577,18 @@ const quotationItemSchema = Joi.object({
   name: Joi.string().trim().max(120).optional(),
   description: Joi.string().trim().max(300).allow('').optional(),
   quantity: Joi.number().positive().required(),
-  unitPrice: Joi.number().min(0).optional(),
+  // Required only for a custom line (no productId) — a catalog line has no
+  // price to require here, since the controller resolves it from the
+  // Product. Joi's sibling-reference form of .when(), not the schema-shaped
+  // form: referencing 'productId' by key name is the well-documented,
+  // reliably-behaving variant.
+  unitPrice: Joi.number().min(0).when('productId', {
+    is: Joi.exist(),
+    then: Joi.optional(),
+    otherwise: Joi.required(),
+  }),
 })
-  .or('productId', 'name')
-  .when(Joi.object({ productId: Joi.exist() }).unknown(), {
-    then: Joi.object(),
-    otherwise: Joi.object({ unitPrice: Joi.number().min(0).required() }),
-  })
-  .unknown(true);
+  .or('productId', 'name');
 
 export const createQuotationSchema = Joi.object({
   customerId: Joi.string().hex().length(24).required(),
@@ -1964,7 +1968,7 @@ git commit -m "Add pdfkit-based PDF rendering for the three quotation templates"
 - Test: extend `tests/quotationCrud.test.js` and `tests/publicQuotation.test.js`
 
 **Interfaces:**
-- Consumes: `renderQuotationPdf` (Task B9), the shop's `quotationTemplate` (Task B11 adds this field to `Shop` — if executing tasks in order, B11 comes after B10 in this document; move B11 earlier in your execution order, or read `req.user.shop.quotationTemplate` here with `|| 'classic'` as a safe default so this task doesn't hard-depend on B11's ordering).
+- Consumes: `renderQuotationPdf` (Task B9), the shop's `quotationTemplate` field (added to the `Shop` model back in Task B3, Step 5 — already present by this point in task order). Default to `'classic'` wherever it's read (`req.user.shop.quotationTemplate || 'classic'`) since older shop documents predate the field.
 - Produces: `GET /quotations/:id/pdf` (auth), `GET /public/quotation/:token/pdf` — both respond `Content-Type: application/pdf`.
 
 - [ ] **Step 1: Write the failing tests**
