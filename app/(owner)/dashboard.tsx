@@ -61,6 +61,9 @@ const BASE_ACTION_TILES: QuickActionTile[] = [
 const PURCHASES_TILE: QuickActionTile = {
   id: 'purchases', title: 'Purchases', icon: 'cart-outline', tint: Colors.primary, tintBg: Colors.primarySubtle, route: '/(owner)/purchases',
 };
+const QUOTATIONS_TILE: QuickActionTile = {
+  id: 'quotations', title: 'Quotations', icon: 'document-text-outline', tint: Colors.warning, tintBg: Colors.warningSubtle, route: '/(owner)/quotations',
+};
 
 const DashboardSkeleton = () => (
   <View style={styles.skeletonContainer}>
@@ -94,10 +97,14 @@ export default function OwnerDashboard() {
     queryFn: getShopConfig,
   });
   const showPurchasesTile = canViewPurchases && (shopConfigData?.data?.purchasingEnabled ?? false);
-  const actionTiles = useMemo(
-    () => (showPurchasesTile ? [BASE_ACTION_TILES[0], PURCHASES_TILE, ...BASE_ACTION_TILES.slice(1)] : BASE_ACTION_TILES),
-    [showPurchasesTile],
-  );
+  // Either grant is enough to see the list — matches getQuotations' own
+  // permission check (create_quotation for drafting, convert_quotation_to_sale
+  // for a view-only look at converting one to a sale).
+  const showQuotationsTile = usePermission('create_quotation') || usePermission('convert_quotation_to_sale');
+  const actionTiles = useMemo(() => {
+    const base = showPurchasesTile ? [BASE_ACTION_TILES[0], PURCHASES_TILE, ...BASE_ACTION_TILES.slice(1)] : BASE_ACTION_TILES;
+    return showQuotationsTile ? [...base, QUOTATIONS_TILE] : base;
+  }, [showPurchasesTile, showQuotationsTile]);
 
   const [timeContext, setTimeContext] = useState({
     greeting: getGreeting(),
