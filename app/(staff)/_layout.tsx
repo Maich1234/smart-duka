@@ -314,6 +314,10 @@ export default function StaffLayout() {
           rendered, stacking two bars with the same title. */}
       <Tabs.Screen name="customers" options={{ title: 'Customers', href: null, headerShown: false }} />
       <Tabs.Screen name="pick-credit-customer" options={{ title: 'Choose Customer', href: null, headerShown: false }} />
+      {/* The nested Stack at app/(staff)/quotations/_layout.tsx draws its own
+          header (CreateQuotationScreen renders <ScreenHeader> itself) — same
+          reason as "customers" above. */}
+      <Tabs.Screen name="quotations" options={{ title: 'Quotations', href: null, headerShown: false }} />
       <Tabs.Screen name="refer" options={{ title: 'Refer & Earn', href: null }} />
       <Tabs.Screen name="reconciliation" options={{ title: 'My Reconciliation', href: null }} />
       <Tabs.Screen name="printer" options={{ title: 'Receipt Printer', href: null }} />

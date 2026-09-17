@@ -445,6 +445,17 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="quotations"
+        options={{
+          title: 'Quotations',
+          href: null,
+          // The nested Stack at app/(owner)/quotations/_layout.tsx draws its
+          // own header (CreateQuotationScreen renders <ScreenHeader> itself)
+          // — same reason as "credit"/"customers" above.
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="reports"
         options={{
           title: 'Reports',
