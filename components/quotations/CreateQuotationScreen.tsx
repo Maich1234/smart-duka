@@ -12,6 +12,7 @@ import { CustomerPickerSheet } from '@/components/credit/CustomerPickerSheet';
 import { ServicePickerSheet } from '@/components/quotations/ServicePickerSheet';
 import { useAlert } from '@/context/AlertContext';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useShopConfig } from '@/hooks/useShopConfig';
 import { usePermission } from '@/utils/permissions';
 import { useAuthStore } from '@/store/authStore';
 import { createQuotation } from '@/services/quotations';
@@ -43,6 +44,11 @@ interface LineItem {
 
 const DEFAULT_VALID_DAYS = 30;
 
+/** Mirrors the backend's own `round2` in quotationController.js — the same
+ * cents-precision rounding, so the displayed total never drifts a cent from
+ * what the server will actually record. */
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
 /**
  * Drafts a quotation for a customer: pick who it's for, add service-catalog
  * or free-text line items, set how long it stands, and send it off. The
@@ -52,6 +58,11 @@ const DEFAULT_VALID_DAYS = 30;
 export const CreateQuotationScreen: React.FC<CreateQuotationScreenProps> = ({ basePath }) => {
   const tabBarHeight = useTabBarHeight();
   const currency = useAuthStore((s) => s.user?.shop?.currency);
+  // The shop's tax rate isn't on the cached auth user (services/shop.ts's
+  // fuller Shop type is), so it's read from the same shopConfig cache the
+  // rest of the app's settings screens already share.
+  const { shopConfig } = useShopConfig();
+  const taxRate = shopConfig?.taxRate ?? 0;
   const canCreate = usePermission('create_quotation');
   const { toast } = useAlert();
 
@@ -79,7 +90,12 @@ export const CreateQuotationScreen: React.FC<CreateQuotationScreenProps> = ({ ba
     },
   });
 
-  const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+  // Matches the server's own formula exactly (quotationController.js:
+  // taxAmount = round2(subtotal * (taxRate / 100)), total = subtotal + taxAmount)
+  // so this screen's "Total" never disagrees with what's actually recorded.
+  const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+  const taxAmount = round2(subtotal * (taxRate / 100));
+  const total = round2(subtotal + taxAmount);
 
   const addServiceItem = (product: Product) => {
     setItems((prev) => [
@@ -106,7 +122,7 @@ export const CreateQuotationScreen: React.FC<CreateQuotationScreenProps> = ({ ba
 
   const customQuantityNumber = Number.parseFloat(customQuantity || '0');
   const customUnitPriceNumber = Number.parseFloat(customUnitPrice || '0');
-  const canConfirmCustomLine = customName.trim().length > 0 && customQuantityNumber > 0 && customUnitPrice.trim().length > 0;
+  const canConfirmCustomLine = customName.trim().length > 0 && customQuantityNumber > 0 && customUnitPriceNumber > 0;
 
   const confirmCustomLine = () => {
     if (!canConfirmCustomLine) return;
@@ -279,9 +295,24 @@ export const CreateQuotationScreen: React.FC<CreateQuotationScreenProps> = ({ ba
         <Text style={styles.sectionTitle}>Valid Until</Text>
         <DatePicker value={validUntil} onChange={(d) => d && setValidUntil(d)} />
 
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatCurrency(total, currency)}</Text>
+        <View style={styles.totalsCard}>
+          {taxAmount > 0 && (
+            <>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(subtotal, currency)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Tax ({taxRate}%)</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(taxAmount, currency)}</Text>
+              </View>
+              <View style={styles.divider} />
+            </>
+          )}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>{formatCurrency(total, currency)}</Text>
+          </View>
         </View>
 
         <Button
@@ -385,12 +416,23 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
 
+  totalsCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xs },
+  summaryLabel: { fontSize: Typography.size.small, fontFamily: Typography.fontFamily, color: Colors.textSecondary },
+  summaryValue: { fontSize: Typography.size.small, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
+  divider: { height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.sm },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.md,
   },
   totalLabel: { fontSize: Typography.size.body, fontFamily: Typography.fontFamilySemiBold, color: Colors.textPrimary },
   totalValue: { fontSize: Typography.size.h3, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
