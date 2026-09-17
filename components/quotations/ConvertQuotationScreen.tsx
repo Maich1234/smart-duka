@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -17,9 +17,11 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useShopConfig } from '@/hooks/useShopConfig';
 import { usePermission } from '@/utils/permissions';
 import { useAuthStore } from '@/store/authStore';
+import { usePendingQuotationMpesaStore, type PendingQuotationMpesaPayment } from '@/store/pendingQuotationMpesaStore';
 import { getQuotations, convertQuotation } from '@/services/quotations';
 import { getCustomerById, type CreditAccount } from '@/services/customers';
 import { getPaymentStatus } from '@/services/paymentConfig';
+import { getTransactionStatus } from '@/services/mpesa';
 import {
   resolveSaleMethods,
   methodIcon,
@@ -33,6 +35,12 @@ import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { BorderRadius } from '@/constants/BorderRadius';
+
+// Same values PosScreen.tsx uses for its own pending-payment background
+// watch — how long, and how often, to keep quietly re-checking a payment
+// the cashier hasn't come back to the banner for.
+const BACKGROUND_WATCH_INTERVAL_MS = 10000;
+const MAX_BACKGROUND_WATCH_MS = 5 * 60 * 1000;
 
 interface ConvertQuotationScreenProps {
   quotationId: string;
@@ -57,7 +65,8 @@ interface ConvertQuotationScreenProps {
 export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ quotationId, basePath }) => {
   const tabBarHeight = useTabBarHeight();
   const currency = useAuthStore((s) => s.user?.shop?.currency);
-  const { toast } = useAlert();
+  const shopId = useAuthStore((s) => s.user?.shop?._id) ?? '';
+  const { toast, alert } = useAlert();
   const queryClient = useQueryClient();
   const canConvert = usePermission('convert_quotation_to_sale');
   const canMakeCreditSale = usePermission('make_credit_sale');
@@ -101,6 +110,20 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
     : methods[0]?.key ?? null;
 
   const [mpesaVisible, setMpesaVisible] = useState(false);
+  // Mirrors mpesaModalVisibleRef in PosScreen.tsx: checkPendingPayment's
+  // `.then()` can resolve after the modal has since been opened and is
+  // already polling this same transaction itself — the ref (not the state
+  // closed over when the callback was created) is what tells it to stand
+  // down instead of firing a second, conflicting outcome.
+  const mpesaVisibleRef = useRef(mpesaVisible);
+  useEffect(() => { mpesaVisibleRef.current = mpesaVisible; }, [mpesaVisible]);
+  // Set only when reopening the modal against an already-sent STK push (via
+  // the recovery banner's "Check" button) — never on a fresh checkout tap.
+  const [resumePayment, setResumePayment] = useState<PendingQuotationMpesaPayment | null>(null);
+  // A payment still genuinely pending — the customer may complete it any
+  // moment — surfaced as a banner rather than auto-reopening the modal, so
+  // landing on this screen never pops a payment prompt the user didn't ask for.
+  const [pendingBanner, setPendingBanner] = useState<PendingQuotationMpesaPayment | null>(null);
 
   // ── Credit checkout — mirrors PosScreen's openCreditSummary/confirmCreditSale ──
   const [creditSummaryVisible, setCreditSummaryVisible] = useState(false);
@@ -121,6 +144,103 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
       toast({ type: 'error', message: mutationErrorMessage(error, 'Could not convert this quotation.') });
     },
   });
+
+  // ── M-Pesa pending-payment recovery ─────────────────────────────────────
+  // An STK push sent from this screen and then left mid-flight — the app was
+  // backgrounded and later killed before it resolved — must never be
+  // silently forgotten: the customer may have completed it, and forgetting
+  // it is how a cashier ends up retrying and charging them twice. This
+  // mirrors PosScreen's own checkPendingPayment/mount-recovery/background-
+  // watch trio exactly, against the sibling pendingQuotationMpesaStore
+  // (never the till's own store — a record from either could otherwise be
+  // misread as the other's).
+  const checkPendingPayment = React.useCallback((payment: PendingQuotationMpesaPayment) => {
+    return getTransactionStatus(payment.transactionId)
+      .then((res) => {
+        // The modal can already be open and polling this same transaction
+        // itself (reopened via the banner's "Check" button) by the time this
+        // resolves — acting here too would pop a second, conflicting outcome
+        // on top of it.
+        if (mpesaVisibleRef.current) return;
+        const s = res.data.status;
+        if (s === 'success') {
+          setPendingBanner(null);
+          alert({
+            type: 'confirm',
+            title: 'M-Pesa Payment Confirmed',
+            message: `A payment of ${formatCurrency(payment.amount, currency)} from ${payment.phoneNumber} has gone through. Record this sale now?`,
+            buttons: [
+              { label: 'Already recorded', variant: 'ghost', onPress: () => usePendingQuotationMpesaStore.getState().clear() },
+              {
+                label: 'Record Sale',
+                onPress: () => {
+                  usePendingQuotationMpesaStore.getState().clear();
+                  submitConvert({ paymentMethod: MPESA_METHOD_KEY, mpesaTransactionId: payment.transactionId });
+                },
+              },
+            ],
+          });
+        } else if (s === 'pending') {
+          setPendingBanner(payment);
+        } else {
+          // failed / cancelled / timeout — nothing was charged, safe to drop.
+          usePendingQuotationMpesaStore.getState().clear();
+          setPendingBanner(null);
+          toast({
+            type: 'info',
+            message: `A pending M-Pesa payment of ${formatCurrency(payment.amount, currency)} to ${payment.phoneNumber} did not complete.`,
+          });
+        }
+      })
+      .catch(() => {
+        // No connection right now — keep watching/showing the banner rather
+        // than guessing either way.
+        setPendingBanner(payment);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency]);
+
+  // Recover a payment left mid-flight by a previous app session. Runs once
+  // this screen knows which shop and which quotation it's for.
+  useEffect(() => {
+    if (!shopId || !quotationId) return;
+    const payment = usePendingQuotationMpesaStore.getState().payment;
+    if (!payment) return;
+    if (payment.shopId !== shopId) {
+      // Stale record from a different shop/login — never ask about money
+      // that isn't this shop's to begin with.
+      usePendingQuotationMpesaStore.getState().clear();
+      return;
+    }
+    if (payment.quotationId !== quotationId) {
+      // Belongs to a different quotation's convert screen — leave it alone
+      // for that screen to find; clearing it here would drop the one record
+      // of a payment that screen still needs to reconcile.
+      return;
+    }
+    checkPendingPayment(payment);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId, quotationId]);
+
+  // A payment the user cancelled out of (or that mount-time recovery found)
+  // while it was still genuinely pending. Re-checks quietly in the
+  // background so a payment the customer completes moments later is caught
+  // without anyone needing to notice the banner and tap it — capped so this
+  // screen doesn't poll forever for a payment that's simply never coming.
+  // Pauses while the modal itself is open so the two don't poll the same
+  // transaction at once.
+  useEffect(() => {
+    if (!pendingBanner || mpesaVisible) return;
+    const remaining = MAX_BACKGROUND_WATCH_MS - (Date.now() - new Date(pendingBanner.createdAt).getTime());
+    if (remaining <= 0) return;
+
+    const intervalId = setInterval(() => checkPendingPayment(pendingBanner), BACKGROUND_WATCH_INTERVAL_MS);
+    const timeoutId = setTimeout(() => clearInterval(intervalId), remaining);
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
+  }, [pendingBanner, mpesaVisible, checkPendingPayment]);
 
   const openCreditSummary = async () => {
     if (!quotation) return;
@@ -170,6 +290,8 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
 
   const handleMpesaSuccess = (transactionId: string | null, mpesaReceiptNumber: string | null) => {
     setMpesaVisible(false);
+    setResumePayment(null);
+    usePendingQuotationMpesaStore.getState().clear();
     submitConvert({
       paymentMethod: MPESA_METHOD_KEY,
       mpesaTransactionId: transactionId ?? undefined,
@@ -189,6 +311,36 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
   return (
     <View style={styles.flex}>
       <ScreenHeader title="Convert to Sale" />
+
+      {pendingBanner && (
+        <View style={styles.recoveryBanner}>
+          <Ionicons name="time-outline" size={16} color={Colors.warning} />
+          <Text style={styles.recoveryBannerText}>
+            M-Pesa payment of {formatCurrency(pendingBanner.amount, currency)} to{' '}
+            {pendingBanner.phoneNumber} is still awaiting confirmation.
+          </Text>
+          <AnimatedPressable
+            onPress={() => {
+              setResumePayment(pendingBanner);
+              setPendingBanner(null);
+              setMpesaVisible(true);
+            }}
+            style={styles.recoveryBannerBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Check M-Pesa payment status"
+          >
+            <Text style={styles.recoveryBannerBtnText}>Check</Text>
+          </AnimatedPressable>
+          <AnimatedPressable
+            onPress={() => setPendingBanner(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          >
+            <Ionicons name="close" size={16} color={Colors.textTertiary} />
+          </AnimatedPressable>
+        </View>
+      )}
 
       {isLoading ? (
         <ListSkeleton rows={3} showSearch={false} />
@@ -266,30 +418,66 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
         </ScrollView>
       )}
 
-      {quotation && (
-        <>
-          <MpesaPaymentModal
-            visible={mpesaVisible}
-            phoneNumber={quotation.customerSnapshot.phone || ''}
-            amount={quotation.total}
-            accountReference={quotation.quoteNumber}
-            currency={currency}
-            onCancel={() => setMpesaVisible(false)}
-            onSuccess={handleMpesaSuccess}
-          />
+      {/*
+        Rendered unconditionally on `quotation` (unlike CreditSummarySheet
+        below) — the recovery banner's "Check" button must still be able to
+        reopen this and resolve a pending payment even if the quotation
+        itself somehow failed to load (or was deleted elsewhere) in the
+        meantime. Money-safety here depends only on the persisted payment
+        record, never on the quotation record still being fetchable.
+      */}
+      <MpesaPaymentModal
+        visible={mpesaVisible}
+        phoneNumber={resumePayment?.phoneNumber ?? quotation?.customerSnapshot.phone ?? ''}
+        amount={resumePayment?.amount ?? quotation?.total ?? 0}
+        accountReference={quotation?.quoteNumber}
+        currency={currency}
+        onCancel={() => {
+          setMpesaVisible(false);
+          // Closing the modal stops its polling outright (it unmounts). If
+          // the transaction never got a chance to resolve on its own, don't
+          // just drop it — surface the banner immediately and let the
+          // background watcher keep checking.
+          const stillOpen = usePendingQuotationMpesaStore.getState().payment;
+          if (stillOpen && stillOpen.quotationId === quotationId) setPendingBanner(stillOpen);
+          setResumePayment(null);
+        }}
+        onSuccess={handleMpesaSuccess}
+        onResolved={() => {
+          // Polling itself determined this is dead — nothing left to watch.
+          usePendingQuotationMpesaStore.getState().clear();
+          setPendingBanner(null);
+        }}
+        resumeTransactionId={resumePayment?.transactionId}
+        onInitiated={
+          resumePayment
+            ? undefined
+            : (transactionId) => {
+                if (!shopId || !quotation) return;
+                usePendingQuotationMpesaStore.getState().set({
+                  quotationId,
+                  transactionId,
+                  shopId,
+                  phoneNumber: quotation.customerSnapshot.phone || '',
+                  amount: quotation.total,
+                  createdAt: new Date().toISOString(),
+                });
+              }
+        }
+      />
 
-          <CreditSummarySheet
-            visible={creditSummaryVisible}
-            onClose={() => setCreditSummaryVisible(false)}
-            onConfirm={confirmCreditSale}
-            customerName={quotation.customerSnapshot.name}
-            account={creditAccount}
-            saleAmount={quotation.total}
-            currency={currency}
-            loading={creditSummaryLoading}
-            error={creditSummaryError}
-          />
-        </>
+      {quotation && (
+        <CreditSummarySheet
+          visible={creditSummaryVisible}
+          onClose={() => setCreditSummaryVisible(false)}
+          onConfirm={confirmCreditSale}
+          customerName={quotation.customerSnapshot.name}
+          account={creditAccount}
+          saleAmount={quotation.total}
+          currency={currency}
+          loading={creditSummaryLoading}
+          error={creditSummaryError}
+        />
       )}
     </View>
   );
@@ -340,4 +528,34 @@ const styles = StyleSheet.create({
   methodLabelSelected: { fontFamily: Typography.fontFamilySemiBold, color: Colors.primary },
 
   convertBtn: { marginTop: Spacing.xs },
+
+  recoveryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.warningSubtle,
+    borderWidth: 1,
+    borderColor: `${Colors.warning}30`,
+  },
+  recoveryBannerText: {
+    flex: 1,
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamily,
+    color: Colors.textPrimary,
+  },
+  recoveryBannerBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.warning,
+  },
+  recoveryBannerBtnText: {
+    fontSize: Typography.size.caption,
+    fontFamily: Typography.fontFamilySemiBold,
+    color: Colors.white,
+  },
 });
