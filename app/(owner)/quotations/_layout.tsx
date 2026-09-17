@@ -17,6 +17,7 @@ export default function QuotationsStackLayout() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="new" options={{ headerShown: false }} />
+      <Stack.Screen name="[id]/convert" options={{ headerShown: false }} />
     </Stack>
   );
 }
