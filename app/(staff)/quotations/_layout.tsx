@@ -15,6 +15,7 @@ export default function StaffQuotationsStackLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="new" options={{ headerShown: false }} />
     </Stack>
   );
