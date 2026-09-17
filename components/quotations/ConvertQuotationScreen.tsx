@@ -18,7 +18,7 @@ import { useShopConfig } from '@/hooks/useShopConfig';
 import { usePermission } from '@/utils/permissions';
 import { useAuthStore } from '@/store/authStore';
 import { usePendingQuotationMpesaStore, type PendingQuotationMpesaPayment } from '@/store/pendingQuotationMpesaStore';
-import { getQuotations, convertQuotation } from '@/services/quotations';
+import { getQuotationById, convertQuotation } from '@/services/quotations';
 import { getCustomerById, type CreditAccount } from '@/services/customers';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { getTransactionStatus } from '@/services/mpesa';
@@ -72,14 +72,11 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
   const canMakeCreditSale = usePermission('make_credit_sale');
   const { shopConfig } = useShopConfig();
 
-  // getQuotations() resolves to the full {success, data, pagination} envelope,
-  // not a bare array — there's no getQuotationById, so this finds the one
-  // this screen is for out of the full list (same as QuotationsListScreen).
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['quotations'],
-    queryFn: () => getQuotations(),
+    queryKey: ['quotation', quotationId],
+    queryFn: () => getQuotationById(quotationId),
   });
-  const quotation = data?.data?.find((q) => q._id === quotationId);
+  const quotation = data?.data;
 
   // Credential presence AND the backend's own enabled flag — same two-flag
   // check as PosScreen's mpesaEnabled, so a shop without Daraja credentials
@@ -134,8 +131,22 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
   const { mutate: submitConvert, isPending } = useMutation({
     mutationFn: (payload: { paymentMethod: string; mpesaTransactionId?: string; mpesaReceiptNumber?: string }) =>
       convertQuotation(quotationId, payload),
-    onSuccess: () => {
+    onSuccess: ({ data }) => {
       queryClient.invalidateQueries({ queryKey: ['quotations'] });
+      // Mirrors PosScreen's own checkout onSuccess (the real-network-round-trip
+      // branch, which this always is — conversion is never queued offline):
+      // a real Sale was just created, so the same caches it invalidates need
+      // to be invalidated here too.
+      queryClient.invalidateQueries({ queryKey: ['mySales'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['myCommission'] });
+      if (data.credit) {
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        if (data.customer) {
+          queryClient.invalidateQueries({ queryKey: ['customer', data.customer] });
+        }
+        queryClient.invalidateQueries({ queryKey: ['creditOverview'] });
+      }
       toast({ type: 'success', message: 'Quotation converted to a sale.' });
       // The Quotations list (Task 19) lives at this same basePath.
       router.replace(basePath as never);

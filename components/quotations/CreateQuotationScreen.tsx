@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { router } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Button } from '@/components/ui/Button';
@@ -64,7 +64,9 @@ export const CreateQuotationScreen: React.FC<CreateQuotationScreenProps> = ({ ba
   const { shopConfig } = useShopConfig();
   const taxRate = shopConfig?.taxRate ?? 0;
   const canCreate = usePermission('create_quotation');
+  const canCreateCustomer = usePermission('make_credit_sale');
   const { toast } = useAlert();
+  const queryClient = useQueryClient();
 
   const [customerPickerVisible, setCustomerPickerVisible] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -81,6 +83,7 @@ export const CreateQuotationScreen: React.FC<CreateQuotationScreenProps> = ({ ba
   const mutation = useMutation({
     mutationFn: createQuotation,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotations'] });
       toast({ type: 'success', message: 'Quotation created.' });
       // The Quotations list (Task 19) lives at this same basePath.
       router.replace(basePath as never);
@@ -332,6 +335,7 @@ export const CreateQuotationScreen: React.FC<CreateQuotationScreenProps> = ({ ba
         onClose={() => setCustomerPickerVisible(false)}
         onSelect={(c) => { setCustomer(c); setCustomerPickerVisible(false); }}
         currency={currency}
+        canCreate={canCreateCustomer}
       />
 
       <ServicePickerSheet

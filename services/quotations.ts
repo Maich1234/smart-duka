@@ -88,6 +88,14 @@ export const getQuotations = async (
   return response.data;
 };
 
+/** Same access as getQuotations. Fetches a single quotation by id — used
+ * wherever a specific quotation is needed regardless of where it falls in
+ * the default list's pagination (e.g. ConvertQuotationScreen). */
+export const getQuotationById = async (id: string): Promise<QuotationResponse> => {
+  const response = await api.get(`/quotations/${id}`);
+  return response.data;
+};
+
 /** Owner, or staff with 'create_quotation'. */
 export const createQuotation = async (data: CreateQuotationInput): Promise<QuotationResponse> => {
   const response = await api.post('/quotations', data);

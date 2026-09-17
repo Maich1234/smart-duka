@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Share } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -189,9 +189,14 @@ export const QuotationsListScreen: React.FC<QuotationsListScreenProps> = ({ base
     setActionsVisible(true);
   };
 
+  const closeActionsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (closeActionsTimeoutRef.current) clearTimeout(closeActionsTimeoutRef.current);
+  }, []);
+
   const closeActionsThen = (fn: () => void) => {
     setActionsVisible(false);
-    setTimeout(fn, ACTIONS_SHEET_CLOSE_MS);
+    closeActionsTimeoutRef.current = setTimeout(fn, ACTIONS_SHEET_CLOSE_MS);
   };
 
   const shareQuotation = async (quotation: Quotation) => {
