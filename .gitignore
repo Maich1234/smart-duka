@@ -57,3 +57,5 @@ lint-results.json
 .env
 .env.*
 !.env.example
+
+.worktrees/

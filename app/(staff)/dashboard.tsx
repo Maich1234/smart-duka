@@ -54,6 +54,11 @@ export default function StaffDashboard() {
   const canManageExpenses = usePermission('manage_expenses');
   const canViewPurchases = usePermission('view_purchases');
   const canViewReconciliation = usePermission('view_reconciliation');
+  // Either grant is enough to see the list — matches getQuotations' own
+  // permission check (create_quotation for drafting, convert_quotation_to_sale
+  // for a view-only look at converting one to a sale).
+  const canCreateQuotation = usePermission('create_quotation');
+  const canConvertQuotation = usePermission('convert_quotation_to_sale');
   // Same eligibility the backend applies (customerController.canListCustomers):
   // any credit grant, or just being able to record a sale — the directory
   // doubles as the till's customer picker. Each usePermission is its own
@@ -86,6 +91,7 @@ export default function StaffDashboard() {
     (shopConfigData?.data?.showStaffCommission ?? false) && user?.commissionEligible === true;
   const showReconciliationTile =
     canViewReconciliation && (shopConfigData?.data?.shiftManagementEnabled ?? false);
+  const showQuotationsTile = canCreateQuotation || canConvertQuotation;
 
   const [timeContext, setTimeContext] = useState({
     greeting: getGreeting(),
@@ -123,13 +129,16 @@ export default function StaffDashboard() {
     if (showReconciliationTile) {
       list.push({ id: 'reconciliation', title: 'My Reconciliation', icon: 'swap-horizontal-outline', tint: Colors.info, tintBg: Colors.primarySubtle, route: '/(staff)/reconciliation' });
     }
+    if (showQuotationsTile) {
+      list.push({ id: 'quotations', title: 'Quotations', icon: 'document-text-outline', tint: Colors.warning, tintBg: Colors.warningSubtle, route: '/(staff)/quotations' });
+    }
     // Always shown, same as the owner's equivalent tab — whether the
     // program is currently live is a platform-wide toggle, not a per-person
     // eligibility check, so refer.tsx itself renders the "not live yet"
     // state rather than the tile disappearing.
     list.push({ id: 'refer', title: 'Refer & Earn', icon: 'gift-outline', tint: Colors.primaryDark, tintBg: Colors.primarySubtle, route: '/(staff)/refer' });
     return list;
-  }, [canManageExpenses, showPurchasesTile, showCommissionTile, showReconciliationTile, canOpenCustomers]);
+  }, [canManageExpenses, showPurchasesTile, showCommissionTile, showReconciliationTile, showQuotationsTile, canOpenCustomers]);
 
   const unreadCount = useUnreadNotificationsCount();
   // Stable reference so the 60s unread-count poll (see useUnreadNotificationsCount)

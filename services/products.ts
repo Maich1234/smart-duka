@@ -166,6 +166,9 @@ export const getProducts = async (params?: {
   /** Comma-separated product types to hide, e.g. 'bundle,service' — used by
    * the Purchasing product picker to only show types that can be purchased. */
   excludeTypes?: string;
+  /** Comma-separated product types to show exclusively, e.g. 'service' — used by
+   * the Quotation line-item picker to only show sellable services. */
+  includeTypes?: string;
 }): Promise<ProductsResponse> => {
   const response = await api.get('/products', { params });
   return response.data;
