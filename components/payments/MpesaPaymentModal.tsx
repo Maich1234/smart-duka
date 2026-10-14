@@ -3,10 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   AppState,
 } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
@@ -29,6 +26,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { BottomSheet, SheetScrollBody } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency , formatKenyanPhone } from '@/utils/formatters';
 import { randomUUID } from '@/utils/uuid';
@@ -401,23 +399,8 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
   const isTerminal = status === 'failed' || status === 'cancelled' || status === 'timeout';
 
   return (
-    // The backdrop fades and the sheet springs as siblings, not one inside the
-    // other: an `entering` nested under another `entering` can be left stranded
-    // at its start values, and here that would strand the sheet's contents.
-    <View style={StyleSheet.absoluteFill}>
-      <Animated.View entering={FadeIn.duration(200)} style={StyleSheet.absoluteFill}>
-        <Pressable
-          style={styles.backdrop}
-          onPress={status === 'pending' || status === 'initiating' ? undefined : onCancel}
-        />
-      </Animated.View>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.sheetWrap}
-      >
-        <Animated.View entering={FadeInDown.springify().damping(20).stiffness(200)} style={styles.sheet}>
-          <View style={styles.handle} />
-
+    <BottomSheet visible onClose={onCancel} dismissible={status !== 'pending' && status !== 'initiating' && !verifying}>
+      <SheetScrollBody>
           {/* Initiating */}
           {status === 'initiating' && (
             <Animated.View entering={FadeIn} style={styles.body}>
@@ -602,9 +585,8 @@ const MpesaPaymentModalBody: React.FC<Omit<Props, 'visible'>> = ({
               )}
             </Animated.View>
           )}
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </View>
+      </SheetScrollBody>
+    </BottomSheet>
   );
 };
 
@@ -645,36 +627,6 @@ const WaitingDots: React.FC = () => (
 );
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15,23,42,0.55)',
-  },
-  sheetWrap: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  sheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingBottom: 36,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    elevation: 24,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-  },
   body: {
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,

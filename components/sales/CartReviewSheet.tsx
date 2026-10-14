@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { BottomSheet, SheetScrollBody, SheetFooter } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors } from '@/constants/Colors';
@@ -38,9 +38,7 @@ export const CartReviewSheet: React.FC<CartReviewSheetProps> = ({
     onClose={onClose}
     maxHeightPercent={80}
     footer={(
-      <SheetFooter>
-        <Button title="Done" onPress={onClose} size="lg" />
-      </SheetFooter>
+      <Button title="Done" onPress={onClose} size="lg" />
     )}
   >
     <View style={s.header}>

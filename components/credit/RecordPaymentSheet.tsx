@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TextInput } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { formatCurrency } from '@/utils/formatters';
@@ -109,6 +109,7 @@ export const RecordPaymentSheet: React.FC<RecordPaymentSheetProps> = ({
         </View>
       }
     >
+      <SheetScrollBody>
       <View style={styles.body}>
         <Text style={styles.heading}>Record payment</Text>
         <Text style={styles.customer} numberOfLines={1}>{customerName}</Text>
@@ -214,6 +215,7 @@ export const RecordPaymentSheet: React.FC<RecordPaymentSheetProps> = ({
           </Animated.View>
         )}
       </View>
+      </SheetScrollBody>
     </BottomSheet>
   );
 };

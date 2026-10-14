@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -8,6 +8,7 @@ import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
 import { Motion } from '@/constants/Motion';
 import { formatCurrency } from '@/utils/formatters';
+import { parseSaleNumber } from '@/utils/saleInput';
 import { applyBestPromotion } from '@/utils/promotions';
 import type { BundleItem, ProductPromotion, UnitOfMeasure } from '@/services/products';
 
@@ -28,9 +29,12 @@ interface CartItemProps {
   /** Employee's commission per unit for this line, if the shop shows it. */
   commissionPerUnit?: number;
   onRemove: () => void;
+  currency?: string;
+  onQuantityChange?: (quantity: number) => void;
+  disabled?: boolean;
 }
 
-export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionPerUnit, onRemove }) => {
+export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionPerUnit, onRemove, currency, onQuantityChange, disabled = false }) => {
   const price = unitPrice ?? item.sellingPrice;
   const { subtotal, discountAmount, appliedPromotionLabel } = applyBestPromotion(item.promotions, item.quantity, price);
   const isDecimalUnit = !!item.unitOfMeasure && item.unitOfMeasure !== 'unit';
@@ -44,28 +48,33 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionP
       layout={LinearTransition.duration(Motion.duration.slow)}
     >
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={styles.name} numberOfLines={2}>
           {item.name}
           {item.variantName ? ` (${item.variantName})` : ''}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {quantityLabel} · {formatCurrency(price)}
+          {quantityLabel} · {formatCurrency(price, currency)}
           {item.bundleComponentNames?.length ? ` · ${item.bundleComponentNames.join(', ')}` : ''}
         </Text>
         {discountAmount > 0 && (
           <Text style={styles.promo} numberOfLines={1}>
-            {appliedPromotionLabel} · saved {formatCurrency(discountAmount)}
+            {appliedPromotionLabel} · saved {formatCurrency(discountAmount, currency)}
           </Text>
         )}
         {!!commissionPerUnit && (
           <Text style={styles.commission} numberOfLines={1}>
-            You earn {formatCurrency(commissionPerUnit * item.quantity)}
+            You earn {formatCurrency(commissionPerUnit * item.quantity, currency)}
           </Text>
         )}
+        {!!onQuantityChange && <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
+          <Text style={styles.meta}>Qty{isDecimalUnit ? ` (${item.unitOfMeasure})` : ''}</Text>
+          <QuantityEditor quantity={item.quantity} wholeUnits={!isDecimalUnit} onChange={onQuantityChange} disabled={disabled} />
+        </View>}
       </View>
-      <Text style={styles.subtotal}>{formatCurrency(subtotal)}</Text>
+      <Text style={styles.subtotal}>{formatCurrency(subtotal, currency)}</Text>
       <AnimatedPressable
         onPress={onRemove}
+        disabled={disabled}
         style={styles.removeBtn}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         accessibilityLabel={`Remove ${item.name} from sale`}
@@ -75,6 +84,30 @@ export const CartItem: React.FC<CartItemProps> = ({ item, unitPrice, commissionP
       </AnimatedPressable>
     </Animated.View>
   );
+};
+
+const QuantityEditor = ({ quantity, wholeUnits, onChange, disabled }: {
+  quantity: number; wholeUnits: boolean; onChange: (quantity: number) => void; disabled: boolean;
+}) => {
+  const [value, setValue] = useState(String(quantity));
+  const commit = () => {
+    const parsed = parseSaleNumber(value, wholeUnits);
+    if (parsed == null) setValue(String(quantity));
+    else onChange(parsed);
+  };
+  return <TextInput
+    value={value}
+    onChangeText={(text) => {
+      setValue(text);
+      const parsed = parseSaleNumber(text, wholeUnits);
+      if (parsed != null) onChange(parsed);
+    }}
+    onBlur={commit}
+    keyboardType={wholeUnits ? 'number-pad' : 'decimal-pad'}
+    editable={!disabled}
+    accessibilityLabel="Quantity in this sale"
+    style={{ minWidth: 52, minHeight: 44, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, color: Colors.textPrimary, textAlign: 'center', paddingHorizontal: 6 }}
+  />;
 };
 
 const styles = StyleSheet.create({
@@ -100,5 +133,5 @@ const styles = StyleSheet.create({
   },
   // A quiet close, not a red bin: removing a mistyped line is routine, and
   // the loudest control on a till should be the one that completes the sale.
-  removeBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  removeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });
