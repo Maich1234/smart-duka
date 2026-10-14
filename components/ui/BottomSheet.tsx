@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Modal, View, Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Modal, View, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -26,6 +26,7 @@ interface BottomSheetProps {
    * Passing them here keeps them in place while the body scrolls under them.
    */
   footer?: React.ReactNode;
+  dismissible?: boolean;
 }
 
 /**
@@ -41,8 +42,16 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   maxHeightPercent = 90,
   footer,
+  dismissible = true,
 }) => {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const [availableHeight, setAvailableHeight] = useState(height);
+  const close = () => { if (dismissible) onClose(); };
+  const maxHeight = Math.max(0, Math.min(
+    height * Math.min(100, Math.max(1, maxHeightPercent)) / 100,
+    availableHeight - insets.top - Spacing.sm,
+  ));
   const dragY = useSharedValue(0);
 
   // The handle glyph has always visually promised a drag-to-dismiss gesture
@@ -71,6 +80,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   // Reanimated shared value — same false positive, same fix, as
   // VerificationModal's handleSheetLayout/closeWith.
   const dragGesture = Gesture.Pan()
+    .enabled(dismissible)
     .onUpdate((event) => {
       if (event.translationY > 0) {
         // eslint-disable-next-line react-hooks/immutability
@@ -90,29 +100,25 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   }));
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent accessibilityViewIsModal>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={close} statusBarTranslucent accessibilityViewIsModal>
       {/* RNGH pressables inside a RN Modal need their own gesture root on Android */}
       <GestureHandlerRootView style={styles.gestureRoot}>
-        {/* A plain View here (not KeyboardAvoidingView) so the sheet is
-            bottom-anchored on the very first frame — Modal centers its
-            content by default until a child claims full height, and
-            KeyboardAvoidingView doesn't get real layout/keyboard data until
-            its first keyboard event, so wrapping the whole overlay in it
-            used to show the sheet centered for a frame (fixed the instant a
-            field was focused and the keyboard fired). Keyboard avoidance now
-            only wraps the sheet itself, which needs it. */}
-        <View style={styles.overlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-          {/* Always 'padding', not the usual iOS-padding/Android-height split:
-              'height' shrinks whatever it wraps by the keyboard's height, which
-              only makes sense wrapping a full screen — wrapping just this sheet,
-              a short sheet's own height can be smaller than the keyboard's,
-              going negative and silently skipping the adjustment entirely. */}
-          <KeyboardAvoidingView behavior="padding">
+        <KeyboardAvoidingView behavior="padding" style={styles.gestureRoot}>
+          <View
+            style={styles.overlay}
+            onLayout={(event) => setAvailableHeight(event.nativeEvent.layout.height)}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={close}
+              accessibilityRole="button"
+              accessibilityLabel="Close sheet"
+              disabled={!dismissible}
+            />
             <Animated.View
               style={[
                 styles.sheet,
-                { maxHeight: `${maxHeightPercent}%`, paddingBottom: Spacing.xl + insets.bottom },
+                { maxHeight, paddingBottom: Spacing.xl + insets.bottom },
                 dragAnimStyle,
               ]}
             >
@@ -121,14 +127,11 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                   <View style={styles.handle} />
                 </View>
               </GestureDetector>
-              {/* flexShrink lets the body give up height to the footer rather
-                  than pushing it off the sheet. Only applied when there is a
-                  footer, so sheets without one keep their existing layout. */}
-              {footer ? <View style={styles.body}>{children}</View> : children}
+              {children}
               {!!footer && <View style={styles.footer}>{footer}</View>}
             </Animated.View>
-          </KeyboardAvoidingView>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </GestureHandlerRootView>
     </Modal>
   );
@@ -143,8 +146,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.overlay,
     justifyContent: 'flex-end',
   },
-  body: { flexShrink: 1 },
+  body: { flexShrink: 1, minHeight: 0 },
   footer: {
+    flexShrink: 0,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
@@ -190,6 +194,7 @@ export const SheetScrollBody: React.FC<{ children: React.ReactNode }> = ({ child
   <ScrollView
     style={styles.body}
     keyboardShouldPersistTaps="handled"
+    keyboardDismissMode="on-drag"
     showsVerticalScrollIndicator={false}
   >
     {children}

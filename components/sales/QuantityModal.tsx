@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAlert } from '@/context/AlertContext';
+import { parseSaleNumber } from '@/utils/saleInput';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
@@ -68,8 +69,8 @@ const QuantityModalBody: React.FC<Omit<QuantityModalProps, 'visible'>> = ({
   const available = Math.max(0, maxStock - inCart);
   // Android's decimal-pad emits the locale separator, so a comma has to mean
   // the same as a dot — otherwise "0,5" parses to 0 and reads as an error.
-  const qty = isDecimal ? parseFloat(quantity.replace(',', '.')) : parseInt(quantity, 10);
-  const unitPrice = priceEditable ? parseFloat(price.replace(',', '.')) : undefined;
+  const qty = parseSaleNumber(quantity, !isDecimal) ?? NaN;
+  const unitPrice = priceEditable ? parseSaleNumber(price) ?? NaN : undefined;
 
   // Live feedback under the field, rather than a toast the cashier only sees
   // after tapping Add: at a busy counter the correction should arrive while

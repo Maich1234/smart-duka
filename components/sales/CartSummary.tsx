@@ -8,6 +8,7 @@ import { Button } from '../ui/Button';
 import { Colors } from '@/constants/Colors';
 import { Typography } from '@/constants/Typography';
 import { Spacing } from '@/constants/Spacing';
+import { normalizeKenyanPhoneInput } from '@/utils/saleInput';
 import { formatCurrency } from '@/utils/formatters';
 import {
   CREDIT_METHOD_KEY,
@@ -128,8 +129,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   const mpesaReady = stkSelected && isValidKenyanPhone(customerPhone);
 
   const handleDigitChange = (digits: string) => {
-    const clean = digits.replace(/\D/g, '').slice(0, 9);
-    onCustomerPhoneChange?.(clean ? `+254${clean}` : '');
+    onCustomerPhoneChange?.(normalizeKenyanPhoneInput(digits));
   };
 
   const checkoutLabel = stkSelected
@@ -144,7 +144,8 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
       : 'checkmark-circle-outline';
   // STK needs a number to push to; credit needs a named customer before there
   // is anyone to owe the debt. Every other combination records and prints.
-  const checkoutDisabled = (stkSelected && !mpesaReady) || (isCredit && !creditCustomerName);
+  const missingReceipt = stkAvailable && mpesaMode === 'manual' && manualReceiptCode.trim().length < 6;
+  const checkoutDisabled = itemCount === 0 || methods.length === 0 || !methods.some((method) => method.key === paymentMethod) || (stkSelected && !mpesaReady) || missingReceipt || (isCredit && !creditCustomerName);
 
   return (
     <View style={styles.container}>
@@ -177,7 +178,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         accessibilityHint={onReview ? 'Shows the items in this sale' : undefined}
       >
         <Text style={styles.totalLabel}>
-          {itemCount} item{itemCount === 1 ? '' : 's'}
+          Total · {itemCount} item{itemCount === 1 ? '' : 's'}
         </Text>
         {!!onReview && (
           <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} style={styles.totalChevron} />
@@ -197,6 +198,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
             <AnimatedPressable
               key={method.key}
               onPress={() => onPaymentMethodChange(method.key)}
+              disabled={loading}
               style={[styles.method, selected && styles.methodSelected]}
               pressScale={0.985}
               // "button" + selected, never "radio": RNGH-backed pressables do
@@ -256,7 +258,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
                   value={digitsOnly(customerPhone)}
                   onChangeText={handleDigitChange}
                   keyboardType="number-pad"
-                  maxLength={9}
+                  maxLength={13}
                   placeholder="7XXXXXXXX"
                   placeholderTextColor={Colors.textTertiary}
                   returnKeyType="done"
@@ -333,7 +335,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         // Greyed says "not now" to anyone who can see it and nothing at all to
         // anyone who can't. This is the one control on the screen that is ever
         // withheld, so it should be able to say what it is waiting for.
-        accessibilityHint={checkoutDisabled ? "Enter the customer's phone number first" : undefined}
+        accessibilityHint={checkoutDisabled ? (isCredit ? 'Choose a customer first' : missingReceipt ? 'Enter the M-Pesa receipt code first' : 'Enter payment details first') : undefined}
         size="lg"
       />
     </View>

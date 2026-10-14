@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useAlert } from '@/context/AlertContext';
+import { parseSaleNumber } from '@/utils/saleInput';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BottomSheet, SheetScrollBody, SheetFooter } from '../ui/BottomSheet';
@@ -59,7 +60,7 @@ const VariantPickerModalBody: React.FC<Omit<VariantPickerModalProps, 'visible'>>
   const selected = variants.find((v) => v._id === selectedId);
   const available = selected ? remaining(selected) : 0;
   const inCart = selected ? inCartByVariant?.[selected._id] ?? 0 : 0;
-  const qty = parseInt(quantity, 10);
+  const qty = parseSaleNumber(quantity, true) ?? NaN;
 
   // Shown under the field as it's typed, not as a toast after tapping Add.
   // Only genuinely invalid input blocks Add — exceeding stock is allowed

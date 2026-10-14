@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { BottomSheet } from '@/components/ui/BottomSheet';
+import { BottomSheet, SheetScrollBody } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { Colors } from '@/constants/Colors';
@@ -142,6 +142,7 @@ export const CreditSummarySheet: React.FC<CreditSummarySheetProps> = ({
         </View>
       }
     >
+      <SheetScrollBody>
       <View style={styles.body}>
         <Text style={styles.heading}>Sell on credit</Text>
         <Text style={styles.customer} numberOfLines={1}>{customerName}</Text>
@@ -221,6 +222,7 @@ export const CreditSummarySheet: React.FC<CreditSummarySheetProps> = ({
           </>
         )}
       </View>
+      </SheetScrollBody>
     </BottomSheet>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler, ActivityIndicator } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useFocusEffect } from "expo-router/react-navigation";
 import { router, useIsFocused } from 'expo-router';
@@ -13,13 +13,12 @@ import { createSale, getMySales, voidSale, refundSale, type Sale, type SaleItem,
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { getTransactionStatus } from '@/services/mpesa';
-import { PosProductRow } from '@/components/sales/PosProductRow';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { ProductCard } from '@/components/inventory/ProductCard';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useSearch } from '@/hooks/useSearch';
 import { CartItem } from '@/components/sales/CartItem';
 import { CartSummary, isValidKenyanPhone } from '@/components/sales/CartSummary';
-import { PosCheckoutPanel } from '@/components/sales/PosCheckoutPanel';
-import { CartReviewSheet } from '@/components/sales/CartReviewSheet';
 import { QuantityModal } from '@/components/sales/QuantityModal';
 import { VariantPickerModal } from '@/components/sales/VariantPickerModal';
 import { SaleCard } from '@/components/sales/SaleCard';
@@ -164,6 +163,8 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const setSearch = (value: string) => {
     setSearchValue(value);
   };
+  const productListRef = React.useRef<FlatList<Product>>(null);
+  const [cartHeaderHeight, setCartHeaderHeight] = useState(0);
   const [salesPage, setSalesPage] = useState(1);
 
   // Leaving mid-sale silently loses the cart, so the hardware back gesture and
@@ -228,13 +229,13 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   // version counter. Never blocks the till — a failed sync just leaves the
   // previously cached catalogue in place, which is still the best source there
   // is when the shop is offline.
-  const { isFetched: syncSettled, refetch: resyncCatalogue } = useQuery({
+  const { data: syncedProductCount, refetch: resyncCatalogue } = useQuery({
     queryKey: ['productCacheSync', shopId],
     queryFn: async () => {
       const count = await syncProductCache(shopId);
       // New rows on disk — re-run the local searches reading from them.
       await queryClient.invalidateQueries({ queryKey: ['productCache', shopId] });
-      return count ?? 0;
+      return count;
     },
     enabled: cacheEnabled,
     staleTime: PRODUCT_CACHE_STALE_MS,
@@ -251,7 +252,13 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   // Fall back to the server until the first sync settles, so a fresh install
   // isn't staring at an empty till while the mirror fills.
-  const usingCache = cacheEnabled && syncSettled;
+  const { data: cachedCatalogue } = useQuery({
+    queryKey: ['productCache', shopId, 'catalogue-presence'],
+    queryFn: () => searchCachedProducts(shopId, ''),
+    enabled: cacheEnabled,
+  });
+  const usingCache = cacheEnabled && cachedProducts !== undefined &&
+    (syncedProductCount != null || (cachedCatalogue?.length ?? 0) > 0);
 
   const {
     data: productsData,
@@ -259,6 +266,8 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     fetchNextPage: fetchMoreProducts,
     hasNextPage: hasMoreProducts,
     isFetchingNextPage: loadingMoreProducts,
+    isPending: productsLoading,
+    isError: productsFailed,
   } = useInfiniteQuery({
     // The search term is the key, so typing restarts paging by itself and the
     // grid no longer blanks between keystrokes.
@@ -268,7 +277,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     // one stores the response itself — sharing a key makes whichever ran last
     // hand the other a shape it cannot read. Prefix invalidation on
     // ['<entity>'] still matches this.
-    queryKey: ['products', 'paged', searchQuery],
+    queryKey: ['products', 'paged', shopId, searchQuery],
     queryFn: ({ pageParam }) => getProducts({ search: searchQuery, page: pageParam, limit: 10 }),
     enabled: canRecordSale && !usingCache,
     initialPageParam: 1,
@@ -278,11 +287,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   // Manual pull state (not isLoading/isRefetching) so the spinner never
   // appears for query-key changes or background invalidation refetches.
-  // The checkout panel floats over the list, so the list has to be told how
-  // much of itself is covered. Measured rather than assumed: the panel's
-  // height moves with the item count, the payment method and the keyboard.
-  const [checkoutHeight, setCheckoutHeight] = useState(0);
-  const [reviewVisible, setReviewVisible] = useState(false);
 
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const onPullRefresh = async () => {
@@ -1092,7 +1096,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   return (
     <ShiftGate>
-    <View style={styles.container}>
+    <KeyboardAvoidingView behavior="padding" style={styles.container}>
       <ScreenHeader
         title="Record Sale"
         showBack={showBack}
@@ -1153,26 +1157,33 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         )}
       </View>
 
+      {cart.length > 0 && (
+        <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, gap: Spacing.md, marginBottom: Spacing.sm }}>
+          <AnimatedPressable onPress={() => productListRef.current?.scrollToOffset({ offset: 0, animated: true })} accessibilityRole="button" accessibilityLabel="Go to current sale" style={{ flex: 1, minHeight: 44, justifyContent: 'center' }}>
+            <Text style={{ color: Colors.primary, fontFamily: Typography.fontFamilySemiBold }}>Current sale ({cart.length}) · {formatCurrency(totalAmount, user?.shop?.currency)}</Text>
+          </AnimatedPressable>
+          <AnimatedPressable onPress={() => productListRef.current?.scrollToOffset({ offset: cartHeaderHeight, animated: true })} accessibilityRole="button" accessibilityLabel="Go to products" style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Text style={{ color: Colors.primary, fontFamily: Typography.fontFamilySemiBold }}>Products ↓</Text>
+          </AnimatedPressable>
+        </View>
+      )}
       <FlatList
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ref={productListRef}
         data={products}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <PosProductRow
+        renderItem={({ item, index }) => (
+          <ProductCard
             product={item}
-            currency={user?.shop?.currency}
+            showCostPrice={false}
+            showActions={false}
+            isLast={index === products.length - 1}
             onPress={() => addToCart(item)}
           />
         )}
-        contentContainerStyle={{
-          paddingHorizontal: Spacing.lg,
-          // The panel sits on the screen edge and covers the tab bar, so it
-          // replaces that clearance rather than adding to it. Its measured
-          // height survives unmounting, hence the cart check — reusing it
-          // once the sale is cleared would leave a dead gap under the list.
-          paddingBottom: (cart.length > 0 ? checkoutHeight : tabBarHeight) + Spacing.lg,
-          gap: Spacing.sm,
-        }}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
         // The catalogue arrives as the cashier scrolls. Never on the cached
         // path: a local search already returns every match at once.
         onEndReached={() => { if (canLoadMoreProducts && !loadingMoreProducts) fetchMoreProducts(); }}
@@ -1183,7 +1194,9 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         // search. This makes "no match" an explicit, distinct state from
         // "still typing" or "broken".
         ListEmptyComponent={
-          <EmptyState
+          !usingCache && productsLoading ? <ActivityIndicator color={Colors.primary} /> : productsFailed && !usingCache ? (
+            <EmptyState title="Could not load products" subtitle="Check your connection and try again. Your cart is still saved." actionLabel="Retry" onAction={() => refetchProducts()} />
+          ) : <EmptyState
             title={search.trim() ? 'No matching products' : 'No products yet'}
             subtitle={
               search.trim()
@@ -1203,6 +1216,61 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                 : undefined
             }
           />
+        }
+        ListHeaderComponent={
+          <View onLayout={(event) => setCartHeaderHeight(event.nativeEvent.layout.height)}>
+            {cart.length > 0 && (
+              <View style={styles.cartSection}>
+                <Text style={styles.sectionTitle}>Current Sale</Text>
+                {cart.map((item) => (
+                  <CartItem
+                    key={cartKey(item)}
+                    item={{
+                      ...item,
+                      quantity: item.cartQuantity,
+                      variantName: item.cartVariantName,
+                      bundleComponentNames: item.bundleItems?.map(
+                        (b) => products.find((p) => p._id === b.product)?.name || 'item'
+                      ),
+                    }}
+                    currency={user?.shop?.currency}
+                    onQuantityChange={(quantity) => updateItem(cartKey(item), { cartQuantity: quantity })}
+                    disabled={createSaleMutation.isPending}
+                    unitPrice={item.cartUnitPrice}
+                    commissionPerUnit={item.cartVariantCommission}
+                    onRemove={() => removeFromCart(cartKey(item))}
+                  />
+                ))}
+                <CartSummary
+                  total={totalAmount}
+                  totalSavings={totalSavings}
+                  itemCount={cart.length}
+                  totalCommission={totalCommission}
+                  creditCustomerName={creditCustomer?.name}
+                  onPickCreditCustomer={() => router.push((user?.role === 'staff' ? '/(staff)/pick-credit-customer' : '/(owner)/pick-credit-customer') as never)}
+                  methods={saleMethods}
+                  paymentMethod={paymentMethod}
+                  onPaymentMethodChange={(m) => {
+                    setPaymentMethod(m);
+                    // Leaving M-Pesa drops anything only M-Pesa collects.
+                    if (m !== MPESA_METHOD_KEY && m !== paymentMethod) {
+                      resetSaleFields();
+                    }
+                  }}
+                  onCheckout={handleCheckout}
+                  loading={createSaleMutation.isPending}
+                  mpesaEnabled={mpesaEnabled}
+                  customerPhone={customerPhone}
+                  onCustomerPhoneChange={setCustomerPhone}
+                  currency={user?.shop?.currency}
+                  mpesaMode={mpesaMode}
+                  onMpesaModeChange={setMpesaMode}
+                  manualReceiptCode={manualReceiptCode}
+                  onManualReceiptCodeChange={setManualReceiptCode}
+                />
+              </View>
+            )}
+          </View>
         }
         ListFooterComponent={
           <View>
@@ -1263,49 +1331,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         }
       />
 
-      {cart.length > 0 && (
-        <PosCheckoutPanel onHeightChange={setCheckoutHeight}>
-          <CartSummary
-            total={totalAmount}
-            totalSavings={totalSavings}
-            itemCount={cart.length}
-            totalCommission={totalCommission}
-            onReview={() => setReviewVisible(true)}
-            methods={saleMethods}
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={(m) => {
-              setPaymentMethod(m);
-              // Leaving M-Pesa drops anything only M-Pesa collects. Re-tapping
-              // the method that's already selected drops nothing — added
-              // alongside credit so choosing the same Credit button twice
-              // (or re-rendering while it's selected) never re-wipes a
-              // customer the cashier already picked.
-              if (m !== MPESA_METHOD_KEY && m !== paymentMethod) {
-                resetSaleFields();
-              }
-            }}
-            onCheckout={handleCheckout}
-            loading={createSaleMutation.isPending}
-            mpesaEnabled={mpesaEnabled}
-            customerPhone={customerPhone}
-            onCustomerPhoneChange={setCustomerPhone}
-            currency={user?.shop?.currency}
-            mpesaMode={mpesaMode}
-            onMpesaModeChange={setMpesaMode}
-            manualReceiptCode={manualReceiptCode}
-            onManualReceiptCodeChange={setManualReceiptCode}
-            creditCustomerName={creditCustomer?.name}
-            onPickCreditCustomer={() =>
-              // `as never`: these routes are freshly added and the dev server
-              // hasn't regenerated .expo/types/router.d.ts yet — same cast the
-              // codebase already uses elsewhere for this (see business/customers
-              // pushes), not a real type hole.
-              router.push((user?.role === 'staff' ? '/(staff)/pick-credit-customer' : '/(owner)/pick-credit-customer') as never)
-            }
-          />
-        </PosCheckoutPanel>
-      )}
-
       <CreditSummarySheet
         visible={creditSummaryVisible}
         onClose={() => setCreditSummaryVisible(false)}
@@ -1318,29 +1343,6 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         error={creditSummaryError}
       />
 
-      <CartReviewSheet
-        visible={reviewVisible}
-        onClose={() => setReviewVisible(false)}
-        itemCount={cart.length}
-        total={formatCurrency(totalAmount, user?.shop?.currency)}
-      >
-        {cart.map((item) => (
-          <CartItem
-            key={cartKey(item)}
-            item={{
-              ...item,
-              quantity: item.cartQuantity,
-              variantName: item.cartVariantName,
-              bundleComponentNames: item.bundleItems?.map(
-                (b) => products.find((p) => p._id === b.product)?.name || 'item'
-              ),
-            }}
-            unitPrice={item.cartUnitPrice}
-            commissionPerUnit={item.cartVariantCommission}
-            onRemove={() => removeFromCart(cartKey(item))}
-          />
-        ))}
-      </CartReviewSheet>
 
       <QuantityModal
         visible={quantityModalVisible}
@@ -1451,13 +1453,20 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
               }
         }
       />
-    </View>
+    </KeyboardAvoidingView>
     </ShiftGate>
   );
 }
 
 
 const styles = StyleSheet.create({
+  cartSection: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
   container: { flex: 1, backgroundColor: Colors.background },
   recoveryBanner: {
     flexDirection: 'row',

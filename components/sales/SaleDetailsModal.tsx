@@ -76,14 +76,15 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
   if (!sale) return null;
 
+  const busy = voiding || refunding || printing != null;
   const isVoided = sale.status === 'voided';
   const isRefunded = sale.status === 'refunded';
   const isRefundPending = sale.status === 'refund_pending';
   const isSettled = isVoided || isRefunded || isRefundPending;
 
   return (
-    <BottomSheet visible={visible} onClose={onClose}>
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <BottomSheet visible={visible} onClose={onClose} dismissible={!busy}>
+      <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Sale Details</Text>
 
         {isVoided && (
@@ -125,31 +126,11 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
 
         <ReceiptPreview sale={sale} shopName={shopName} shopPhone={shopPhone} currency={currency} thankYouNote={thankYouNote} logoUrl={logoUrl} motto={motto} />
 
-        <View style={styles.buttonRow}>
-          <Button title="Close" variant="outline" onPress={onClose} style={styles.flexBtn} />
-          <Button
-            title={printer ? 'Print' : 'Print Receipt'}
-            leftIcon={printer ? 'print' : undefined}
-            onPress={() => handlePrint('bluetooth')}
-            loading={printing === 'bluetooth'}
-            style={styles.flexBtn}
-          />
-        </View>
-
-        {printer && (
-          <Button
-            title="System printer / PDF"
-            variant="ghost"
-            onPress={() => handlePrint('system')}
-            loading={printing === 'system'}
-            style={styles.voidBtn}
-          />
-        )}
-
         {canRefund && !isSettled && onRefund && (
           <Button
             title={sale.paymentMethod === 'mpesa' ? 'Refund Customer (M-Pesa)' : 'Refund Customer'}
             variant="outline"
+            disabled={busy}
             loading={refunding}
             onPress={() => onRefund(sale)}
             style={styles.voidBtn}
@@ -160,12 +141,39 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
           <Button
             title="Void Sale"
             variant="danger"
+            disabled={busy}
             loading={voiding}
             onPress={() => onVoid(sale)}
             style={styles.voidBtn}
           />
         )}
       </ScrollView>
+      <View style={{ flexShrink: 0 }}>
+        <View style={styles.buttonRow}>
+          <Button title="Close" variant="outline" onPress={onClose} disabled={busy} style={styles.flexBtn} />
+          <Button
+            title={printer ? 'Print' : 'Print Receipt'}
+            leftIcon={printer ? 'print' : undefined}
+            onPress={() => handlePrint('bluetooth')}
+            disabled={busy}
+            loading={printing === 'bluetooth'}
+            style={styles.flexBtn}
+          />
+        </View>
+
+        {printer && (
+          <Button
+            title="System printer / PDF"
+            variant="ghost"
+            onPress={() => handlePrint('system')}
+            disabled={busy}
+            loading={printing === 'system'}
+            style={styles.voidBtn}
+          />
+        )}
+
+
+      </View>
     </BottomSheet>
   );
 };
