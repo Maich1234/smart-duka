@@ -1,4 +1,5 @@
 import React, { Component, ReactNode, ErrorInfo } from 'react';
+import * as Sentry from '@sentry/react-native';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
@@ -27,8 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (__DEV__) {
       console.error('[ErrorBoundary] Uncaught error:', error.message, info.componentStack);
     }
-    // TODO: send to Sentry / Firebase Crashlytics
-    // Crashlytics.recordError(error);
+    Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack } } });
   }
 
   reset = () => this.setState({ hasError: false, error: null });

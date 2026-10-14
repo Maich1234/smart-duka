@@ -1,6 +1,6 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 // Some packages (e.g. zustand) ship an ESM build with `import.meta.env`
 // under the "import" package-exports condition. Metro bundles for web as

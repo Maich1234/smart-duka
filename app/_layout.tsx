@@ -34,6 +34,14 @@ import { getPaymentStatus } from '@/services/paymentConfig';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Motion } from '@/constants/Motion';
 import { openWebPage } from '@/utils/openWebPage';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://458c55f6aaf147bc9022a19f9024c82a@o4512254863147008.ingest.de.sentry.io/4512254886936656',
+  enabled: !__DEV__,
+  sendDefaultPii: false,
+  enableLogs: false,
+});
 
 // Initialise SQLite queue DB synchronously before any React render
 initOfflineDb();
@@ -362,7 +370,7 @@ function NotificationListener() {
   return null;
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_600SemiBold,
@@ -443,4 +451,4 @@ export default function RootLayout() {
       </GestureHandlerRootView>
     </PersistQueryClientProvider>
   );
-}
+});

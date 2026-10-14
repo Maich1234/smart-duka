@@ -120,7 +120,22 @@
           "bluetoothAlwaysPermission": "DuQana connects to your Bluetooth receipt printer to print sale receipts."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "duqana",
+          "organization": "duqana",
+          "experimental_android": {
+            "enableAndroidGradlePlugin": true,
+            "includeProguardMapping": true,
+            "autoUploadProguardMapping": true,
+            "uploadNativeSymbols": true,
+            "autoUploadNativeSymbols": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
