@@ -12,6 +12,8 @@ import Animated, {
   withSequence,
   withTiming,
   Easing,
+  cancelAnimation,
+  useReducedMotion,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -35,7 +37,9 @@ type Phase = 'pick' | 'stk' | 'paid' | 'receipt';
 /** Gentle attention pulse on the "tap a product" hint until the first tap. */
 const PulsingHint: React.FC<{ text: string }> = ({ text }) => {
   const scale = useSharedValue(1);
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
+    if (reduceMotion) return;
     scale.value = withRepeat(
       withSequence(
         withTiming(1.04, { duration: 700, easing: Easing.inOut(Easing.ease) }),
@@ -44,7 +48,8 @@ const PulsingHint: React.FC<{ text: string }> = ({ text }) => {
       -1
     );
     // Reanimated shared values: stable identities, declared for honesty.
-  }, [scale]);
+    return () => cancelAnimation(scale);
+  }, [scale, reduceMotion]);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Animated.View style={[styles.hint, style]} entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>
@@ -68,6 +73,7 @@ const StatTile: React.FC<{ label: string; value: string; accent?: boolean }> = (
 export default function DemoSale() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isGuest = mode === 'guest';
+  const reduceMotion = useReducedMotion();
 
   const [phase, setPhase] = useState<Phase>('pick');
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -89,12 +95,15 @@ export default function DemoSale() {
   const displayStock = useCountUp(stock, 600);
 
   const addToCart = (id: string) => {
-    if (phase !== 'pick') return;
+    if (phase !== 'pick' || itemCount >= stock) return;
     haptics.selection();
     setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
   };
 
+  const charging = useRef(false);
   const charge = () => {
+    if (charging.current || itemCount === 0) return;
+    charging.current = true;
     haptics.medium();
     setPhase('stk');
     timersRef.current.push(
@@ -115,6 +124,7 @@ export default function DemoSale() {
     haptics.light();
     setCart({});
     setPhase('pick');
+    charging.current = false;
   };
 
   const soldItems = PRODUCTS.filter((p) => (cart[p.id] ?? 0) > 0);
@@ -127,7 +137,7 @@ export default function DemoSale() {
       <View style={styles.header}>
         <View style={styles.tryPill}>
           <Ionicons name="flash" size={12} color={Colors.accentDark} />
-          <Text style={styles.tryPillText}>{isGuest ? 'DEMO MODE' : 'TRY IT'}</Text>
+          <Text style={styles.tryPillText}>DEMO · NO REAL PAYMENTS</Text>
         </View>
         <AnimatedPressable
           onPress={() =>
@@ -146,10 +156,10 @@ export default function DemoSale() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.Text entering={FadeInDown.duration(450)} style={styles.title}>
-          Make your first sale.
+          Try a practice sale.
         </Animated.Text>
         <Animated.Text entering={FadeInDown.duration(450).delay(90)} style={styles.subtitle}>
-          No account needed. This shop is yours to play with.
+          1. Tap products. 2. Try a payment. 3. See your receipt. This uses sample data only.
         </Animated.Text>
 
         {/* Live stats strip */}
@@ -259,7 +269,7 @@ export default function DemoSale() {
           </View>
           <AnimatedPressable onPress={charge} style={styles.chargeBtn} accessibilityRole="button">
             <Ionicons name="phone-portrait-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.chargeBtnText}>Charge with M-PESA</Text>
+            <Text style={styles.chargeBtnText}>Try M-PESA payment</Text>
           </AnimatedPressable>
         </Animated.View>
       ) : null}
@@ -273,8 +283,8 @@ export default function DemoSale() {
                 <View style={styles.stkIconWrap}>
                   <Ionicons name="phone-portrait-outline" size={26} color={Colors.primary} />
                 </View>
-                <Text style={styles.stkTitle}>Asking the customer to pay…</Text>
-                <Text style={styles.stkSub}>M-PESA prompt sent to 0712 345 678</Text>
+                <Text style={styles.stkTitle}>Previewing the payment step…</Text>
+                <Text style={styles.stkSub}>Simulating a payment prompt. No money is collected.</Text>
                 <ActivityIndicator color={Colors.primary} style={styles.stkSpinner} />
               </>
             ) : (
@@ -282,7 +292,7 @@ export default function DemoSale() {
                 <Animated.View entering={ZoomIn.springify().damping(11)} style={[styles.stkIconWrap, styles.stkIconSuccess]}>
                   <Ionicons name="checkmark" size={30} color="#FFFFFF" />
                 </Animated.View>
-                <Text style={styles.stkTitle}>Payment received</Text>
+                <Text style={styles.stkTitle}>Demo payment complete</Text>
                 <Text style={[styles.stkSub, { color: Colors.success }]}>
                   +KSh {cartTotal.toLocaleString()} · M-PESA confirmed
                 </Text>
@@ -292,7 +302,7 @@ export default function DemoSale() {
         </Animated.View>
       ) : null}
 
-      {phase === 'receipt' ? <Confetti count={26} /> : null}
+      {phase === 'receipt' && !reduceMotion ? <Confetti count={26} /> : null}
     </SafeAreaView>
   );
 }

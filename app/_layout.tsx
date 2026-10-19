@@ -60,7 +60,7 @@ async function migrateAsyncStorageQueue() {
   }
 }
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 SplashScreen.setOptions({ duration: 300, fade: true });
 
 export const queryClient = new QueryClient({
@@ -363,20 +363,19 @@ function NotificationListener() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_600SemiBold,
     Inter_700Bold,
     Gegola: require('@/assets/fonts/Gegola.otf'),
   });
 
-  const isAuthLoading = useAuthStore((s: AuthState) => s.isLoading);
-
   useEffect(() => {
-    if (fontsLoaded && !isAuthLoading) {
-      requestAnimationFrame(() => SplashScreen.hideAsync());
+    if (fontsLoaded || fontError) {
+      const frame = requestAnimationFrame(() => { void SplashScreen.hideAsync().catch(() => {}); });
+      return () => cancelAnimationFrame(frame);
     }
-  }, [fontsLoaded, isAuthLoading]);
+  }, [fontsLoaded, fontError]);
 
   useEffect(() => {
     const unsubscribe = onTokenRefresh();
@@ -387,7 +386,7 @@ export default function RootLayout() {
     migrateAsyncStorageQueue();
   }, []);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <PersistQueryClientProvider
@@ -421,8 +420,9 @@ export default function RootLayout() {
               <AuthProvider>
                 <ErrorBoundary>
                   <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="splash" />
-                    <Stack.Screen name="(onboarding)" />
+                    <Stack.Screen name="index" options={{ animation: 'none', contentStyle: { backgroundColor: '#004B39' } }} />
+                    <Stack.Screen name="splash" options={{ animation: 'none' }} />
+                    <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
                     <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(owner)" />
                     <Stack.Screen name="(staff)" />

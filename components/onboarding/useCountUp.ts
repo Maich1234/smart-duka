@@ -1,3 +1,4 @@
+import { useReducedMotion } from 'react-native-reanimated';
 import { useEffect, useRef, useState } from 'react';
 
 /**
@@ -6,11 +7,13 @@ import { useEffect, useRef, useState } from 'react';
  * is text (crosses to JS every frame anyway) and this stays portable to web.
  */
 export function useCountUp(target: number, duration = 700): number {
+  const reduceMotion = useReducedMotion();
   const [display, setDisplay] = useState(target);
   const fromRef = useRef(target);
   const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (reduceMotion) return;
     const from = fromRef.current;
     if (from === target) return;
     const start = Date.now();
@@ -32,7 +35,7 @@ export function useCountUp(target: number, duration = 700): number {
       if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
       fromRef.current = target;
     };
-  }, [target, duration]);
+  }, [target, duration, reduceMotion]);
 
-  return display;
+  return reduceMotion ? target : display;
 }
