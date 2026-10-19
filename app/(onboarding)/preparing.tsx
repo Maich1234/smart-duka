@@ -1,243 +1,53 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { ProgressRing } from '@/components/onboarding/ProgressRing';
-import { Scene, SceneGradient } from '@/components/onboarding/theme';
 import { businessLabel, productRangeLabel } from '@/components/onboarding/content';
 import { useOnboardingStore } from '@/store/onboardingStore';
-import { haptics } from '@/utils/haptics';
+import { BRAND } from '@/components/brand/DukanaMark';
 import { Typography } from '@/constants/Typography';
-import { Spacing } from '@/constants/Spacing';
-
-const ITEM_INTERVAL_MS = 620;
 
 export default function Preparing() {
-  const answers = useOnboardingStore((s) => s.answers);
-  const [revealed, setRevealed] = useState(0);
-  const [done, setDone] = useState(false);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  // Echo the quiz answers back as things DuQana has "prepared" — the
-  // moment the product proves it listened.
-  const items = useMemo(() => {
-    const list: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-      { icon: 'grid-outline', label: `${businessLabel(answers.businessType)} dashboard prepared` },
-      {
-        icon: 'cube-outline',
-        label: `Inventory sized for ${productRangeLabel(answers.productRange).toLowerCase()} products`,
-      },
-    ];
-    if (answers.paymentMethods.includes('mpesa')) {
-      list.push({ icon: 'phone-portrait-outline', label: 'M-PESA payments enabled' });
-    } else {
-      list.push({ icon: 'cash-outline', label: 'Payment tracking configured' });
-    }
-    if (answers.struggles.includes('employees')) {
-      list.push({ icon: 'people-outline', label: 'Staff roles & permissions ready' });
-    }
-    if (answers.struggles.includes('stock-loss') || answers.struggles.includes('inventory')) {
-      list.push({ icon: 'notifications-outline', label: 'Low-stock alerts switched on' });
-    }
-    if (answers.struggles.includes('debts')) {
-      list.push({ icon: 'book-outline', label: 'Customer debt tracking added' });
-    }
-    list.push({ icon: 'bar-chart-outline', label: 'Reports customized for you' });
-    return list.slice(0, 5);
-  }, [answers]);
-
-  useEffect(() => {
-    items.forEach((_, i) => {
-      timersRef.current.push(
-        setTimeout(() => {
-          haptics.light();
-          setRevealed(i + 1);
-        }, 500 + i * ITEM_INTERVAL_MS)
-      );
-    });
-    timersRef.current.push(
-      setTimeout(() => {
-        haptics.success();
-        setDone(true);
-      }, 500 + items.length * ITEM_INTERVAL_MS + 500)
-    );
-    // Captured now: by the time cleanup runs, timersRef.current may point at
-    // a different array, and we must clear the timers *this* run created.
-    const timers = timersRef.current;
-    return () => timers.forEach(clearTimeout);
-  }, [items]);
-
-  const progress = done ? 1 : revealed / (items.length + 1);
-
-  return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <LinearGradient
-        colors={[...SceneGradient]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <SafeAreaView style={styles.safe}>
-        <Animated.Text entering={FadeInDown.duration(500)} style={styles.kicker}>
-          {done ? 'ALL SET' : 'PERFECT'}
-        </Animated.Text>
-        <Animated.Text entering={FadeInDown.duration(500).delay(120)} style={styles.title}>
-          {done
-            ? 'Your DuQana is ready to build.'
-            : `We're preparing DuQana for your ${businessLabel(answers.businessType).toLowerCase()}.`}
-        </Animated.Text>
-
-        <View style={styles.ringWrap}>
-          <ProgressRing
-            progress={progress}
-            size={132}
-            strokeWidth={7}
-            color={Scene.glow}
-            trackColor="rgba(94,234,212,0.14)"
-            duration={ITEM_INTERVAL_MS}
-          >
-            {done ? (
-              <Animated.View entering={ZoomIn.springify().damping(12)}>
-                <Ionicons name="checkmark" size={44} color={Scene.glowSoft} />
-              </Animated.View>
-            ) : (
-              <Text style={styles.ringPct}>{Math.round(progress * 100)}%</Text>
-            )}
-          </ProgressRing>
-        </View>
-
-        <View style={styles.list}>
-          {items.slice(0, revealed).map((item, i) => (
-            <Animated.View key={item.label} entering={FadeInUp.duration(380).springify().damping(16)} style={styles.item}>
-              <View style={styles.itemCheck}>
-                <Ionicons name="checkmark" size={12} color={Scene.bgFrom} />
-              </View>
-              <Ionicons name={item.icon} size={16} color={Scene.textDim} />
-              <Text style={styles.itemText}>{item.label}</Text>
-            </Animated.View>
-          ))}
-        </View>
-
-        <View style={styles.footer}>
-          {done ? (
-            <Animated.View entering={FadeInUp.duration(450).springify().damping(16)}>
-              <AnimatedPressable
-                onPress={() => {
-                  haptics.medium();
-                  router.push('/(onboarding)/setup');
-                }}
-                style={styles.ctaWrap}
-                accessibilityRole="button"
-                accessibilityLabel="Build my shop profile"
-              >
-                <LinearGradient
-                  colors={['#14B8A6', '#0F766E']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.cta}
-                >
-                  <Text style={styles.ctaText}>Build My Shop Profile</Text>
-                  <Ionicons name="arrow-forward" size={19} color="#FFFFFF" />
-                </LinearGradient>
-              </AnimatedPressable>
-            </Animated.View>
-          ) : null}
-          <Text style={styles.eta}>
-            <Ionicons name="time-outline" size={12} color={Scene.textFaint} /> Ready in under 2
-            minutes
-          </Text>
-        </View>
-      </SafeAreaView>
+  const answers = useOnboardingStore(s => s.answers);
+  const items = [
+    { icon: 'storefront-outline' as const, title: 'Your business', detail: businessLabel(answers.businessType) },
+    { icon: 'cube-outline' as const, title: 'Your product range', detail: `${productRangeLabel(answers.productRange)} products` },
+    { icon: 'wallet-outline' as const, title: 'Your payments', detail: answers.paymentMethods.includes('mpesa') ? 'Cash and M-PESA tracking. Connect M-PESA after setup to send payment prompts.' : 'Record the payments you receive at the counter.' },
+    { icon: 'people-outline' as const, title: 'Your team', detail: 'Invite staff and choose their permissions after creating your shop.' },
+  ];
+  return <SafeAreaView style={styles.safe}>
+    <StatusBar style="light" />
+    <ScrollView contentContainerStyle={styles.content}>
+      <Text style={styles.kicker}>YOUR SHOP PROFILE</Text>
+      <Text accessibilityRole="header" style={styles.title}>A good place to start.</Text>
+      <Text style={styles.body}>Here’s what you’ve told us. Next, add your shop details and create your account.</Text>
+      <View style={styles.list}>{items.map(item => <View key={item.title} style={styles.item}>
+        <Ionicons name={item.icon} size={22} color="#F2D393" />
+        <View style={styles.itemBody}><Text style={styles.itemTitle}>{item.title}</Text><Text style={styles.body}>{item.detail}</Text></View>
+      </View>)}</View>
+      <Text style={styles.body}>Your shop will be created when you finish registration. You can adjust its settings later.</Text>
+    </ScrollView>
+    <View style={styles.footer}>
+      <Pressable onPress={() => router.push('/(onboarding)/setup')} style={styles.primary} accessibilityRole="button"><Text style={styles.primaryText}>Continue to shop details</Text><Ionicons name="arrow-forward" size={20} color={BRAND.green} /></Pressable>
+      <Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button"><Text style={styles.backText}>Review my answers</Text></Pressable>
     </View>
-  );
+  </SafeAreaView>;
 }
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Scene.bgFrom },
-  safe: { flex: 1, paddingHorizontal: Spacing.lg },
-  kicker: {
-    color: Scene.glowSoft,
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamilySemiBold,
-    letterSpacing: 3,
-    marginTop: Spacing.xl,
-  },
-  title: {
-    color: Scene.text,
-    fontSize: Typography.size.h1,
-    lineHeight: Typography.lineHeight.h1,
-    fontFamily: Typography.fontFamilyBold,
-    letterSpacing: -0.5,
-    marginTop: Spacing.sm,
-    maxWidth: 330,
-  },
-  ringWrap: { alignItems: 'center', marginVertical: Spacing.xl },
-  ringPct: {
-    color: Scene.text,
-    fontSize: Typography.size.h2,
-    fontFamily: Typography.fontFamilyBold,
-    fontVariant: ['tabular-nums'],
-  },
-  list: { gap: 10, flex: 1 },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: Scene.cardBg,
-    borderWidth: 1,
-    borderColor: Scene.cardBorderSoft,
-    borderRadius: 14,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 11,
-  },
-  itemCheck: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: Scene.glow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemText: {
-    flex: 1,
-    color: Scene.text,
-    fontSize: Typography.size.small,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
-  footer: { paddingBottom: Spacing.lg },
-  ctaWrap: {
-    borderRadius: 18,
-    shadowColor: Scene.glow,
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
-  },
-  cta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 18,
-    paddingVertical: 17,
-  },
-  ctaText: {
-    color: '#FFFFFF',
-    fontSize: Typography.size.h3,
-    fontFamily: Typography.fontFamilySemiBold,
-  },
-  eta: {
-    color: Scene.textFaint,
-    fontSize: Typography.size.caption,
-    fontFamily: Typography.fontFamily,
-    textAlign: 'center',
-    marginTop: Spacing.md,
-  },
+  safe: { flex: 1, backgroundColor: BRAND.green },
+  content: { padding: 24, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  kicker: { color: '#F2D393', fontSize: 11, letterSpacing: 2, fontFamily: Typography.fontFamilySemiBold, marginTop: 20 },
+  title: { color: '#FFFFFF', fontFamily: Typography.fontFamilyBold, fontSize: 32, lineHeight: 40, marginTop: 16 },
+  body: { color: '#D7EAE2', fontFamily: Typography.fontFamily, fontSize: 14, lineHeight: 22, marginTop: 8 },
+  list: { gap: 12, marginVertical: 28 },
+  item: { padding: 16, borderWidth: 1, borderColor: '#397562', borderRadius: 16, flexDirection: 'row', gap: 14 },
+  itemBody: { flex: 1 },
+  itemTitle: { color: '#FFFFFF', fontFamily: Typography.fontFamilySemiBold, fontSize: 15 },
+  footer: { paddingHorizontal: 24, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  primary: { backgroundColor: '#F2D393', borderRadius: 16, minHeight: 56, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryText: { color: BRAND.green, fontFamily: Typography.fontFamilySemiBold, fontSize: 15, flexShrink: 1 },
+  back: { minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  backText: { color: '#D7EAE2', fontFamily: Typography.fontFamily, fontSize: 14 },
 });
