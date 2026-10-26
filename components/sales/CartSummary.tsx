@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '../ui/AnimatedPressable';
@@ -11,6 +11,7 @@ import { Spacing } from '@/constants/Spacing';
 import { normalizeKenyanPhoneInput } from '@/utils/saleInput';
 import { formatCurrency } from '@/utils/formatters';
 import {
+  CASH_METHOD_KEY,
   CREDIT_METHOD_KEY,
   MPESA_METHOD_KEY,
   methodIcon,
@@ -119,6 +120,9 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   creditCustomerName = null,
   onPickCreditCustomer,
 }) => {
+  const [cashReceived, setCashReceived] = useState('');
+  const cash = Number(cashReceived);
+  const cashError = paymentMethod === CASH_METHOD_KEY && cashReceived.trim() !== '' && (!Number.isFinite(cash) || cash < total);
   const isMpesa = paymentMethod === MPESA_METHOD_KEY;
   const isCredit = paymentMethod === CREDIT_METHOD_KEY;
   // STK Push is only on the table with Daraja credentials saved. Without them
@@ -136,7 +140,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
     ? 'Send Payment Request'
     : isCredit
       ? 'Review Credit Sale'
-      : 'Complete Sale';
+      : `Complete sale · ${formatCurrency(total, currency)}`;
   const checkoutIcon = stkSelected
     ? 'phone-portrait-outline'
     : isCredit
@@ -145,7 +149,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   // STK needs a number to push to; credit needs a named customer before there
   // is anyone to owe the debt. Every other combination records and prints.
   const missingReceipt = stkAvailable && mpesaMode === 'manual' && manualReceiptCode.trim().length < 6;
-  const checkoutDisabled = itemCount === 0 || methods.length === 0 || !methods.some((method) => method.key === paymentMethod) || (stkSelected && !mpesaReady) || missingReceipt || (isCredit && !creditCustomerName);
+  const checkoutDisabled = loading || cashError || itemCount === 0 || methods.length === 0 || !methods.some((method) => method.key === paymentMethod) || (stkSelected && !mpesaReady) || missingReceipt || (isCredit && !creditCustomerName);
 
   return (
     <View style={styles.container}>
@@ -210,7 +214,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
               <Ionicons
                 name={selected ? 'checkmark-circle' : (methodIcon(method) as never)}
                 size={18}
-                color={selected ? Colors.white : Colors.textSecondary}
+                color={selected ? Colors.primary : Colors.textSecondary}
               />
               <Text
                 style={[styles.methodLabel, selected && styles.methodLabelSelected]}
@@ -230,6 +234,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
             <Button
               title="STK Push"
               variant={mpesaMode === 'stk' ? 'primary' : 'ghost'}
+              disabled={loading}
               onPress={() => onMpesaModeChange?.('stk')}
               size="sm"
               style={styles.subModeBtn}
@@ -238,6 +243,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
             <Button
               title="Already Paid"
               variant={mpesaMode === 'manual' ? 'primary' : 'ghost'}
+              disabled={loading}
               onPress={() => onMpesaModeChange?.('manual')}
               size="sm"
               style={styles.subModeBtn}
@@ -324,6 +330,12 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         </Animated.View>
       )}
 
+      {paymentMethod === CASH_METHOD_KEY && <View>
+        <Text style={styles.phoneLabel}>Cash received (optional)</Text>
+        <TextInput accessibilityLabel="Cash received" keyboardType="decimal-pad" value={cashReceived} onChangeText={setCashReceived} editable={!loading} placeholder="Leave blank for exact cash" placeholderTextColor={Colors.textTertiary} style={styles.receiptInput} />
+        {cashError ? <Text accessibilityRole="alert" style={{ color: Colors.danger }}>Enter an amount at least equal to the total.</Text> : cashReceived.trim() !== '' && <Text accessibilityLiveRegion="polite" style={{ color: Colors.primary, fontFamily: Typography.fontFamilySemiBold }}>Change: {formatCurrency(cash - total, currency)}</Text>}
+      </View>}
+      {methods.length === 0 && <Text accessibilityRole="alert" style={{ color: Colors.danger }}>No payment methods available. Ask the shop owner to enable one.</Text>}
       {/* size lg, full width, and the only filled teal below the payment
           row — the end of every visit to this screen. */}
       <Button
@@ -335,9 +347,10 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         // Greyed says "not now" to anyone who can see it and nothing at all to
         // anyone who can't. This is the one control on the screen that is ever
         // withheld, so it should be able to say what it is waiting for.
-        accessibilityHint={checkoutDisabled ? (isCredit ? 'Choose a customer first' : missingReceipt ? 'Enter the M-Pesa receipt code first' : 'Enter payment details first') : undefined}
+        accessibilityHint={checkoutDisabled ? (cashError ? 'Enter enough cash to cover the total' : isCredit ? 'Choose a customer first' : missingReceipt ? 'Enter the M-Pesa receipt code first' : 'Enter payment details first') : undefined}
         size="lg"
       />
+      <Text style={{ color: Colors.textSecondary, textAlign: 'center', fontSize: 12 }}>{loading ? 'Saving sale. Please wait…' : 'Receipt available after saving'}</Text>
     </View>
   );
 };
@@ -402,7 +415,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   methodSelected: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primarySubtle,
     borderColor: Colors.primary,
   },
   methodLabel: {
@@ -410,7 +423,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textSecondary,
   },
-  methodLabelSelected: { color: Colors.white },
+  methodLabelSelected: { color: Colors.primary },
 
   // Sub-mode selector
   subModeRow: {

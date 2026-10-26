@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler, ActivityIndicator, ScrollView } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useFocusEffect } from "expo-router/react-navigation";
 import { router, useIsFocused } from 'expo-router';
@@ -8,13 +8,15 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { getProducts, type Product, type ProductVariant } from '@/services/products';
+import { getProducts, getProductCategories, type Product, type ProductVariant } from '@/services/products';
 import { createSale, getMySales, voidSale, refundSale, type Sale, type SaleItem, type CreateSaleData } from '@/services/sales';
 import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { getTransactionStatus } from '@/services/mpesa';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { ProductCard } from '@/components/inventory/ProductCard';
+import { PosProductRow } from '@/components/sales/PosProductRow';
+import { BottomSheet, SheetScrollBody } from '@/components/ui/BottomSheet';
+import { Button } from '@/components/ui/Button';
 import { ContextualSearchBar } from '@/components/ui/ContextualSearchBar';
 import { useSearch } from '@/hooks/useSearch';
 import { CartItem } from '@/components/sales/CartItem';
@@ -164,7 +166,9 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     setSearchValue(value);
   };
   const productListRef = React.useRef<FlatList<Product>>(null);
-  const [cartHeaderHeight, setCartHeaderHeight] = useState(0);
+  const [reviewVisible, setReviewVisible] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [category, setCategory] = useState<string | null>(null);
   const [salesPage, setSalesPage] = useState(1);
 
   // Leaving mid-sale silently loses the cart, so the hardware back gesture and
@@ -277,8 +281,8 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     // one stores the response itself — sharing a key makes whichever ran last
     // hand the other a shape it cannot read. Prefix invalidation on
     // ['<entity>'] still matches this.
-    queryKey: ['products', 'paged', shopId, searchQuery],
-    queryFn: ({ pageParam }) => getProducts({ search: searchQuery, page: pageParam, limit: 10 }),
+    queryKey: ['products', 'paged', shopId, searchQuery, category],
+    queryFn: ({ pageParam }) => getProducts({ search: searchQuery, category: category ?? undefined, page: pageParam, limit: 10 }),
     enabled: canRecordSale && !usingCache,
     initialPageParam: 1,
     getNextPageParam: (last) =>
@@ -301,7 +305,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     }
   };
 
-  const { data: mySalesData } = useQuery({
+  const { data: mySalesData, isPending: historyLoading, isError: historyFailed, refetch: retryHistory } = useQuery({
     queryKey: ['mySales', salesPage],
     queryFn: () => getMySales({ page: salesPage, limit: 10 }),
     enabled: canViewSales,
@@ -459,12 +463,14 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       return { data: optimisticSale, local: true };
     },
     onSuccess: ({ data, local }) => {
+      setReviewVisible(false);
       clearCart();
       setManualReceiptCode('');
       setMpesaMode('stk');
       setCreditCustomer(null);
       setCompletedSale(data);
       setReceiptVisible(true);
+      toast({ type: 'success', message: local ? 'Sale saved on this phone. Awaiting sync.' : 'Sale saved successfully.' });
       if (local) {
         queryClient.invalidateQueries({ queryKey: ['productCache', shopId] });
       } else {
@@ -630,6 +636,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     [productsData],
   );
   const products = usingCache ? cachedProducts ?? [] : serverProducts;
+  const { data: categoryData } = useQuery({
+    queryKey: ['productCategories', shopId], queryFn: getProductCategories, enabled: canRecordSale,
+  });
+  // Filters are derived from the shop catalogue, never invented categories.
+  const categories = Array.from(new Set([...(categoryData?.data ?? []), ...(cachedCatalogue ?? products).map(p => p.category).filter(Boolean)])).sort();
+  const visibleProducts = usingCache && category ? products.filter(p => p.category === category) : products;
   const mySales = mySalesData?.data || [];
   // Sales this device has made but the server hasn't confirmed yet, newest
   // first — shown ahead of the server page so a sale appears the instant
@@ -642,6 +654,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   const salesTotalPages = mySalesData?.pagination?.pages ?? 1;
 
   const addToCart = (product: Product) => {
+    if (createSaleMutation.isPending) return;
+    if (product.productType === 'standard') {
+      addOrIncrementCartItem({ cart: useCartStore.getState().cart, product, quantity: 1, addItem, updateItem });
+      toast({ type: 'success', message: `${product.name} added to sale` });
+      return;
+    }
     if (product.productType === 'configurable') {
       if (!product.variants?.length) {
         toast({ type: 'warning', message: `${product.name} has no variants configured yet` });
@@ -790,6 +808,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         toast({ type: 'error', message: 'Enter a valid Kenyan number (e.g. +254712345678).' });
         return;
       }
+      setReviewVisible(false);
       setMpesaModalVisible(true);
       return;
     }
@@ -837,6 +856,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
   const openCreditSummary = async () => {
     if (!creditCustomer) return;
+    setReviewVisible(false);
     setCreditSummaryVisible(true);
     setCreditAccount(null);
     setCreditSummaryError(null);
@@ -1034,14 +1054,14 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           showsVerticalScrollIndicator={false}
           data={mySales}
           keyExtractor={(item) => item._id}
-          renderItem={({ item, index }) => (
+          renderItem={({ item }) => (
             <SaleCard
               sale={item}
               showStaff={false}
               onPress={() => { setSelectedSale(item); setDetailsModalVisible(true); }}
             />
           )}
-          contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: tabBarHeight + Spacing.lg }}
+          contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg }}
           ListEmptyComponent={<EmptyState title="No sales yet" />}
           ListFooterComponent={
             salesTotalPages > 1 ? (
@@ -1098,7 +1118,8 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     <ShiftGate>
     <KeyboardAvoidingView behavior="padding" style={styles.container}>
       <ScreenHeader
-        title="Record Sale"
+        title="New sale"
+        right={canViewSales ? <AnimatedPressable onPress={() => setHistoryVisible(true)} accessibilityRole="button" accessibilityLabel="Sales history" style={styles.historyAction}><Ionicons name="time-outline" size={22} color={Colors.primary} /><Text style={{ color: Colors.primary }}>History</Text></AnimatedPressable> : undefined}
         showBack={showBack}
         onBack={confirmLeave}
         bordered={false}
@@ -1116,6 +1137,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             onPress={() => {
               setResumePayment(pendingBanner);
               setPendingBanner(null);
+              setReviewVisible(false);
               setMpesaModalVisible(true);
             }}
             style={styles.recoveryBannerBtn}
@@ -1142,7 +1164,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           recentSearches={productRecentSearches}
           onSelectRecent={selectProductRecent}
           onClearRecent={clearProductRecentSearches}
-          placeholder="Search products…"
+          placeholder="Search name or barcode"
           style={styles.searchBar}
         />
         {barcodeScanningEnabled && (
@@ -1152,38 +1174,34 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             accessibilityRole="button"
             accessibilityLabel="Scan barcode"
           >
-            <Ionicons name="barcode-outline" size={22} color={Colors.primary} />
+            <Ionicons name="barcode-outline" size={22} color={Colors.primary} /><Text style={{ color: Colors.primary, fontSize: 12 }}>Scan</Text>
           </AnimatedPressable>
         )}
       </View>
 
-      {cart.length > 0 && (
-        <View style={{ flexDirection: 'row', paddingHorizontal: Spacing.lg, gap: Spacing.md, marginBottom: Spacing.sm }}>
-          <AnimatedPressable onPress={() => productListRef.current?.scrollToOffset({ offset: 0, animated: true })} accessibilityRole="button" accessibilityLabel="Go to current sale" style={{ flex: 1, minHeight: 44, justifyContent: 'center' }}>
-            <Text style={{ color: Colors.primary, fontFamily: Typography.fontFamilySemiBold }}>Current sale ({cart.length}) · {formatCurrency(totalAmount, user?.shop?.currency)}</Text>
-          </AnimatedPressable>
-          <AnimatedPressable onPress={() => productListRef.current?.scrollToOffset({ offset: cartHeaderHeight, animated: true })} accessibilityRole="button" accessibilityLabel="Go to products" style={{ minHeight: 44, justifyContent: 'center' }}>
-            <Text style={{ color: Colors.primary, fontFamily: Typography.fontFamilySemiBold }}>Products ↓</Text>
-          </AnimatedPressable>
-        </View>
-      )}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: 8, paddingBottom: 12 }}>
+        {[null, ...categories].map(c => <AnimatedPressable key={c ?? 'all'} accessibilityRole="button" accessibilityState={{ selected: category === c }} onPress={() => setCategory(c)} style={[styles.category, category === c && styles.categorySelected]}><Text style={{ color: category === c ? Colors.primary : Colors.textSecondary }}>{c ?? 'All'}</Text></AnimatedPressable>)}
+      </ScrollView>
       <FlatList
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         ref={productListRef}
-        data={products}
+        data={visibleProducts}
         keyExtractor={(item) => item._id}
-        renderItem={({ item, index }) => (
-          <ProductCard
-            product={item}
-            showCostPrice={false}
-            showActions={false}
-            isLast={index === products.length - 1}
-            onPress={() => addToCart(item)}
-          />
+        renderItem={({ item }) => (
+          <PosProductRow product={item} currency={user?.shop?.currency}
+            quantity={cart.filter(line => line._id === item._id).reduce((sum, line) => sum + line.cartQuantity, 0)}
+            disabled={createSaleMutation.isPending}
+            onDecrement={item.productType === 'standard' ? () => {
+              const line = useCartStore.getState().cart.find(entry => entry._id === item._id);
+              if (!line) return;
+              if (line.cartQuantity <= 1) removeItem(cartKey(line));
+              else updateItem(cartKey(line), { cartQuantity: line.cartQuantity - 1 });
+            } : undefined}
+            onPress={() => addToCart(item)} />
         )}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}
+        contentContainerStyle={{ paddingBottom: Spacing.lg }}
         // The catalogue arrives as the cashier scrolls. Never on the cached
         // path: a local search already returns every match at once.
         onEndReached={() => { if (canLoadMoreProducts && !loadingMoreProducts) fetchMoreProducts(); }}
@@ -1197,11 +1215,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           !usingCache && productsLoading ? <ActivityIndicator color={Colors.primary} /> : productsFailed && !usingCache ? (
             <EmptyState title="Could not load products" subtitle="Check your connection and try again. Your cart is still saved." actionLabel="Retry" onAction={() => refetchProducts()} />
           ) : <EmptyState
-            title={search.trim() ? 'No matching products' : 'No products yet'}
+            title={search.trim() || category ? 'No matching products' : 'No products yet'}
             subtitle={
               search.trim()
                 ? `Nothing matches "${search.trim()}" by name, SKU, barcode, or category.`
-                : 'Add your first product to start selling.'
+                : category ? 'No products in this category. Choose All to browse the catalogue.' : 'Add your first product to start selling.'
             }
             actionLabel={canCreateProduct ? 'Add Product' : undefined}
             onAction={
@@ -1217,11 +1235,19 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             }
           />
         }
-        ListHeaderComponent={
-          <View onLayout={(event) => setCartHeaderHeight(event.nativeEvent.layout.height)}>
-            {cart.length > 0 && (
-              <View style={styles.cartSection}>
-                <Text style={styles.sectionTitle}>Current Sale</Text>
+        ListHeaderComponent={<Text style={[styles.sectionTitle, { paddingHorizontal: Spacing.lg }]}>Products</Text>}
+
+        ListFooterComponent={loadingMoreProducts ? <ActivityIndicator color={Colors.primary} /> : null}
+      />
+
+      <View style={[styles.basketDock, { marginBottom: tabBarHeight }]}>
+        <View style={{ flex: 1 }}><Text style={{ color: Colors.textSecondary }}>{cart.length} item{cart.length === 1 ? '' : 's'}</Text><Text style={styles.basketTotal}>{formatCurrency(totalAmount, user?.shop?.currency)}</Text></View>
+        <Button title="Review sale" onPress={() => setReviewVisible(true)} disabled={cart.length === 0} leftIcon="arrow-forward" />
+      </View>
+      <BottomSheet visible={reviewVisible} onClose={() => setReviewVisible(false)} dismissible={!createSaleMutation.isPending} maxHeightPercent={92}>
+        <View style={styles.sheetHeading}><Text style={styles.basketTotal}>Review sale</Text><AnimatedPressable onPress={() => setReviewVisible(false)} disabled={createSaleMutation.isPending} accessibilityRole="button" accessibilityLabel="Close review" style={styles.historyAction}><Ionicons name="close" size={24} color={Colors.textPrimary} /></AnimatedPressable></View>
+        <SheetScrollBody>
+          {createSaleMutation.isError && <Text accessibilityRole="alert" style={{ color: Colors.danger, paddingVertical: 12 }}>{mutationErrorMessage(createSaleMutation.error, 'Could not save sale. Your basket is retained. Check the details and try again.')}</Text>}
                 {cart.map((item) => (
                   <CartItem
                     key={cartKey(item)}
@@ -1241,13 +1267,15 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                     onRemove={() => removeFromCart(cartKey(item))}
                   />
                 ))}
+                <Button title="Add more items" variant="ghost" leftIcon="add-circle-outline" onPress={() => setReviewVisible(false)} disabled={createSaleMutation.isPending} />
                 <CartSummary
+                  key={completedSale?._id ?? 'new-sale'}
                   total={totalAmount}
                   totalSavings={totalSavings}
                   itemCount={cart.length}
                   totalCommission={totalCommission}
                   creditCustomerName={creditCustomer?.name}
-                  onPickCreditCustomer={() => router.push((user?.role === 'staff' ? '/(staff)/pick-credit-customer' : '/(owner)/pick-credit-customer') as never)}
+                  onPickCreditCustomer={() => { setReviewVisible(false); router.push((user?.role === 'staff' ? '/(staff)/pick-credit-customer' : '/(owner)/pick-credit-customer') as never); }}
                   methods={saleMethods}
                   paymentMethod={paymentMethod}
                   onPaymentMethodChange={(m) => {
@@ -1268,19 +1296,15 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                   manualReceiptCode={manualReceiptCode}
                   onManualReceiptCodeChange={setManualReceiptCode}
                 />
-              </View>
-            )}
-          </View>
-        }
-        ListFooterComponent={
-          <View>
-            {/* Sales history — map() inside a FlatList footer loses virtualisation,
-                acceptable here because the server pages to ≤10 items. If the page
-                limit is ever removed, move this section to a separate screen/tab. */}
+        </SheetScrollBody>
+      </BottomSheet>
+      <BottomSheet visible={historyVisible} onClose={() => setHistoryVisible(false)} maxHeightPercent={90}>
+        <Button title="Back to sale" variant="ghost" onPress={() => setHistoryVisible(false)} />
+        <SheetScrollBody>
             {canViewSales && (
               <View style={styles.historySection}>
                 <Text style={styles.sectionTitle}>My Sales History</Text>
-                {displayedSales.length === 0 ? (
+                {historyLoading && displayedSales.length === 0 ? <ActivityIndicator color={Colors.primary} /> : historyFailed && displayedSales.length === 0 ? <EmptyState title="Could not load sales" subtitle="Your current basket is retained. Reconnect and try again." actionLabel="Retry" onAction={() => retryHistory()} /> : displayedSales.length === 0 ? (
                   <EmptyState title="No sales yet" />
                 ) : (
                   displayedSales.map((sale) => {
@@ -1293,7 +1317,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                         syncStatus={localStatus ? (localStatus === 'failed' ? 'failed' : 'syncing') : undefined}
                         // A sale still syncing has no server record yet — its
                         // details sheet (void/refund) needs one to act on.
-                        onPress={localStatus ? undefined : () => { setSelectedSale(sale); setDetailsModalVisible(true); }}
+                        onPress={localStatus ? undefined : () => { setHistoryVisible(false); setSelectedSale(sale); setDetailsModalVisible(true); }}
                       />
                     );
                   })
@@ -1327,13 +1351,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                 )}
               </View>
             )}
-          </View>
-        }
-      />
+        </SheetScrollBody>
+      </BottomSheet>
 
       <CreditSummarySheet
         visible={creditSummaryVisible}
-        onClose={() => setCreditSummaryVisible(false)}
+        onClose={() => { setCreditSummaryVisible(false); setReviewVisible(true); }}
         onConfirm={confirmCreditSale}
         customerName={creditCustomer?.name ?? ''}
         account={creditAccount}
@@ -1422,6 +1445,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
         onSuccess={handleMpesaSuccess}
         onCancel={() => {
           setMpesaModalVisible(false);
+          if (cart.length > 0) setReviewVisible(true);
           // Closing the modal stops its polling outright (it unmounts). If
           // the transaction never got a chance to resolve on its own, don't
           // just drop it — surface the banner immediately and let the
@@ -1460,6 +1484,12 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 
 
 const styles = StyleSheet.create({
+  basketDock: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 16, borderTopWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
+  basketTotal: { fontSize: 24, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, fontVariant: ['tabular-nums'] },
+  sheetHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  historyAction: { minHeight: 48, minWidth: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  category: { minHeight: 48, paddingHorizontal: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  categorySelected: { backgroundColor: Colors.primarySubtle, borderColor: Colors.primary },
   cartSection: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,

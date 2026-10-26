@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { formatCurrency, formatQuantity } from '@/utils/formatters';
 import type { Product } from '@/services/products';
@@ -29,6 +28,9 @@ interface PosProductRowProps {
   product: Product;
   onPress: () => void;
   currency?: string;
+  quantity?: number;
+  disabled?: boolean;
+  onDecrement?: () => void;
 }
 
 /** The follow-up a tap will ask for, when there is one. */
@@ -79,72 +81,51 @@ const TONE_COLOR = {
   out: Colors.danger,
 } as const;
 
-const PosProductRowComponent: React.FC<PosProductRowProps> = ({ product, onPress, currency }) => {
+const PosProductRowComponent: React.FC<PosProductRowProps> = ({ product, onPress, currency, quantity = 0, disabled = false, onDecrement }) => {
   const price = displayPrice(product);
   const stock = stockFor(product);
   const hint = actionHint(product);
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      style={s.row}
-      pressScale={0.985}
-      accessibilityRole="button"
-      accessibilityLabel={[
-        product.name,
-        `${price.from ? 'from ' : ''}${formatCurrency(price.amount, currency)}`,
-        stock?.label,
-        hint,
-      ].filter(Boolean).join(', ')}
-      accessibilityHint="Adds to the sale"
-    >
-      <View style={s.text}>
-        <Text style={s.name} numberOfLines={1}>{product.name}</Text>
-        <View style={s.metaRow}>
-          <Text style={s.price} numberOfLines={1}>
-            {price.from ? 'from ' : ''}{formatCurrency(price.amount, currency)}
-          </Text>
-          {!!stock && (
-            <>
-              <Text style={s.dot}>·</Text>
-              <Text style={[s.stock, { color: TONE_COLOR[stock.tone] }]} numberOfLines={1}>
-                {stock.label}
-              </Text>
-            </>
-          )}
-          {!!hint && (
-            <>
-              <Text style={s.dot}>·</Text>
-              <Text style={s.hint} numberOfLines={1}>{hint}</Text>
-            </>
-          )}
+    <View style={[s.row, quantity > 0 && { backgroundColor: Colors.primarySubtle }]}>
+      <AnimatedPressable onPress={onPress} disabled={disabled} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 }} accessibilityRole="button" accessibilityLabel={`${product.name}, ${formatCurrency(price.amount, currency)}, ${stock?.label ?? ''}`} accessibilityHint={hint ? 'Opens product options' : 'Adds one to the sale'}>
+        <View style={s.avatar}><Text style={s.initials}>{product.name.split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase()}</Text></View>
+        <View style={s.text}>
+          <Text style={s.name}>{product.name}</Text>
+          {!!stock && <Text style={[s.stock, { color: TONE_COLOR[stock.tone] }]}>{stock.label}</Text>}
+          {!!hint && <Text style={s.hint}>{hint}</Text>}
+        </View>
+      </AnimatedPressable>
+      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+        <Text style={s.price}>{price.from ? 'From ' : ''}{formatCurrency(price.amount, currency)}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {quantity > 0 && onDecrement && <AnimatedPressable disabled={disabled} onPress={onDecrement} style={s.add} accessibilityRole="button" accessibilityLabel={`Decrease ${product.name} quantity`}><Text style={{ color: Colors.primary }}>−</Text></AnimatedPressable>}
+          {quantity > 0 && <Text accessibilityLiveRegion="polite" style={{ color: Colors.textPrimary }}>{formatQuantity(quantity)}</Text>}
+          <AnimatedPressable disabled={disabled} onPress={onPress} style={s.add} accessibilityRole="button" accessibilityLabel={`${hint ? 'Choose' : 'Add'} ${product.name}`}><Text style={{ color: Colors.primary }}>{hint ? 'Choose' : '+'}</Text></AnimatedPressable>
         </View>
       </View>
-
-      <View style={s.add}>
-        <Ionicons name="add" size={20} color={Colors.white} />
-      </View>
-    </AnimatedPressable>
+    </View>
   );
 };
 
 export const PosProductRow = React.memo(PosProductRowComponent);
 
 const s = StyleSheet.create({
+  avatar: { width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' },
+  initials: { fontFamily: Typography.fontFamilySemiBold, color: Colors.primary, fontSize: 16 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    borderBottomWidth: 1,
     borderColor: Colors.border,
     paddingLeft: Spacing.md,
     paddingRight: 10,
     paddingVertical: 10,
     // Comfortably past the 48dp floor without the card height the inventory
     // list needs.
-    minHeight: 62,
+    minHeight: 88,
   },
   text: { flex: 1, gap: 3 },
   name: {
@@ -171,10 +152,13 @@ const s = StyleSheet.create({
     color: Colors.primary,
   },
   add: {
-    width: 40,
-    height: 40,
+    minWidth: 48,
+    minHeight: 48,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
     borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
