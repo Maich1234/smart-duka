@@ -11,6 +11,20 @@
 // Firebase Console → Project Settings → Service Accounts → Generate new private key.
 module.exports = ({ config }) => ({
   ...config,
+  // APK previews target one CPU architecture. Production AABs retain every
+  // default ABI so Google Play can deliver the correct split to each phone.
+  plugins: (config.plugins ?? []).map((plugin) => {
+    if (!Array.isArray(plugin) || plugin[0] !== 'expo-build-properties') return plugin;
+    const architectures = process.env.DUQANA_ANDROID_ARCHS?.split(',').filter(Boolean);
+    return [plugin[0], {
+      ...plugin[1],
+      android: {
+        ...plugin[1]?.android,
+        enableBundleCompression: true,
+        ...(architectures?.length ? { buildArchs: architectures } : {}),
+      },
+    }];
+  }),
   android: {
     ...config.android,
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? config.android?.googleServicesFile,

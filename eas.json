@@ -16,12 +16,27 @@
       "environment": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "DUQANA_ANDROID_ARCHS": "arm64-v8a"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "environment": "production"
+    },
+    "preview-arm32": {
+      "extends": "preview",
+      "env": {
+        "DUQANA_ANDROID_ARCHS": "armeabi-v7a"
+      }
+    },
+    "preview-universal": {
+      "extends": "preview",
+      "env": {
+        "DUQANA_ANDROID_ARCHS": "armeabi-v7a,arm64-v8a,x86,x86_64"
+      }
     }
   },
   "submit": {
