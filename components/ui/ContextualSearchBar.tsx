@@ -32,6 +32,7 @@ export interface ContextualSearchBarProps {
   onClearRecent?: () => void;
   /** Custom style for the outer wrapper (e.g. margins) */
   style?: object;
+  barStyle?: object;
   autoFocus?: boolean;
 }
 
@@ -54,6 +55,7 @@ export const ContextualSearchBar: React.FC<ContextualSearchBarProps> = ({
   onSelectRecent,
   onClearRecent,
   style,
+  barStyle,
   autoFocus = false,
 }) => {
   const inputRef = useRef<TextInput>(null);
@@ -88,7 +90,7 @@ export const ContextualSearchBar: React.FC<ContextualSearchBarProps> = ({
     /* zIndex + elevation so the absolute dropdown floats above adjacent siblings */
     <View style={[styles.wrapper, style]}>
       <Animated.View
-        style={[styles.bar, containerAnim]}
+        style={[styles.bar, containerAnim, barStyle]}
         onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
       >
         <Ionicons name="search-outline" size={18} color={iconColor} />

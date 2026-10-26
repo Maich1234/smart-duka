@@ -1119,7 +1119,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     <KeyboardAvoidingView behavior="padding" style={styles.container}>
       <ScreenHeader
         title="New sale"
-        right={canViewSales ? <AnimatedPressable onPress={() => setHistoryVisible(true)} accessibilityRole="button" accessibilityLabel="Sales history" style={styles.historyAction}><Ionicons name="time-outline" size={22} color={Colors.primary} /><Text style={{ color: Colors.primary }}>History</Text></AnimatedPressable> : undefined}
+        right={canViewSales ? <AnimatedPressable onPress={() => setHistoryVisible(true)} accessibilityRole="button" accessibilityLabel="Sales history" style={styles.historyAction}><Ionicons name="time-outline" size={22} color={Colors.primary} /><Text style={{ color: Colors.primary, fontFamily: Typography.fontFamilySemiBold, fontSize: 14 }}>History</Text></AnimatedPressable> : undefined}
         showBack={showBack}
         onBack={confirmLeave}
         bordered={false}
@@ -1166,6 +1166,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
           onClearRecent={clearProductRecentSearches}
           placeholder="Search name or barcode"
           style={styles.searchBar}
+          barStyle={{ borderRadius: 10, borderWidth: 1, minHeight: 48 }}
         />
         {barcodeScanningEnabled && (
           <AnimatedPressable
@@ -1174,13 +1175,13 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
             accessibilityRole="button"
             accessibilityLabel="Scan barcode"
           >
-            <Ionicons name="barcode-outline" size={22} color={Colors.primary} /><Text style={{ color: Colors.primary, fontSize: 12 }}>Scan</Text>
+            <Ionicons name="barcode-outline" size={22} color={Colors.primary} /><Text style={{ color: Colors.primary, fontSize: 12, fontFamily: Typography.fontFamilySemiBold }}>Scan</Text>
           </AnimatedPressable>
         )}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: 8, paddingBottom: 12 }}>
-        {[null, ...categories].map(c => <AnimatedPressable key={c ?? 'all'} accessibilityRole="button" accessibilityState={{ selected: category === c }} onPress={() => setCategory(c)} style={[styles.category, category === c && styles.categorySelected]}><Text style={{ color: category === c ? Colors.primary : Colors.textSecondary }}>{c ?? 'All'}</Text></AnimatedPressable>)}
+        {[null, ...categories].map(c => <AnimatedPressable key={c ?? 'all'} accessibilityRole="button" accessibilityState={{ selected: category === c }} onPress={() => setCategory(c)} style={[styles.category, category === c && styles.categorySelected]}><Text style={{ color: category === c ? Colors.primary : Colors.textSecondary, fontFamily: Typography.fontFamilySemiBold, fontSize: 14 }}>{c ?? 'All'}</Text></AnimatedPressable>)}
       </ScrollView>
       <FlatList
         showsVerticalScrollIndicator={false}
@@ -1241,11 +1242,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       />
 
       <View style={[styles.basketDock, { marginBottom: tabBarHeight }]}>
-        <View style={{ flex: 1 }}><Text style={{ color: Colors.textSecondary }}>{cart.length} item{cart.length === 1 ? '' : 's'}</Text><Text style={styles.basketTotal}>{formatCurrency(totalAmount, user?.shop?.currency)}</Text></View>
-        <Button title="Review sale" onPress={() => setReviewVisible(true)} disabled={cart.length === 0} leftIcon="arrow-forward" />
+        <View style={{ flex: 1 }}><Text style={{ color: Colors.textSecondary, fontFamily: Typography.fontFamily, fontSize: 12 }}>{cart.length} item{cart.length === 1 ? '' : 's'}</Text><Text style={styles.basketTotal}>{formatCurrency(totalAmount, user?.shop?.currency)}</Text></View>
+        <Button title="Review sale" onPress={() => setReviewVisible(true)} disabled={cart.length === 0} leftIcon="arrow-forward" style={{ borderRadius: 12, minHeight: 48, shadowOpacity: 0, elevation: 0 }} />
       </View>
       <BottomSheet visible={reviewVisible} onClose={() => setReviewVisible(false)} dismissible={!createSaleMutation.isPending} maxHeightPercent={92}>
-        <View style={styles.sheetHeading}><Text style={styles.basketTotal}>Review sale</Text><AnimatedPressable onPress={() => setReviewVisible(false)} disabled={createSaleMutation.isPending} accessibilityRole="button" accessibilityLabel="Close review" style={styles.historyAction}><Ionicons name="close" size={24} color={Colors.textPrimary} /></AnimatedPressable></View>
+        <View style={styles.sheetHeading}><Text style={styles.reviewTitle}>Review sale</Text><AnimatedPressable onPress={() => setReviewVisible(false)} disabled={createSaleMutation.isPending} accessibilityRole="button" accessibilityLabel="Close review" style={styles.historyAction}><Ionicons name="close" size={24} color={Colors.textPrimary} /></AnimatedPressable></View>
         <SheetScrollBody>
           {createSaleMutation.isError && <Text accessibilityRole="alert" style={{ color: Colors.danger, paddingVertical: 12 }}>{mutationErrorMessage(createSaleMutation.error, 'Could not save sale. Your basket is retained. Check the details and try again.')}</Text>}
                 {cart.map((item) => (
@@ -1267,7 +1268,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
                     onRemove={() => removeFromCart(cartKey(item))}
                   />
                 ))}
-                <Button title="Add more items" variant="ghost" leftIcon="add-circle-outline" onPress={() => setReviewVisible(false)} disabled={createSaleMutation.isPending} />
+                <Button title="Add more items" variant="ghost" size="sm" style={{ alignSelf: 'flex-start', paddingHorizontal: 0, borderRadius: 8, marginVertical: 4 }} textStyle={{ fontSize: 14 }} leftIcon="add-circle-outline" onPress={() => setReviewVisible(false)} disabled={createSaleMutation.isPending} />
                 <CartSummary
                   key={completedSale?._id ?? 'new-sale'}
                   total={totalAmount}
@@ -1486,9 +1487,10 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
 const styles = StyleSheet.create({
   basketDock: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 16, borderTopWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   basketTotal: { fontSize: 24, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary, fontVariant: ['tabular-nums'] },
-  sheetHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  reviewTitle: { fontSize: 22, fontFamily: Typography.fontFamilyBold, color: Colors.textPrimary },
+  sheetHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   historyAction: { minHeight: 48, minWidth: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  category: { minHeight: 48, paddingHorizontal: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  category: { minHeight: 48, paddingHorizontal: 20, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   categorySelected: { backgroundColor: Colors.primarySubtle, borderColor: Colors.primary },
   cartSection: {
     paddingHorizontal: Spacing.lg,
@@ -1538,7 +1540,7 @@ const styles = StyleSheet.create({
   scanBtn: {
     width: 48,
     height: 48,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,

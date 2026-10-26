@@ -191,6 +191,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         <Text style={styles.totalAmount}>{formatCurrency(total, currency)}</Text>
       </AnimatedPressable>
 
+      <Text style={[styles.phoneLabel, { marginBottom: -4 }]}>Payment method</Text>
       {/* The shop's own buttons, in its own order. Selection is carried by
           fill, border and a tick together rather than fill alone: at arm's
           length over a counter, one filled button among outlines is easy to
@@ -332,7 +333,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
 
       {paymentMethod === CASH_METHOD_KEY && <View>
         <Text style={styles.phoneLabel}>Cash received (optional)</Text>
-        <TextInput accessibilityLabel="Cash received" keyboardType="decimal-pad" value={cashReceived} onChangeText={setCashReceived} editable={!loading} placeholder="Leave blank for exact cash" placeholderTextColor={Colors.textTertiary} style={styles.receiptInput} />
+        <TextInput accessibilityLabel="Cash received" keyboardType="decimal-pad" value={cashReceived} onChangeText={setCashReceived} editable={!loading} placeholder="Leave blank for exact cash" placeholderTextColor={Colors.textTertiary} style={[styles.receiptInput, { fontFamily: Typography.fontFamily, fontSize: 16 }]} />
         {cashError ? <Text accessibilityRole="alert" style={{ color: Colors.danger }}>Enter an amount at least equal to the total.</Text> : cashReceived.trim() !== '' && <Text accessibilityLiveRegion="polite" style={{ color: Colors.primary, fontFamily: Typography.fontFamilySemiBold }}>Change: {formatCurrency(cash - total, currency)}</Text>}
       </View>}
       {methods.length === 0 && <Text accessibilityRole="alert" style={{ color: Colors.danger }}>No payment methods available. Ask the shop owner to enable one.</Text>}
@@ -348,16 +349,18 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
         // anyone who can't. This is the one control on the screen that is ever
         // withheld, so it should be able to say what it is waiting for.
         accessibilityHint={checkoutDisabled ? (cashError ? 'Enter enough cash to cover the total' : isCredit ? 'Choose a customer first' : missingReceipt ? 'Enter the M-Pesa receipt code first' : 'Enter payment details first') : undefined}
-        size="lg"
+        size="md"
+        style={{ minHeight: 56, borderRadius: 12, paddingVertical: 14, shadowOpacity: 0, elevation: 0 }}
+        textStyle={{ fontSize: 16, letterSpacing: 0 }}
       />
-      <Text style={{ color: Colors.textSecondary, textAlign: 'center', fontSize: 12 }}>{loading ? 'Saving sale. Please wait…' : 'Receipt available after saving'}</Text>
+      <Text style={{ color: Colors.textSecondary, textAlign: 'center', fontSize: 12, fontFamily: Typography.fontFamily }}>{loading ? 'Saving sale. Please wait…' : 'Receipt available after saving'}</Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    gap: 10,
+    gap: 12,
   },
   totalRow: {
     flexDirection: 'row',
@@ -365,7 +368,10 @@ const styles = StyleSheet.create({
     // A control's floor, not a label's: this row is the way into the lines,
     // and the cashiers this is built for include older hands with less steady
     // aim than a design review has.
-    minHeight: 44,
+    minHeight: 48,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+    paddingTop: 12,
   },
   totalSpacer: { flex: 1 },
   totalChevron: { marginLeft: 2 },
@@ -377,7 +383,7 @@ const styles = StyleSheet.create({
   totalAmount: {
     // Prominent, not a hero number: the cashier confirms it, they don't
     // admire it, and every point it gains is a point the catalogue loses.
-    fontSize: Typography.size.h3,
+    fontSize: Typography.size.h2,
     fontFamily: Typography.fontFamilyBold,
     color: Colors.textPrimary,
     letterSpacing: -0.5,
@@ -495,7 +501,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.body,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
-    letterSpacing: 2,
+    letterSpacing: 0,
     marginBottom: Spacing.sm,
   },
   alreadyPaidHint: {
