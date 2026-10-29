@@ -1,8 +1,9 @@
+import { useShopConfigQuery } from '@/hooks/useShopConfig';
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Text, BackHandler, ActivityIndicator } from 'react-native';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useFocusEffect } from "expo-router/react-navigation";
-import { router, useIsFocused } from 'expo-router';
+import { router } from 'expo-router';
 import { useAlert } from '@/context/AlertContext';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -10,7 +11,6 @@ import { useAuthStore, type AuthState } from '@/store/authStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getProducts, type Product, type ProductVariant } from '@/services/products';
 import { createSale, getMySales, voidSale, refundSale, type Sale, type SaleItem, type CreateSaleData } from '@/services/sales';
-import { getShopConfig } from '@/services/shop';
 import { getPaymentStatus } from '@/services/paymentConfig';
 import { getTransactionStatus } from '@/services/mpesa';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -307,35 +307,10 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
     enabled: canViewSales,
   });
 
-  const isFocused = useIsFocused();
-  const { data: shopConfigData, refetch: refetchShopConfig } = useQuery({
-    queryKey: ['shopConfig'],
-    queryFn: getShopConfig,
-    // Till buttons are owner-edited from a separate screen (and often a
-    // separate device — the owner's phone vs. a cashier's) while this screen
-    // stays mounted for a whole shift without ever losing focus. Without a
-    // poll, a payment method removed mid-shift would sit on the till until
-    // the cashier happened to navigate away and back. Only polls while this
-    // screen is actually the one on-screen, so it doesn't burn battery/data
-    // in the background. Five minutes rather than thirty seconds: the
-    // focus refetch below already covers navigating back to the till, so the
-    // poll only has to catch an edit made while the till sits open — and at
-    // 30s it was spending 120 requests an hour of a cashier's mobile data to
-    // watch a value the owner changes a few times a month.
-    refetchInterval: isFocused ? 5 * 60_000 : false,
-  });
+  const { data: shopConfigData, refetch: refetchShopConfig } = useShopConfigQuery({ live: true });
   const thankYouNote = shopConfigData?.data.receiptThankYouNote;
   const shopLogoUrl = shopConfigData?.data.logoUrl;
   const shopMotto = shopConfigData?.data.motto;
-
-  // Covers the gap the poll above can't: an edit made in the few seconds
-  // between polls, or the till having sat backgrounded past its interval.
-  // Refetch on every focus instead of trusting staleTime.
-  useFocusEffect(
-    React.useCallback(() => {
-      refetchShopConfig();
-    }, [refetchShopConfig])
-  );
 
   const { data: paymentStatusData } = useQuery({
     queryKey: ['paymentStatus'],
@@ -354,8 +329,7 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   // sync) still sees the button.
   const barcodeScanningEnabled = shopConfigData?.data?.barcodeScanningEnabled ?? true;
 
-  // The shop's own till buttons, plus a system Credit button appended when
-  // the module is on and this person may use it — see resolveSaleMethods.
+  // The owner's configured buttons; Credit also requires permission.
   // Falls back to Cash + M-PESA for shops that never opened the payment-
   // methods setting, so nobody is ever left without a way to sell.
   const creditEnabled = shopConfigData?.data?.creditSettings?.enabled ?? false;
@@ -372,10 +346,8 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   // Derived, not corrected from an effect: the effect version rendered one
   // frame with the stale method still selected, and a fast till tap in that
   // frame would have posted it.
-  const paymentMethod =
-    saleMethods.length === 0 || saleMethods.some((m) => m.key === chosenMethod)
-      ? chosenMethod
-      : saleMethods[0].key;
+  const paymentMethod = saleMethods.some(method => method.key === chosenMethod)
+    ? chosenMethod : saleMethods[0]?.key ?? '';
 
   // Local-first: "Sell" is a deterministic on-device write, never a network
   // round trip. The sale is validated, committed to SQLite, reflected in the
@@ -782,6 +754,10 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
       .join('\n') + '\n\nContinue with this sale? The shop owner will be notified.';
 
   const proceedToCheckout = () => {
+    if (!saleMethods.some(method => method.key === paymentMethod)) {
+      toast({ type: 'warning', message: 'No payment method is available. Ask the owner to enable one.' });
+      return;
+    }
     // STK Push is the one flow with a precondition, and only when the shop has
     // actually connected M-Pesa Business. Everything else — cash, an
     // unconfigured M-Pesa, Airtel, a bank transfer — records and prints.

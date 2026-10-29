@@ -70,7 +70,7 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
   const queryClient = useQueryClient();
   const canConvert = usePermission('convert_quotation_to_sale');
   const canMakeCreditSale = usePermission('make_credit_sale');
-  const { shopConfig } = useShopConfig();
+  const { shopConfig } = useShopConfig({ live: true });
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['quotation', quotationId],

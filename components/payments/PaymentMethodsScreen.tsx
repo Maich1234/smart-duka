@@ -94,7 +94,8 @@ export const PaymentMethodsScreen: React.FC = () => {
           order: i,
         })),
       }),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
+      await queryClient.cancelQueries({ queryKey: ['shopConfig'] });
       setDraft(null);
       queryClient.setQueryData(['shopConfig'], res);
       queryClient.invalidateQueries({ queryKey: ['shopConfig'] });
@@ -387,6 +388,7 @@ export const PaymentMethodsScreen: React.FC = () => {
       </ScrollView>
 
       <View style={styles.footer}>
+        {dirty && <Text accessibilityRole="text" style={{ color: Colors.textSecondary, marginBottom: Spacing.sm }}>Save changes to update the till buttons.</Text>}
         <Button
           title={dirty ? 'Save changes' : 'Saved'}
           onPress={handleSave}
