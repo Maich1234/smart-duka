@@ -1,3 +1,4 @@
+import { useShopConfigQuery } from '@/hooks/useShopConfig';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -15,7 +16,6 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useAuthStore } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getCustomerById, type CreditTransaction } from '@/services/customers';
-import { getShopConfig } from '@/services/shop';
 import { recordCreditPayment, reverseCreditTransaction } from '@/services/credit';
 import { mutationErrorMessage } from '@/utils/errors';
 import { formatCurrency, formatDate } from '@/utils/formatters';
@@ -56,7 +56,7 @@ export const CustomerAccountScreen: React.FC<CustomerAccountScreenProps> = ({ cu
     queryFn: () => getCustomerById(customerId, { limit: 30 }),
   });
 
-  const { data: shopConfig } = useQuery({ queryKey: ['shopConfig'], queryFn: getShopConfig });
+  const { data: shopConfig } = useShopConfigQuery({ live: true });
 
   const paymentMutation = useMutation({
     mutationFn: (body: { amount: number; paymentMethod: string; reference?: string }) =>

@@ -87,27 +87,16 @@ export const methodIcon = (method?: ShopPaymentMethod): string =>
  */
 export const resolveSaleMethods = (
   methods?: ShopPaymentMethod[] | null,
-  /**
-   * Adds a Credit button when the shop has credit on and this user may sell on
-   * it. Appended rather than read from the shop's own list because credit is a
-   * system capability: an owner who enables it shouldn't also have to go and
-   * build the button, and a shop that already has one shouldn't end up with two.
-   * It sits last, after the ways money actually arrives today.
-   */
+  /** Credit is permission-gated; only the owner's configured buttons render. */
   credit?: { enabled: boolean; permitted: boolean }
 ): ShopPaymentMethod[] => {
-  const list = methods?.length ? methods : DEFAULT_SALE_METHODS;
+  const list = Array.isArray(methods) ? methods : DEFAULT_SALE_METHODS;
   const visible = list
-    .filter((m) => m.enabled !== false)
+    .filter((m) => m.enabled !== false && !(credit?.enabled && !credit.permitted && m.key === CREDIT_METHOD_KEY))
     .slice()
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  if (!credit?.enabled || !credit.permitted) {
-    return visible;
-  }
-  return visible.some((m) => m.key === CREDIT_METHOD_KEY)
-    ? visible
-    : [...visible, { key: CREDIT_METHOD_KEY, label: 'Credit', icon: 'clock' as MethodIcon, enabled: true }];
+  return visible;
 };
 
 /** Turn a typed label into a valid key: "Airtel Money" → "airtel_money". */

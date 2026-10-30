@@ -1,19 +1,27 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getShopConfig } from '@/services/shop';
+import { useActiveScreen } from '@/hooks/useActiveScreen';
 
-/**
- * Reads the shop config cache — every Settings sub-screen needs a slice of
- * it (which flags are on, payment methods, tax rate...). Extracted because
- * five screens had `useQuery({ queryKey: ['shopConfig'], queryFn: getShopConfig })`
- * copied verbatim, and one of them had already drifted (omitted `isLoading`
- * entirely). `useShopConfigToggle` owns writes to this same key; this is its
- * read-side companion.
- */
-export function useShopConfig() {
-  const { data, isLoading } = useQuery({
+/** One cache for settings, the till, quotation checkout and repayments. */
+export function useShopConfigQuery({ live = false }: { live?: boolean } = {}) {
+  const active = useActiveScreen();
+  const query = useQuery({
     queryKey: ['shopConfig'],
     queryFn: getShopConfig,
+    staleTime: live ? 0 : 60_000,
+    refetchInterval: live && active ? 15_000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnMount: live ? 'always' : true,
   });
+  const { refetch } = query;
+  useEffect(() => {
+    if (live && active) refetch();
+  }, [live, active, refetch]);
+  return query;
+}
 
+export function useShopConfig(options: { live?: boolean } = {}) {
+  const { data, isLoading } = useShopConfigQuery(options);
   return { shopConfig: data?.data, loadingShop: isLoading };
 }
