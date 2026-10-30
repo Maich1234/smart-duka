@@ -1,3 +1,4 @@
+import { PriceAlertCard } from '@/components/inventory/PriceAlerts';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
@@ -209,6 +210,7 @@ export default function OwnerDashboard() {
 
           {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
           <TrialBanner />
+        <PriceAlertCard />
           <NeedsAttention items={attentionItems} />
 
           {/* 6 · Pulse check on the till */}

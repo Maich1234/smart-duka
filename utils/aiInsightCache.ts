@@ -5,7 +5,7 @@ import type { AiInsightData } from '@/services/aiInsight';
 // A cached row from before a snapshot shape change is otherwise trusted
 // as-is and can crash screens built against the new shape (e.g. Insights
 // reading health.requirements before that field existed).
-const CURRENT_SNAPSHOT_VERSION = 2;
+const CURRENT_SNAPSHOT_VERSION = 3;
 
 export interface CachedInsight {
   summary: string;

@@ -1,3 +1,4 @@
+import { PriceAlertCard } from '@/components/inventory/PriceAlerts';
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator, ScrollView } from 'react-native';
 import { router } from 'expo-router';
@@ -79,6 +80,7 @@ export default function OwnerInsights() {
           ) : undefined
         }
       >
+        <PriceAlertCard />
         {isSubscriptionLoading ? (
           <View style={s.loading}>
             <ActivityIndicator color={Colors.primary} />

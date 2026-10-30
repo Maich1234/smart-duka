@@ -1,3 +1,4 @@
+import { PriceAlertCard } from '@/components/inventory/PriceAlerts';
 import React, { useState, useMemo } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
@@ -347,7 +348,7 @@ export default function OwnerInventory() {
           // `entering` here would be a second animation on the same path —
           // which can leave those cards stuck at their start offset.
           <View>
-            <InventoryStatsRow stats={stats} />
+            <InventoryStatsRow stats={stats} /><PriceAlertCard />
             {/* Intelligence banner — shows when depletion data is ready */}
             {depletion &&
               (depletion.fastMovers.length > 0 || depletion.stockoutSoon.length > 0) && (

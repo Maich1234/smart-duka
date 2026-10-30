@@ -58,6 +58,8 @@ export function NewProductScreen() {
     mutationFn: createProduct,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['priceHealth'] });
+      queryClient.invalidateQueries({ queryKey: ['aiInsight'] });
       // A brand-new category typed on this product should be selectable the
       // next time someone opens this picker, not just after a manual refresh.
       queryClient.invalidateQueries({ queryKey: ['productCategories'] });
