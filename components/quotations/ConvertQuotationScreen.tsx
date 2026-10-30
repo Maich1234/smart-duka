@@ -276,6 +276,11 @@ export const ConvertQuotationScreen: React.FC<ConvertQuotationScreenProps> = ({ 
   };
 
   const confirmCreditSale = () => {
+    if (!creditEnabled || !canMakeCreditSale || !methods.some(method => method.key === CREDIT_METHOD_KEY)) {
+      setCreditSummaryVisible(false);
+      toast({ type: 'warning', message: 'Credit is no longer available. Review the payment methods before continuing.' });
+      return;
+    }
     setCreditSummaryVisible(false);
     submitConvert({ paymentMethod: CREDIT_METHOD_KEY });
   };

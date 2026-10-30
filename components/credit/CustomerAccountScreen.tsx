@@ -56,7 +56,7 @@ export const CustomerAccountScreen: React.FC<CustomerAccountScreenProps> = ({ cu
     queryFn: () => getCustomerById(customerId, { limit: 30 }),
   });
 
-  const { data: shopConfig } = useShopConfigQuery({ live: true });
+  const { data: shopConfig, isPending: methodsLoading, isError: methodsError, refetch: refetchMethods } = useShopConfigQuery({ live: true });
 
   const paymentMutation = useMutation({
     mutationFn: (body: { amount: number; paymentMethod: string; reference?: string }) =>
@@ -268,7 +268,10 @@ export const CustomerAccountScreen: React.FC<CustomerAccountScreenProps> = ({ cu
           onConfirm={(body) => paymentMutation.mutate(body)}
           customerName={customer.name}
           outstanding={account.outstanding}
-          shopMethods={shopConfig?.data?.paymentMethods}
+          shopMethods={shopConfig?.data?.paymentMethods ?? []}
+          methodsLoading={methodsLoading}
+          methodsError={methodsError}
+          onRetryMethods={() => { refetchMethods(); }}
           currency={currency}
           loading={paymentMutation.isPending}
         />
