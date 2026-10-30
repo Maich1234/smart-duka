@@ -108,6 +108,8 @@ function EditProductForm({ id, product }: { id: string; product: Product }) {
     mutationFn: (data: UpdateProductData) => updateProduct(id, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['priceHealth'] });
+      queryClient.invalidateQueries({ queryKey: ['aiInsight'] });
       queryClient.invalidateQueries({ queryKey: ['product', id] });
       // A category renamed to something new here should show up next time
       // this picker opens, not just after a manual refresh.

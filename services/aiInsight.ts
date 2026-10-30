@@ -1,3 +1,4 @@
+import type { PriceHealth } from './priceHealth';
 import api from './api';
 
 export interface BusinessSnapshotTotals {
@@ -7,6 +8,7 @@ export interface BusinessSnapshotTotals {
 }
 
 export interface BusinessSnapshot {
+  priceHealth?: PriceHealth;
   version: number;
   generatedAt: string;
   business: { name: string | null; address: string | null; country: string | null };
