@@ -834,6 +834,11 @@ export function PosScreen({ showBack = false }: PosScreenProps) {
   };
 
   const confirmCreditSale = () => {
+    if (!creditEnabled || !canMakeCreditSale || !saleMethods.some(method => method.key === CREDIT_METHOD_KEY)) {
+      setCreditSummaryVisible(false);
+      toast({ type: 'warning', message: 'Credit is no longer available. Review the payment methods before continuing.' });
+      return;
+    }
     if (!creditCustomer) return;
     setCreditSummaryVisible(false);
     submitSale({

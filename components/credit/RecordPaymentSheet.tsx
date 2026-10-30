@@ -26,6 +26,9 @@ interface RecordPaymentSheetProps {
   outstanding: number;
   /** The shop's own money-in buttons; credit is filtered out here. */
   shopMethods?: ShopPaymentMethod[] | null;
+  methodsLoading?: boolean;
+  methodsError?: boolean;
+  onRetryMethods?: () => void;
   currency?: string;
   loading?: boolean;
 }
@@ -49,6 +52,9 @@ export const RecordPaymentSheet: React.FC<RecordPaymentSheetProps> = ({
   outstanding,
   shopMethods,
   currency,
+  methodsLoading = false,
+  methodsError = false,
+  onRetryMethods,
   loading = false,
 }) => {
   const [amountText, setAmountText] = useState('');
@@ -61,7 +67,8 @@ export const RecordPaymentSheet: React.FC<RecordPaymentSheetProps> = ({
     () => resolveSaleMethods(shopMethods).filter((m) => m.key !== CREDIT_METHOD_KEY),
     [shopMethods],
   );
-  const selected = method || methods[0]?.key || 'cash';
+  const selected = methods.some((m) => m.key === method) ? method : methods[0]?.key ?? '';
+  const methodAvailable = !methodsLoading && !methodsError && methods.some((m) => m.key === selected);
   const needsReference = selected === 'mpesa';
 
   const amount = Number.parseFloat(amountText.replace(/,/g, ''));
@@ -78,7 +85,7 @@ export const RecordPaymentSheet: React.FC<RecordPaymentSheetProps> = ({
   const handleClose = () => { reset(); onClose(); };
 
   const handleConfirm = () => {
-    if (!valid) return;
+    if (!valid || !methodAvailable || loading) return;
     onConfirm({
       amount,
       paymentMethod: selected,
@@ -99,11 +106,11 @@ export const RecordPaymentSheet: React.FC<RecordPaymentSheetProps> = ({
             title="Record Payment"
             leftIcon="checkmark-circle-outline"
             onPress={handleConfirm}
-            disabled={!valid || loading}
+            disabled={!valid || !methodAvailable || loading}
             loading={loading}
             style={styles.flex2}
             accessibilityHint={
-              valid ? undefined : tooMuch ? 'The amount is more than the balance' : 'Enter an amount first'
+              !methodAvailable ? 'An enabled payment method is required' : valid ? undefined : tooMuch ? 'The amount is more than the balance' : 'Enter an amount first'
             }
           />
         </View>
@@ -152,6 +159,9 @@ export const RecordPaymentSheet: React.FC<RecordPaymentSheetProps> = ({
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Paid with</Text>
+          {methodsLoading ? <Text style={styles.sectionLabel}>Loading payment methods…</Text>
+            : methodsError ? <View><Text accessibilityRole="alert" style={styles.error}>Could not load payment methods.</Text>{onRetryMethods && <Button title="Retry loading" variant="ghost" onPress={onRetryMethods} />}</View>
+            : methods.length === 0 ? <Text accessibilityRole="alert" style={styles.error}>No payment method is enabled. Ask the owner to enable one in Payment Methods.</Text> : null}
           <View style={styles.methodRow} accessibilityRole="radiogroup">
             {methods.map((m) => {
               const isSelected = selected === m.key;
