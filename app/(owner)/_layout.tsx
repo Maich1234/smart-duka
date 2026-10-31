@@ -464,6 +464,15 @@ export default function OwnerLayout() {
         }}
       />
       <Tabs.Screen
+        name="price-alerts"
+        options={{
+          title: 'Price review',
+          href: null,
+          // PriceAlertsScreen draws its own accessible back button and header.
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="insights"
         options={{
           title: 'Insights',
