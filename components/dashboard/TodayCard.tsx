@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Typography } from '@/constants/Typography';
@@ -16,33 +16,6 @@ interface TodayCardProps {
   /** Yesterday's total; enables the vs-yesterday trend chip. */
   yesterdayTotal?: number;
 }
-
-/** Count-up kept short — the number must be readable within a second. */
-const useCountUp = (target: number, duration = 700) => {
-  const [value, setValue] = useState(target);
-  const rafRef = useRef<number | null>(null);
-  const mountedTarget = useRef(target);
-
-  useEffect(() => {
-    if (target === mountedTarget.current && value === target) return;
-    mountedTarget.current = target;
-    const from = value;
-    const startTime = Date.now();
-    const tick = () => {
-      const progress = Math.min((Date.now() - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(from + (target - from) * eased));
-      if (progress < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, duration]);
-
-  return value;
-};
 
 const TrendChip: React.FC<{ total: number; yesterdayTotal?: number }> = ({ total, yesterdayTotal }) => {
   if (yesterdayTotal == null || yesterdayTotal <= 0 || total <= 0) return null;
@@ -67,7 +40,7 @@ const TrendChip: React.FC<{ total: number; yesterdayTotal?: number }> = ({ total
  */
 export const TodayCard: React.FC<TodayCardProps> = React.memo(
   ({ total, cash, mpesa, transactions, profit, yesterdayTotal }) => {
-    const animatedTotal = useCountUp(total);
+    const [showPayments, setShowPayments] = useState(false);
 
     const other = Math.max(total - cash - mpesa, 0);
     const splitBase = cash + mpesa + other;
@@ -92,13 +65,13 @@ export const TodayCard: React.FC<TodayCardProps> = React.memo(
             style={styles.totalAmount}
             accessibilityLabel={`Today's sales total ${formatCurrency(total)}`}
           >
-            {formatCurrency(animatedTotal)}
+            {formatCurrency(total)}
           </Text>
 
           <View style={styles.statsRow}>
             {profit != null && (
               <View style={styles.stat}>
-                <Text style={styles.statLabel}>Profit</Text>
+                <Text style={styles.statLabel}>Gross profit</Text>
                 <Text style={styles.statValue}>{formatCurrency(profit)}</Text>
               </View>
             )}
@@ -108,9 +81,14 @@ export const TodayCard: React.FC<TodayCardProps> = React.memo(
             </View>
           </View>
 
-          {splitBase > 0 && (
+          {splitBase > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPayments }}
+            onPress={() => setShowPayments(value => !value)} style={styles.paymentToggle}>
+            <Text style={styles.paymentToggleLabel}>{showPayments ? 'Hide payment breakdown' : 'Payment breakdown'}</Text>
+            <Ionicons name={showPayments ? 'chevron-up' : 'chevron-down'} size={16} color="#FFFFFF" />
+          </Pressable>}
+          {splitBase > 0 && showPayments && (
             <>
-              <View style={styles.splitBar} accessible accessibilityLabel={`Payment split: cash ${formatCurrency(cash)}, M-Pesa ${formatCurrency(mpesa)}`}>
+              <View style={styles.splitBar} accessible accessibilityLabel={`Payment split: cash ${formatCurrency(cash)}, M-Pesa ${formatCurrency(mpesa)}, other ${formatCurrency(other)}`}>
                 {cash > 0 && <View style={[styles.splitSegment, { flexBasis: `${pctOf(cash)}%`, backgroundColor: '#4ADE80' }]} />}
                 {mpesa > 0 && <View style={[styles.splitSegment, { flexBasis: `${pctOf(mpesa)}%`, backgroundColor: '#60A5FA' }]} />}
                 {other > 0 && <View style={[styles.splitSegment, { flexBasis: `${pctOf(other)}%`, backgroundColor: 'rgba(255,255,255,0.35)' }]} />}
@@ -139,6 +117,8 @@ const LegendItem: React.FC<{ color: string; label: string; value: string }> = ({
 );
 
 const styles = StyleSheet.create({
+  paymentToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 },
+  paymentToggleLabel: { color: '#FFFFFF', fontFamily: Typography.fontFamilySemiBold, fontSize: Typography.size.small, flexShrink: 1 },
   wrapper: {
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
@@ -167,6 +147,8 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
     alignItems: 'center',
     marginBottom: 10,
   },
@@ -199,8 +181,9 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.lg,
-    marginBottom: 16,
+    marginBottom: 0,
   },
   stat: {
     gap: 2,

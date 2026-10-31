@@ -1,4 +1,4 @@
-import { PriceAlertCard } from '@/components/inventory/PriceAlerts';
+import { usePriceAttention } from '@/hooks/usePriceAttention';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
@@ -135,7 +135,9 @@ export default function OwnerDashboard() {
   );
 
   const dashboard = data?.data;
-  const attentionItems = useOwnerAttention(dashboard);
+  const operationalAttention = useOwnerAttention(dashboard);
+  const priceAttention = usePriceAttention();
+  const attentionItems = [...operationalAttention, ...priceAttention];
   const unreadCount = useUnreadNotificationsCount();
   // Stable reference so the 60s unread-count poll (see useUnreadNotificationsCount)
   // doesn't defeat DashboardHeader's React.memo on every tick.
@@ -193,6 +195,8 @@ export default function OwnerDashboard() {
           <QuickActions primaryRoute="/(owner)/pos" tiles={[]} />
 
           {/* Today at a glance */}
+          {isError && <Text accessibilityRole="alert" style={[styles.errorSub, { marginHorizontal: Spacing.md, marginBottom: Spacing.sm }]}>Could not refresh today’s figures. Showing the last saved figures. Pull down to retry.</Text>}
+
           <TodayCard
             total={dashboard?.todaySalesTotal ?? 0}
             cash={dashboard?.cashSalesTotal ?? 0}
@@ -206,7 +210,6 @@ export default function OwnerDashboard() {
 
           {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
           <TrialBanner />
-          <PriceAlertCard inset />
           <NeedsAttention items={attentionItems} />
 
           <GettingStartedChecklist />

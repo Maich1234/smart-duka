@@ -20,3 +20,12 @@ This is not physical Android, live API, screen-reader or user usability validati
 
 ## Next iteration
 Test actual shop owners/cashiers without coaching. Measure finding customer balances, receipts, quotations, stock checks and expenses. Then decide whether bottom tabs should change, consolidate attention cards and refine forms. Multi-shop membership/context changes belong in a separate branch.
+
+## Second iteration: attention and figures
+- Home price-review warnings now join the operational attention list instead of a separate card. Product counts and potential stock shortfall remain visible, with explicit wording separating exposure from losses already recorded. Full history, definitions and PDF stay on Price checks.
+- A healthy price check stays quiet; an unavailable check remains discoverable. Cached price results with a failed refresh say they are the last check.
+- Attention items sort by severity. Three appear initially, but all critical items remain visible even if there are more than three. A labelled disclosure reveals remaining alerts. Financial and stock warning text wraps rather than truncating.
+- Today's figures render directly without number count-up animation. Gross profit is labelled explicitly; the payment split opens through Payment breakdown. Recent sales show three entries.
+- Background dashboard errors explicitly label figures as last saved, while retaining normal navigation and retry through pull-to-refresh.
+
+Validation repeated the 18 browser scenarios and restricted-staff scenario with no runtime errors. Additional direct checks exercised payment disclosure, alert expand/collapse, four simultaneous critical warnings, integrated stale price warning with KES 250 exposure, healthy/loading/error price states through the actual price-attention mapper, and cached-dashboard failure messaging. TypeScript and focused lint passed. These are simulated data/native adapters, not live financial transactions or physical Android checks. No EAS build or update was submitted; changes are batched on the same testing branch.

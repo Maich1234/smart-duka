@@ -12,7 +12,7 @@ import { BorderRadius } from '@/constants/BorderRadius';
 import { Shadows } from '@/constants/Shadows';
 import { formatCurrency, formatRelativeTime } from '@/utils/formatters';
 
-const MAX_ITEMS = 4;
+const MAX_ITEMS = 3;
 
 interface ActivityTransaction {
   _id: string;
@@ -61,7 +61,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = React.memo(
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>RECENT ACTIVITY</Text>
+          <Text style={styles.sectionTitle}>RECENT SALES</Text>
           {transactions.length > 0 && (
             <AnimatedPressable
               onPress={openHistory}

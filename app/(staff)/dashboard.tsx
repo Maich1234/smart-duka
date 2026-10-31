@@ -200,6 +200,8 @@ export default function StaffDashboard() {
 
           {canRecordSaleForCustomers && <QuickActions primaryRoute="/(staff)/sales" tiles={[]} />}
 
+          {isError && <Text accessibilityRole="alert" style={[styles.errorSub, { marginHorizontal: Spacing.md, marginBottom: Spacing.sm }]}>Could not refresh today’s figures. Showing the last saved figures. Pull down to retry.</Text>}
+
           <TodayCard
             total={dashboard?.todaySalesTotal ?? 0}
             cash={dashboard?.cashSalesTotal ?? 0}
