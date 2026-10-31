@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { HomeMenu, type HomeMenuGroup } from './HomeMenu';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -20,6 +21,7 @@ interface DashboardHeaderProps {
   onBellPress: () => void;
   profileRoute: string;
   insetsTop: number;
+  menuGroups?: HomeMenuGroup[];
 }
 
 /**
@@ -29,9 +31,16 @@ interface DashboardHeaderProps {
  * weight, so the header stays quiet.
  */
 export const DashboardHeader: React.FC<DashboardHeaderProps> = React.memo(
-  ({ greeting, shopName, formattedDate, shopInitials, unreadCount, onBellPress, profileRoute, insetsTop }) => {
+  ({ greeting, shopName, formattedDate, shopInitials, unreadCount, onBellPress, profileRoute, insetsTop, menuGroups = [] }) => {
+    const [menuOpen, setMenuOpen] = useState(false);
     return (
+      <>
+      <HomeMenu visible={menuOpen} onClose={() => setMenuOpen(false)} shopName={shopName} groups={menuGroups} />
       <View style={[styles.header, { paddingTop: insetsTop + 10 }]}>
+        <AnimatedPressable style={styles.menuButton} onPress={() => setMenuOpen(true)} accessibilityRole="button" accessibilityLabel="Open menu" accessibilityState={{ expanded: menuOpen }}>
+          <Ionicons name="menu-outline" size={24} color={Colors.primary} />
+          <Text style={styles.menuLabel}>Menu</Text>
+        </AnimatedPressable>
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>
             {greeting} · {formattedDate}
@@ -78,6 +87,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = React.memo(
           </AnimatedPressable>
         </View>
       </View>
+      </>
     );
   },
 );
@@ -97,6 +107,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
+  menuButton: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  menuLabel: { fontFamily: Typography.fontFamilySemiBold, fontSize: 12, color: Colors.primary },
   headerLeft: {
     flex: 1,
     gap: 2,

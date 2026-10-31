@@ -1,10 +1,12 @@
-import { PriceAlertCard } from '@/components/inventory/PriceAlerts';
+import { usePriceAttention } from '@/hooks/usePriceAttention';
+import { NeedsAttention } from '@/components/dashboard/NeedsAttention';
+import { StockTools } from '@/components/inventory/StockTools';
+import { getShopConfig } from '@/services/shop';
 import React, { useState, useMemo } from 'react';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import {
   View,
   Text,
-  ScrollView,
   RefreshControl,
   StyleSheet,
 } from 'react-native';
@@ -44,25 +46,25 @@ interface FilterOption {
 const FILTER_OPTIONS: FilterOption[] = [
   {
     value: 'all',
-    label: 'All',
+    label: 'All products',
     icon: 'apps-outline',
     activeGradient: ['#0F766E', '#14B8A6'],
   },
   {
     value: 'fast',
-    label: 'Fast Movers',
+    label: 'Selling fast',
     icon: 'trending-up-outline',
     activeGradient: ['#14532D', '#16A34A'],
   },
   {
     value: 'slow',
-    label: 'Slow Movers',
+    label: 'Selling slowly',
     icon: 'trending-down-outline',
     activeGradient: ['#78350F', '#D97706'],
   },
   {
     value: 'stockout',
-    label: 'Stockout Soon',
+    label: 'Running out',
     icon: 'alert-circle-outline',
     activeGradient: ['#7F1D1D', '#DC2626'],
   },
@@ -70,6 +72,8 @@ const FILTER_OPTIONS: FilterOption[] = [
 
 export default function OwnerInventory() {
   const tabBarHeight = useTabBarHeight();
+  const priceAttention = usePriceAttention();
+  const { data: shopConfig } = useQuery({ queryKey: ['shopConfig'], queryFn: getShopConfig });
   const {
     value: searchValue,
     query: searchQuery,
@@ -226,14 +230,6 @@ export default function OwnerInventory() {
 
   const alertCount = stats.lowStockCount + stats.stockoutSoonCount;
 
-  if (isLoading && allProducts.length === 0) {
-    return <ListSkeleton rows={6} heroHeight={120} showSearch />;
-  }
-
-  if (isError && allProducts.length === 0) {
-    return <QueryError onRetry={refetch} />;
-  }
-
   return (
     <Animated.View entering={FadeIn.duration(Motion.duration.slow)} style={styles.container}>
       {/* ── Fixed header: title + search ─────────────────────────────────── */}
@@ -245,19 +241,15 @@ export default function OwnerInventory() {
         recentSearches={recentSearches}
         onSelectRecent={selectRecent}
         onClearRecent={clearRecent}
-        productCount={catalogueTotal}
+        title="Stock"
+        productCount={data ? catalogueTotal : undefined}
         alertCount={alertCount}
         onBellPress={() => router.push('/(owner)/notifications')}
       />
 
       {/* ── Fixed filter chips ────────────────────────────────────────────── */}
       <View style={styles.filterBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-          decelerationRate="fast"
-        >
+        <View style={styles.filterScroll}>
           {FILTER_OPTIONS.map((opt) => {
             const isActive = velocityFilter === opt.value;
             const count = filterCounts[opt.value];
@@ -313,7 +305,7 @@ export default function OwnerInventory() {
               </AnimatedPressable>
             );
           })}
-        </ScrollView>
+        </View>
       </View>
 
       {/* ── Product list ──────────────────────────────────────────────────── */}
@@ -348,8 +340,11 @@ export default function OwnerInventory() {
           // `entering` here would be a second animation on the same path —
           // which can leave those cards stuck at their start offset.
           <View>
-            <InventoryStatsRow stats={stats} />
-            <PriceAlertCard inset />
+            <StockTools purchasingEnabled={shopConfig?.data?.purchasingEnabled ?? false}>
+              {data ? <InventoryStatsRow stats={stats} /> : <Text style={{ padding: Spacing.md, color: Colors.textSecondary }}>Stock figures will appear when products load.</Text>}
+            </StockTools>
+            <NeedsAttention items={priceAttention} />
+            {isError && allProducts.length > 0 && <Text accessibilityRole="alert" style={{ marginHorizontal: Spacing.md, marginBottom: Spacing.sm, color: Colors.textSecondary }}>Could not refresh products. Showing the last saved list. Pull down to retry.</Text>}
             {/* Intelligence banner — shows when depletion data is ready */}
             {depletion &&
               (depletion.fastMovers.length > 0 || depletion.stockoutSoon.length > 0) && (
@@ -377,11 +372,11 @@ export default function OwnerInventory() {
             </View>
           </View>
         }
-        ListEmptyComponent={
+        ListEmptyComponent={isLoading ? <ListSkeleton rows={4} showSearch={false} /> : isError ? <QueryError onRetry={refetch} /> :
           <EmptyInventoryState
-            hasSearch={isSearching}
+            hasSearch={isSearching || velocityFilter !== 'all'}
             onAddProduct={() => router.push('/(owner)/inventory/new')}
-            onClearSearch={clearSearch}
+            onClearSearch={() => { clearSearch(); setVelocityFilter('all'); }}
           />
         }
       />
@@ -527,7 +522,7 @@ function EmptyInventoryState({ hasSearch, onAddProduct, onClearSearch }: EmptyIn
       </Text>
       {hasSearch ? (
         <AnimatedPressable onPress={onClearSearch} style={emptyStyles.secondaryAction}>
-          <Text style={emptyStyles.secondaryActionText}>Clear Search</Text>
+          <Text style={emptyStyles.secondaryActionText}>Clear filters</Text>
         </AnimatedPressable>
       ) : (
         <AnimatedPressable
@@ -629,10 +624,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   filterScroll: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: Spacing.lg,
     gap: Spacing.xs,
   },
   filterChip: {
+    flexBasis: '45%',
+    flexGrow: 1,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -648,6 +648,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   filterChipText: {
+    flexShrink: 1,
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textSecondary,

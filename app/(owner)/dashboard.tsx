@@ -1,4 +1,4 @@
-import { PriceAlertCard } from '@/components/inventory/PriceAlerts';
+import { usePriceAttention } from '@/hooks/usePriceAttention';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
@@ -6,19 +6,17 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { ScreenFade } from '@/components/ui/motion';
-import { Shimmer } from '@/components/ui/Shimmer';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getOwnerDashboard } from '@/services/dashboard';
 import { getShopConfig } from '@/services/shop';
 import { useOwnerAttention } from '@/hooks/useAttention';
 import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
+import type { HomeMenuGroup } from '@/components/dashboard/HomeMenu';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { TodayCard } from '@/components/dashboard/TodayCard';
-import { DailyBrief } from '@/components/dashboard/DailyBrief';
 import { QuickActions, type QuickActionTile } from '@/components/dashboard/QuickActions';
 import { NeedsAttention } from '@/components/dashboard/NeedsAttention';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
@@ -66,23 +64,6 @@ const QUOTATIONS_TILE: QuickActionTile = {
   id: 'quotations', title: 'Quotations', icon: 'document-text-outline', tint: Colors.warning, tintBg: Colors.warningSubtle, route: '/(owner)/quotations',
 };
 
-const DashboardSkeleton = () => (
-  <View style={styles.skeletonContainer}>
-    <View style={styles.skeletonHeader}>
-      <Shimmer height={12} borderRadius={6} style={{ width: '45%' }} />
-      <Shimmer height={22} borderRadius={6} style={{ width: '65%', marginTop: 8 }} />
-    </View>
-    <Shimmer height={190} borderRadius={20} />
-    <Shimmer height={150} borderRadius={16} />
-    <Shimmer height={56} borderRadius={16} />
-    <View style={styles.skeletonTileRow}>
-      {[0, 1, 2].map((i) => (
-        <Shimmer key={i} height={76} borderRadius={16} style={styles.skeletonTile} />
-      ))}
-    </View>
-  </View>
-);
-
 export default function OwnerDashboard() {
   const user = useAuthStore((s: AuthState) => s.user);
   const tabBarHeight = useTabBarHeight();
@@ -101,11 +82,37 @@ export default function OwnerDashboard() {
   // Either grant is enough to see the list — matches getQuotations' own
   // permission check (create_quotation for drafting, convert_quotation_to_sale
   // for a view-only look at converting one to a sale).
-  const showQuotationsTile = usePermission('create_quotation') || usePermission('convert_quotation_to_sale');
+  const canCreateQuotation = usePermission('create_quotation');
+  const canConvertQuotation = usePermission('convert_quotation_to_sale');
+  const showQuotationsTile = canCreateQuotation || canConvertQuotation;
   const actionTiles = useMemo(() => {
     const base = showPurchasesTile ? [BASE_ACTION_TILES[0], PURCHASES_TILE, ...BASE_ACTION_TILES.slice(1)] : BASE_ACTION_TILES;
     return showQuotationsTile ? [...base, QUOTATIONS_TILE] : base;
   }, [showPurchasesTile, showQuotationsTile]);
+
+  const menuGroups: HomeMenuGroup[] = [
+    { title: 'Sales & customers', items: [
+      { title: 'Sales & receipts', route: '/(owner)/sales', icon: 'receipt-outline' },
+      { title: 'Customers', route: '/(owner)/customers', icon: 'people-outline' },
+      { title: 'Customer balances', route: '/(owner)/credit', icon: 'wallet-outline' },
+      ...(showQuotationsTile ? [QUOTATIONS_TILE] : []),
+    ] },
+    { title: 'Stock & money', items: [
+      BASE_ACTION_TILES[1],
+      ...(showPurchasesTile ? [PURCHASES_TILE] : []),
+      { title: 'Price checks', route: '/(owner)/price-alerts', icon: 'pricetag-outline' },
+      BASE_ACTION_TILES[0], BASE_ACTION_TILES[2],
+      { title: 'Business overview', route: '/(owner)/business', icon: 'business-outline' },
+      { title: 'Insights', route: '/(owner)/insights', icon: 'bulb-outline' },
+      ...(shopConfigData?.data?.aiEnabled ? [{ title: 'Ask DuQana', route: '/(owner)/chat', icon: 'chatbubble-outline' }] : []),
+    ] },
+    { title: 'Manage your shop', items: [
+      { title: 'Staff & permissions', route: '/(owner)/staff', icon: 'people-outline' },
+      { title: 'Settings & account', route: '/(owner)/profile', icon: 'settings-outline' },
+      { title: 'Subscription', route: '/(owner)/subscription', icon: 'card-outline' },
+      { title: 'Setup & help', route: '/(owner)/setup-guide', icon: 'help-circle-outline' },
+    ] },
+  ];
 
   const [timeContext, setTimeContext] = useState({
     greeting: getGreeting(),
@@ -128,34 +135,29 @@ export default function OwnerDashboard() {
   );
 
   const dashboard = data?.data;
-  const attentionItems = useOwnerAttention(dashboard);
+  const operationalAttention = useOwnerAttention(dashboard);
+  const priceAttention = usePriceAttention();
+  const attentionItems = [...operationalAttention, ...priceAttention];
   const unreadCount = useUnreadNotificationsCount();
   // Stable reference so the 60s unread-count poll (see useUnreadNotificationsCount)
   // doesn't defeat DashboardHeader's React.memo on every tick.
   const handleBellPress = useCallback(() => router.push('/(owner)/notifications'), []);
 
-  if (isLoading) {
+  if (isLoading || (isError && !dashboard)) {
     return (
-      <ScreenFade rise={0} style={styles.container}>
-        <DashboardSkeleton />
-      </ScreenFade>
-    );
-  }
-
-  // Full-screen error only when there is nothing to show. With cached data
-  // (offline relaunch, flaky network) the dashboard renders the last synced
-  // day and pull-to-refresh stays available — never block on connectivity.
-  if (isError && !dashboard) {
-    return (
-      <ScreenFade rise={0} style={[styles.container, styles.errorCenter]}>
-        <Ionicons name="cloud-offline-outline" size={48} color={Colors.textTertiary} />
-        <Text style={styles.errorTitle}>Could not load dashboard</Text>
-        <Text style={styles.errorSub}>Check your connection and try again.</Text>
-        <AnimatedPressable onPress={() => refetch()} style={styles.retryBtn}>
-          <Ionicons name="refresh-outline" size={16} color={Colors.white} />
-          <Text style={styles.retryBtnText}>Retry</Text>
-        </AnimatedPressable>
-      </ScreenFade>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}>
+        <DashboardHeader greeting={timeContext.greeting} shopName={user?.shop?.name ?? 'DuQana'}
+          formattedDate={timeContext.formattedDate} shopInitials={shopInitials} unreadCount={unreadCount}
+          onBellPress={handleBellPress} profileRoute="/(owner)/profile" insetsTop={insets.top} menuGroups={menuGroups} />
+        {true && <QuickActions primaryRoute="/(owner)/pos" tiles={[]} />}
+        <View style={{ padding: Spacing.md, gap: 12 }}>
+          <Text style={styles.errorTitle}>{isLoading ? 'Loading today’s figures' : 'Today’s figures are unavailable'}</Text>
+          <Text style={styles.errorSub}>You can still open your shop tools. Figures will appear when the connection recovers.</Text>
+          {!isLoading && <AnimatedPressable accessibilityRole="button" accessibilityLabel="Retry loading today’s figures" onPress={() => refetch()} style={styles.retryBtn}>
+            <Text style={styles.retryBtnText}>Retry loading figures</Text>
+          </AnimatedPressable>}
+        </View>
+      </ScrollView>
     );
   }
 
@@ -186,10 +188,15 @@ export default function OwnerDashboard() {
             unreadCount={unreadCount}
             onBellPress={handleBellPress}
             profileRoute="/(owner)/profile"
+            menuGroups={menuGroups}
             insetsTop={insets.top}
           />
 
-          {/* 2 · How is my business today? */}
+          <QuickActions primaryRoute="/(owner)/pos" tiles={[]} />
+
+          {/* Today at a glance */}
+          {isError && <Text accessibilityRole="alert" style={[styles.errorSub, { marginHorizontal: Spacing.md, marginBottom: Spacing.sm }]}>Could not refresh today’s figures. Showing the last saved figures. Pull down to retry.</Text>}
+
           <TodayCard
             total={dashboard?.todaySalesTotal ?? 0}
             cash={dashboard?.cashSalesTotal ?? 0}
@@ -199,21 +206,15 @@ export default function OwnerDashboard() {
             yesterdayTotal={dashboard?.yesterdaySalesTotal}
           />
 
-          {/* 3 · What does it mean? */}
-          <DailyBrief data={dashboard} />
-
-          {/* First-week checklist — self-retires once the shop is running */}
-          <GettingStartedChecklist />
-
-          {/* 4 · What should I do next? */}
-          <QuickActions primaryRoute="/(owner)/pos" tiles={actionTiles} />
+          <QuickActions hidePrimary primaryRoute="/(owner)/pos" tiles={actionTiles.filter((tile) => tile.id !== 'quotations').slice(0, 3)} />
 
           {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
           <TrialBanner />
-          <PriceAlertCard inset />
           <NeedsAttention items={attentionItems} />
 
-          {/* 6 · Pulse check on the till */}
+          <GettingStartedChecklist />
+
+          {/* Recent sales */}
           <RecentActivity
             transactions={dashboard?.recentTransactions ?? []}
             viewAllRoute="/(owner)/sales"

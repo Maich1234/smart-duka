@@ -123,10 +123,10 @@ export const CustomerListScreen: React.FC<CustomerListScreenProps> = ({ basePath
     <View style={styles.flex}>
       <ScreenHeader
         title="Customers"
-        showBack={false}
-        right={canAddCustomer ? <Button title="Add" onPress={() => setAddSheetVisible(true)} size="sm" /> : undefined}
+        fallbackHref={isOwner ? '/(owner)/dashboard' : '/(staff)/dashboard'}
       />
       <View style={styles.searchWrap}>
+        {canAddCustomer && <Button title="Add customer" onPress={() => setAddSheetVisible(true)} size="sm" style={{ alignSelf: 'flex-start', marginBottom: Spacing.sm }} />}
         <ContextualSearchBar
           value={search}
           onChangeText={setSearch}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
@@ -27,7 +27,13 @@ interface NeedsAttentionProps {
  * empty state, so no placeholder card is shown.
  */
 export const NeedsAttention: React.FC<NeedsAttentionProps> = React.memo(({ items }) => {
+  const [expanded, setExpanded] = useState(false);
   if (items.length === 0) return null;
+  const rank: Record<AttentionSeverity, number> = { critical: 0, warning: 1, info: 2 };
+  const ordered = [...items].sort((a, b) => rank[a.severity] - rank[b.severity]);
+  // Critical warnings never disappear behind a disclosure.
+  const initialCount = Math.max(3, ordered.filter(item => item.severity === 'critical').length);
+  const visible = expanded ? ordered : ordered.slice(0, initialCount);
 
   return (
     <View style={styles.section}>
@@ -39,7 +45,7 @@ export const NeedsAttention: React.FC<NeedsAttentionProps> = React.memo(({ items
       </View>
 
       <View style={styles.card}>
-        {items.map((item, index) => {
+        {visible.map((item, index) => {
           const tone = SEVERITY_STYLE[item.severity];
           const Row = (
             <>
@@ -47,10 +53,10 @@ export const NeedsAttention: React.FC<NeedsAttentionProps> = React.memo(({ items
                 <Ionicons name={item.icon} size={17} color={tone.fg} />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowTitle} numberOfLines={1}>
+                <Text style={styles.rowTitle}>
                   {item.title}
                 </Text>
-                <Text style={styles.rowSubtitle} numberOfLines={1}>
+                <Text style={styles.rowSubtitle}>
                   {item.subtitle}
                 </Text>
               </View>
@@ -60,7 +66,7 @@ export const NeedsAttention: React.FC<NeedsAttentionProps> = React.memo(({ items
             </>
           );
 
-          const rowStyle = [styles.row, index < items.length - 1 && styles.rowBorder];
+          const rowStyle = [styles.row, index < visible.length - 1 && styles.rowBorder];
 
           return item.route ? (
             <AnimatedPressable
@@ -82,6 +88,12 @@ export const NeedsAttention: React.FC<NeedsAttentionProps> = React.memo(({ items
           );
         })}
       </View>
+      {ordered.length > initialCount && <AnimatedPressable
+        accessibilityRole="button" accessibilityState={{ expanded }}
+        onPress={() => setExpanded(value => !value)} style={styles.toggle}>
+        <Text style={styles.toggleLabel}>{expanded ? 'Show fewer alerts' : `Show ${ordered.length - initialCount} more alert${ordered.length - initialCount === 1 ? '' : 's'}`}</Text>
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.primary} />
+      </AnimatedPressable>}
     </View>
   );
 });
@@ -89,6 +101,8 @@ export const NeedsAttention: React.FC<NeedsAttentionProps> = React.memo(({ items
 NeedsAttention.displayName = 'NeedsAttention';
 
 const styles = StyleSheet.create({
+  toggle: { minHeight: 48, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  toggleLabel: { color: Colors.primary, fontFamily: Typography.fontFamilySemiBold, fontSize: Typography.size.small },
   section: {
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.md,
