@@ -6,7 +6,7 @@ export interface PriceChange {
 }
 export interface PriceIssue {
   productId: string; name: string; productType: string; unitOfMeasure?: string; variantId?: string; variantName?: string;
-  sellingPrice?: number; costPrice?: number | null; stockQuantity: number; issues: string[];
+  sellingPrice?: number; costPrice?: number | null; stockQuantity: number; stockKnown?: boolean; issues: string[];
   unitShortfall: number | null; potentialLoss: number | null; flexible: boolean; minPrice?: number; lastChange: PriceChange | null;
 }
 export interface PriceHealth {
@@ -16,7 +16,7 @@ export interface PriceHealth {
   realised: { recordedLoss: number; estimatedLoss: number; unknownCostLines: number; belowCostSaleLines: number; products: { productId?: string; variantId?: string; name: string; variantName?: string; loss: number; quantity: number; estimated: boolean }[] };
   items: PriceIssue[]; pagination: { page: number; limit: number; total: number; pages: number }; notes: string;
 }
-export const ISSUE_LABELS: Record<string, string> = { zero_or_missing_price: 'Zero, negative or missing selling price', below_cost: 'Selling price below cost', minimum_below_cost: 'Allowed minimum below cost', cost_not_set: 'Purchase cost needs review', missing_variants: 'No variants configured' };
+export const ISSUE_LABELS: Record<string, string> = { zero_or_missing_price: 'Zero, negative or invalid selling price', below_cost: 'Selling price below cost', minimum_below_cost: 'Allowed minimum below cost', cost_not_set: 'Purchase cost needs review', missing_variants: 'No variants configured', invalid_stock_quantity: 'Stock quantity needs correction', invalid_price_range: 'Allowed price range is invalid' };
 export async function getPriceHealth(page = 1): Promise<PriceHealth> { return (await api.get('/products/price-health', { params: { page, limit: 20 } })).data.data; }
 export async function getPriceHistory(productId: string, page = 1): Promise<{ data: PriceChange[]; pagination: { page: number; pages: number; total: number } }> { return (await api.get(`/products/${encodeURIComponent(productId)}/price-history`, { params: { page } })).data; }
 

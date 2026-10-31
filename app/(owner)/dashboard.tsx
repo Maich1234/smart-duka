@@ -210,7 +210,7 @@ export default function OwnerDashboard() {
 
           {/* 5 · Is anything wrong? Whole zone unmounts when nothing is. */}
           <TrialBanner />
-        <PriceAlertCard />
+          <PriceAlertCard inset />
           <NeedsAttention items={attentionItems} />
 
           {/* 6 · Pulse check on the till */}
