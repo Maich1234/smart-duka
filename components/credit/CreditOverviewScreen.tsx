@@ -37,10 +37,10 @@ function StatFigure({
 }) {
   const content = (
     <View style={styles.figure}>
-      <Text style={[styles.figureValue, tone === 'danger' && styles.figureValueDanger]} numberOfLines={1}>
+      <Text style={[styles.figureValue, tone === 'danger' && styles.figureValueDanger]} >
         {value}
       </Text>
-      <Text style={styles.figureLabel} numberOfLines={1}>{label}</Text>
+      <Text style={styles.figureLabel} >{label}</Text>
     </View>
   );
   if (!onPress) return content;
@@ -61,9 +61,7 @@ function StatFigure({
  * The owner's Credit section: what the shop is owed, what's overdue, and the
  * list that's actually actionable.
  *
- * Four figures in one row rather than four cards — a shop owner checking this
- * on a phone between customers needs the numbers in one glance, not a
- * dashboard to scroll. The overdue list below it is the only content that
+ * A wrapping grid keeps the four figures readable on narrow phones. The overdue list below it is the only content that
  * earns space, because it's the only thing here with a next action attached.
  */
 export const CreditOverviewScreen: React.FC = () => {
@@ -80,7 +78,7 @@ export const CreditOverviewScreen: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Credit" showBack={false} />
+        <ScreenHeader title="Customer balances" fallbackHref="/(owner)/dashboard" />
         <ListSkeleton rows={6} heroHeight={92} />
       </View>
     );
@@ -89,7 +87,7 @@ export const CreditOverviewScreen: React.FC = () => {
   if (isError || !overview) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Credit" showBack={false} />
+        <ScreenHeader title="Customer balances" fallbackHref="/(owner)/dashboard" />
         <QueryError onRetry={refetch} />
       </View>
     );
@@ -98,7 +96,7 @@ export const CreditOverviewScreen: React.FC = () => {
   if (!overview.enabled) {
     return (
       <View style={styles.flex}>
-        <ScreenHeader title="Credit" showBack={false} />
+        <ScreenHeader title="Customer balances" fallbackHref="/(owner)/dashboard" />
         <EmptyState
           title="Customer credit is off"
           subtitle="Turn it on in Settings to let staff sell on account and track what customers owe."
@@ -115,8 +113,8 @@ export const CreditOverviewScreen: React.FC = () => {
   return (
     <View style={styles.flex}>
       <ScreenHeader
-        title="Credit"
-        showBack={false}
+        title="Customer balances"
+        fallbackHref="/(owner)/dashboard"
         right={
           <AnimatedPressable
             onPress={() => router.push('/(owner)/settings/credit' as never)}
@@ -134,26 +132,23 @@ export const CreditOverviewScreen: React.FC = () => {
       >
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)} style={styles.statsCard}>
           <StatFigure
-            label="Outstanding"
+            label="Total owed"
             value={formatCurrency(totals.totalOutstanding, currency)}
             onPress={() => router.push('/(owner)/customers?filter=outstanding' as never)}
           />
-          <View style={styles.figureDivider} />
           <StatFigure
-            label="Overdue"
+            label="Overdue amount"
             value={formatCurrency(totals.totalOverdue, currency)}
             tone={totals.totalOverdue > 0 ? 'danger' : undefined}
             onPress={() => router.push('/(owner)/customers?filter=overdue' as never)}
           />
-          <View style={styles.figureDivider} />
           <StatFigure
             label="Customers owing"
             value={String(totals.customersOwing)}
             onPress={() => router.push('/(owner)/customers?filter=outstanding' as never)}
           />
-          <View style={styles.figureDivider} />
           <StatFigure
-            label="Overdue"
+            label="Overdue customers"
             value={String(totals.customersOverdue)}
             tone={totals.customersOverdue > 0 ? 'danger' : undefined}
             onPress={() => router.push('/(owner)/customers?filter=overdue' as never)}
@@ -208,8 +203,8 @@ export const CreditOverviewScreen: React.FC = () => {
                   accessibilityLabel={`${c.name}, owes ${formatCurrency(c.outstanding, currency)}, ${c.daysOverdue} days overdue`}
                 >
                   <View style={styles.overdueInfo}>
-                    <Text style={styles.overdueName} numberOfLines={1}>{c.name}</Text>
-                    <Text style={styles.overdueMeta} numberOfLines={1}>
+                    <Text style={styles.overdueName} >{c.name}</Text>
+                    <Text style={styles.overdueMeta} >
                       Due {c.dueAt ? formatDate(c.dueAt) : '—'} · {c.daysOverdue} day{c.daysOverdue === 1 ? '' : 's'} overdue
                     </Text>
                   </View>
@@ -247,6 +242,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },
   statsCard: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
     backgroundColor: Colors.surface,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
@@ -264,11 +261,10 @@ const styles = StyleSheet.create({
   },
   figureValueDanger: { color: Colors.danger },
   figureLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.textSecondary,
     textAlign: 'center',
   },
-  figureDivider: { width: StyleSheet.hairlineWidth, backgroundColor: Colors.divider },
   customersLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -364,7 +360,7 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     fontVariant: ['tabular-nums'],
   },
-  figurePressable: { flex: 1 },
+  figurePressable: { flexGrow: 1, flexBasis: '45%', minWidth: 120, minHeight: 72 },
   moreLink: {
     flexDirection: 'row',
     alignItems: 'center',

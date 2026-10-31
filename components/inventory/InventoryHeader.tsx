@@ -32,7 +32,7 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
   recentSearches,
   onSelectRecent,
   onClearRecent,
-  title = 'Inventory',
+  title = 'Stock',
   showAddButton = true,
   productCount,
   alertCount = 0,
@@ -80,7 +80,7 @@ export const InventoryHeader: React.FC<InventoryHeaderProps> = ({
               accessibilityRole="button"
             >
               <Ionicons name="add" size={20} color={Colors.white} />
-              <Text style={styles.addButtonText}>Add</Text>
+              <Text style={styles.addButtonText}>Add product</Text>
             </AnimatedPressable>
           )}
         </View>
@@ -122,6 +122,8 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xs,
   },
   titleBlock: {
+    flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   title: {
@@ -176,6 +178,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
+    minHeight: 48,
     borderRadius: BorderRadius.md,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
