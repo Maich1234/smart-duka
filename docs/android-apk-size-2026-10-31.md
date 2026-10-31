@@ -1,0 +1,11 @@
+# Android APK size, 31 October 2026
+
+The preview profile previously built the four default ABIs with native and JavaScript compression disabled. R8 minification and resource shrinking were already enabled; source-upload size and node_modules size do not represent the APK's download size.
+
+The preview profile now supplies DUQANA_APK_TARGET=phones. Dynamic Expo configuration keeps armeabi-v7a and arm64-v8a for 32-bit and 64-bit ARM phones, omits x86 emulator libraries, and enables JavaScript bundle compression and compressed native library packaging. No runtime feature, permission, font, Firebase configuration or native module is removed. This profile does not target x86 Android emulators/devices; development retains default ABIs. An optional preview-arm64 profile is smaller still, but only installs on devices with a 64-bit ARM Android system. Do not select it merely because the phone's CPU supports 64-bit.
+
+These options are restricted to the APK profiles. Production App Bundles and iOS retain existing settings; Google Play can deliver architecture-specific downloads from an App Bundle. Compression reduces APK download size but can increase installed storage (native library extraction) and startup work (bundle decompression). A final size, startup performance and device compatibility measurement require the finished artifact and a physical-device run. The requested 50-60 MB is a target, not a measured result or guarantee.
+
+Independent verification evaluated the actual dynamic config for phones, arm64 and no target, preserving plugin count, existing minification/shrinking and iOS settings without mutating the source configuration. A disposable Expo Android prebuild with synthetic Firebase client configuration generated reactNativeArchitectures=armeabi-v7a,arm64-v8a, expo.useLegacyPackaging=true, android.enableMinifyInReleaseBuilds=true, android.enableShrinkResourcesInReleaseBuilds=true and android.enableBundleCompression=true. Source syntax and whitespace checks passed. No existing suite, dependency removal, production release or customer data write was used. Physical feature/startup testing remains pending.
+
+References: https://docs.expo.dev/versions/latest/sdk/build-properties/ and https://developer.android.com/build/configure-apk-splits.
