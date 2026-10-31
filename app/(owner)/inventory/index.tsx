@@ -348,7 +348,8 @@ export default function OwnerInventory() {
           // `entering` here would be a second animation on the same path —
           // which can leave those cards stuck at their start offset.
           <View>
-            <InventoryStatsRow stats={stats} /><PriceAlertCard />
+            <InventoryStatsRow stats={stats} />
+            <PriceAlertCard inset />
             {/* Intelligence banner — shows when depletion data is ready */}
             {depletion &&
               (depletion.fastMovers.length > 0 || depletion.stockoutSoon.length > 0) && (
