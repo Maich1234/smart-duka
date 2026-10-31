@@ -14,8 +14,17 @@
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
+      "env": {
+        "DUQANA_APK_TARGET": "phones"
+      },
       "android": {
         "buildType": "apk"
+      }
+    },
+    "preview-arm64": {
+      "extends": "preview",
+      "env": {
+        "DUQANA_APK_TARGET": "arm64"
       }
     },
     "production": {
