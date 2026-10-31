@@ -1,14 +1,12 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { ScreenFade } from '@/components/ui/motion';
-import { ListSkeleton } from '@/components/ui/ListSkeleton';
 import { useAuthStore, type AuthState } from '@/store/authStore';
 import { usePermission } from '@/utils/permissions';
 import { getStaffDashboard } from '@/services/dashboard';
@@ -16,6 +14,7 @@ import { getShopConfig } from '@/services/shop';
 import { useStaffAttention } from '@/hooks/useAttention';
 import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
 import { StaffLockBanner } from '@/components/subscription/StaffLockBanner';
+import type { HomeMenuGroup } from '@/components/dashboard/HomeMenu';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { TodayCard } from '@/components/dashboard/TodayCard';
 import { QuickActions, type QuickActionTile } from '@/components/dashboard/QuickActions';
@@ -143,26 +142,33 @@ export default function StaffDashboard() {
   const unreadCount = useUnreadNotificationsCount();
   // Stable reference so the 60s unread-count poll (see useUnreadNotificationsCount)
   // doesn't defeat DashboardHeader's React.memo on every tick.
-  const handleBellPress = useCallback(() => router.push('/(staff)/notifications'), []);
+  const menuGroups: HomeMenuGroup[] = [
+    { title: 'Your work', items: tiles },
+    { title: 'Account & equipment', items: [
+      { title: 'Profile & help', route: '/(staff)/profile', icon: 'person-outline' },
+      { title: 'Receipt printer', route: '/(staff)/printer', icon: 'print-outline' },
+    ] },
+  ];
 
-  if (isLoading) {
-    return <ListSkeleton rows={4} heroHeight={180} />;
-  }
+  const handleBellPress = useCallback(() => router.push('/(staff)/notifications'), []);
 
   const dashboard = data?.data;
 
-  // Only block on error when there's no cached day to show.
-  if (isError && !dashboard) {
+  if (isLoading || (isError && !dashboard)) {
     return (
-      <ScreenFade rise={0} style={styles.errorCenter}>
-        <Ionicons name="cloud-offline-outline" size={48} color={Colors.textTertiary} />
-        <Text style={styles.errorTitle}>Could not load dashboard</Text>
-        <Text style={styles.errorSub}>Check your connection and try again.</Text>
-        <AnimatedPressable onPress={() => refetch()} style={styles.retryBtn}>
-          <Ionicons name="refresh-outline" size={16} color={Colors.white} />
-          <Text style={styles.retryBtnText}>Retry</Text>
-        </AnimatedPressable>
-      </ScreenFade>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: tabBarHeight + Spacing.lg }}>
+        <DashboardHeader greeting={timeContext.greeting} shopName={user?.shop?.name ?? 'DuQana'}
+          formattedDate={timeContext.formattedDate} shopInitials={initials} unreadCount={unreadCount}
+          onBellPress={handleBellPress} profileRoute="/(staff)/profile" insetsTop={insets.top} menuGroups={menuGroups} />
+        {canRecordSaleForCustomers && <QuickActions primaryRoute="/(staff)/sales" tiles={[]} />}
+        <View style={{ padding: Spacing.md, gap: 12 }}>
+          <Text style={styles.errorTitle}>{isLoading ? 'Loading today’s figures' : 'Today’s figures are unavailable'}</Text>
+          <Text style={styles.errorSub}>You can still open your shop tools. Figures will appear when the connection recovers.</Text>
+          {!isLoading && <AnimatedPressable accessibilityRole="button" accessibilityLabel="Retry loading today’s figures" onPress={() => refetch()} style={styles.retryBtn}>
+            <Text style={styles.retryBtnText}>Retry loading figures</Text>
+          </AnimatedPressable>}
+        </View>
+      </ScrollView>
     );
   }
 
@@ -180,16 +186,19 @@ export default function StaffDashboard() {
         >
           <DashboardHeader
             greeting={timeContext.greeting}
-            shopName={user?.name ?? 'Staff'}
+            shopName={user?.shop?.name ?? 'DuQana'}
             formattedDate={timeContext.formattedDate}
             shopInitials={initials}
             unreadCount={unreadCount}
             onBellPress={handleBellPress}
             profileRoute="/(staff)/profile"
+            menuGroups={menuGroups}
             insetsTop={insets.top}
           />
 
           <StaffLockBanner />
+
+          {canRecordSaleForCustomers && <QuickActions primaryRoute="/(staff)/sales" tiles={[]} />}
 
           <TodayCard
             total={dashboard?.todaySalesTotal ?? 0}
@@ -199,7 +208,7 @@ export default function StaffDashboard() {
             yesterdayTotal={dashboard?.yesterdaySalesTotal}
           />
 
-          <QuickActions primaryRoute="/(staff)/sales" tiles={tiles} />
+          <QuickActions hidePrimary primaryRoute="/(staff)/sales" tiles={tiles.filter((tile) => !['refer', 'commission', 'reconciliation', 'quotations'].includes(tile.id)).slice(0, 3)} />
 
           <NeedsAttention items={attentionItems} />
 

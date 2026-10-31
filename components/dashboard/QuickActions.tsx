@@ -28,16 +28,17 @@ interface QuickActionsProps {
   primaryRoute: string;
   /** Up to three supporting actions, rendered as a compact tile row. */
   tiles: QuickActionTile[];
+  hidePrimary?: boolean;
 }
 
 /**
- * Actions ranked by real usage frequency: selling is the job, so New Sale is
+ * Primary and supporting actions: selling is the job, so New Sale is
  * a full-width primary button in easy thumb reach; everything else is a
  * lightweight tile. Flex-based layout — no Dimensions math — so it adapts to
  * any screen width, split screen, and foldables.
  */
 export const QuickActions: React.FC<QuickActionsProps> = React.memo(
-  ({ primaryTitle = 'New Sale', primaryIcon = 'cart', primaryRoute, tiles }) => {
+  ({ primaryTitle = 'New Sale', primaryIcon = 'cart', primaryRoute, tiles, hidePrimary = false }) => {
     const go = useCallback((route: string) => {
       haptics.light();
       router.push(route as never);
@@ -45,7 +46,7 @@ export const QuickActions: React.FC<QuickActionsProps> = React.memo(
 
     return (
       <View style={styles.section}>
-        <AnimatedPressable
+        {!hidePrimary && <AnimatedPressable
           onPress={() => go(primaryRoute)}
           style={styles.primaryWrapper}
           accessibilityRole="button"
@@ -63,7 +64,7 @@ export const QuickActions: React.FC<QuickActionsProps> = React.memo(
             <Text style={styles.primaryTitle}>{primaryTitle}</Text>
             <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.85)" />
           </LinearGradient>
-        </AnimatedPressable>
+        </AnimatedPressable>}
 
         {tiles.length > 0 && (
           <View style={styles.tileRow}>
@@ -78,7 +79,7 @@ export const QuickActions: React.FC<QuickActionsProps> = React.memo(
                 <View style={[styles.tileIconWrap, { backgroundColor: tile.tintBg }]}>
                   <Ionicons name={tile.icon} size={18} color={tile.tint} />
                 </View>
-                <Text style={styles.tileTitle} numberOfLines={1}>
+                <Text style={styles.tileTitle}>
                   {tile.title}
                 </Text>
               </AnimatedPressable>
@@ -128,10 +129,13 @@ const styles = StyleSheet.create({
   },
   tileRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   tile: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 90,
+    paddingHorizontal: 6,
     alignItems: 'center',
     gap: 8,
     backgroundColor: Colors.surface,
@@ -150,6 +154,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileTitle: {
+    textAlign: 'center',
     fontSize: Typography.size.caption,
     fontFamily: Typography.fontFamilySemiBold,
     color: Colors.textPrimary,
