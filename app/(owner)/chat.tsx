@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -101,7 +101,7 @@ export default function AiChatScreen() {
 
   const [historyVisible, setHistoryVisible] = useState(false);
 
-  const { data: history, isLoading: isLoadingLatest } = useConversationHistory(hasAiChat);
+  const { data: history, isLoading: isLoadingLatest, isError: historyError, refetch: refetchHistory } = useConversationHistory(hasAiChat);
 
   // Derived, not synced from an effect: with nothing explicitly selected (and
   // the user hasn't asked for a blank thread) the most recent conversation is
@@ -305,16 +305,14 @@ export default function AiChatScreen() {
         fallbackHref="/(owner)/dashboard"
         right={
           <>
-            {(history?.conversations.length ?? 0) > 0 && (
-              <AnimatedPressable
-                onPress={() => setHistoryVisible(true)}
-                style={s.headerBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Past conversations"
-              >
-                <Ionicons name="time-outline" size={22} color={Colors.textPrimary} />
-              </AnimatedPressable>
-            )}
+            <AnimatedPressable
+              onPress={() => { setHistoryVisible(true); refetchHistory(); }}
+              style={s.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Past conversations"
+            >
+              <Ionicons name="time-outline" size={22} color={Colors.textPrimary} />
+            </AnimatedPressable>
             <AnimatedPressable
               onPress={handleNewChat}
               style={s.headerBtn}
@@ -337,6 +335,7 @@ export default function AiChatScreen() {
         }
       />
 
+      {historyError && <AnimatedPressable onPress={() => { refetchHistory(); }} accessibilityRole="button" style={s.historyError}><Text style={s.historyErrorText}>Could not load past conversations. Tap to retry.</Text></AnimatedPressable>}
       {showThreadLoading ? (
         <LoadingState />
       ) : messages.length === 0 ? (
@@ -392,6 +391,8 @@ export default function AiChatScreen() {
 
 const s = StyleSheet.create({
   headerBtn: { padding: 4 },
+  historyError: { padding: Spacing.md, backgroundColor: '#FFF7ED' },
+  historyErrorText: { color: '#9A3412' },
   list: { flex: 1 },
   listContent: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
   emptyContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: Spacing.lg },
