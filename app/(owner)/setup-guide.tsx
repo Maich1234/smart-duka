@@ -18,6 +18,21 @@ import { Colors } from '@/constants/Colors';
  * /setup/status is the only endpoint that accepts it) rather than passing
  * the real session token into the page — see backend utils/webviewToken.js.
  */
+const GUIDE_ORIGIN = PUBLIC_WEB_URL === 'https://duqana.co.ke'
+  ? 'https://www.duqana.co.ke'
+  : PUBLIC_WEB_URL;
+
+const GUIDE_ROUTES = new Set([
+  '/(owner)/inventory/new',
+  '/(owner)/sales',
+  '/(owner)/payments',
+  '/(owner)/staff',
+]);
+
+function isGuideOrigin(url: string) {
+  return /^https:\/\/[^/?#]+/i.exec(url)?.[0] === GUIDE_ORIGIN;
+}
+
 export default function SetupGuideScreen() {
   const webViewRef = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -27,7 +42,7 @@ export default function SetupGuideScreen() {
     let cancelled = false;
     getWebviewToken()
       .then(({ token }) => {
-        if (!cancelled) setUri(`${PUBLIC_WEB_URL}/embed/setup-guide?token=${encodeURIComponent(token)}`);
+        if (!cancelled) setUri(`${GUIDE_ORIGIN}/embed/setup-guide#token=${encodeURIComponent(token)}`);
       })
       .catch(() => {
         if (!cancelled) router.back();
@@ -43,9 +58,10 @@ export default function SetupGuideScreen() {
   };
 
   const handleMessage = (event: WebViewMessageEvent) => {
+    if (event.nativeEvent.url.split(/[?#]/)[0] !== `${GUIDE_ORIGIN}/embed/setup-guide`) return;
     try {
       const message = JSON.parse(event.nativeEvent.data);
-      if (message?.type === 'navigate' && typeof message.route === 'string') {
+      if (message?.type === 'navigate' && GUIDE_ROUTES.has(message.route)) {
         router.replace(message.route as Parameters<typeof router.replace>[0]);
       }
     } catch {
@@ -61,11 +77,9 @@ export default function SetupGuideScreen() {
           ref={webViewRef}
           source={{ uri }}
           style={styles.flex}
-          // Confines navigation to our own web origin — the page carries a
-          // scoped auth token in its URL, so an off-domain redirect (a stray
-          // link on the guide page, a compromised ad, etc.) must not be able
-          // to load third-party content inside this authenticated WebView.
-          originWhitelist={[`${PUBLIC_WEB_URL}/*`]}
+          originWhitelist={['*']}
+          setSupportMultipleWindows={false}
+          onShouldStartLoadWithRequest={(request) => isGuideOrigin(request.url)}
           onNavigationStateChange={(nav: WebViewNavigation) => setCanGoBack(nav.canGoBack)}
           onMessage={handleMessage}
           startInLoadingState

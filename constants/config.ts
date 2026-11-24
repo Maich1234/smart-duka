@@ -5,7 +5,10 @@ import { Shadows } from './Shadows';
 
 export { Colors, Spacing, Typography, Shadows };
 
-export const API_BASE_URL = 'https://smart-duka-backend-iota.vercel.app/api/v1';
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+export const API_BASE_URL = (
+  configuredApiUrl || 'https://smart-duka-backend-iota.vercel.app/api/v1'
+).replace(/\/+$/, '');
 
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
 
@@ -48,7 +51,7 @@ export const HELP_CENTER_URL = WEB_URL;
  */
 const configuredAppUrl = process.env.EXPO_PUBLIC_APP_URL;
 export const PUBLIC_WEB_URL = (
-  configuredAppUrl && !isLocalUrl(configuredAppUrl) ? configuredAppUrl : 'https://app.duqana.co.ke'
+  configuredAppUrl && !isLocalUrl(configuredAppUrl) ? configuredAppUrl : 'https://duqana.co.ke'
 ).replace(/\/+$/, '');
 
 // Matches app.json's "scheme" — used to deep-link from the web verification
